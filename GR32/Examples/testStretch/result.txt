@@ -1,0 +1,13 @@
+Image(1600x1200)
+MMX=143ms
+Scanline=216ms
+PixelPtr=287ms
+new MMX/PiwelPtr=68ms
+Blur PixelPtr=305ms
+Blur MMX/PPtr=84ms
+Gaussian Blur=62ms
+Sharp PixelPtr=286ms
+Sharp MMX/PPtr=69ms
+Sharpness=48ms
+5x5 Blur=139ms
+5x5 Laplace=150ms
