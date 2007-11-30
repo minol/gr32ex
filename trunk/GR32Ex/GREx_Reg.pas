@@ -1,4 +1,4 @@
-unit GR32Ex_Reg;
+unit GREx_Reg;
 
 (* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1
