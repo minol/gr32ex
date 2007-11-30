@@ -16,12 +16,17 @@ How to set the transparent to the GRControls:
  2. GRControl.Color := clNone;
 
 Feature:
+ * General Sprites Engine
+ * General Animation Effects Engine(Water)
+ * General Particle Engine(Star, Snow)
+ * General Animation Transition effects
+ * Composed Background supports
  * Alpha Blending Controls:
- * TGRPanel with Alpha Blending, background and Advanced Font.
- * TGRLabel with Alpha Blending, Advanced Font.
- * TGRSpeedButton <just a start, maybe port the TBX instead>
- * TGRGroupBox  <just a start>
- * TGRCheckBox  <just a start>
+   * TGRPanel with Alpha Blending, background and Advanced Font.
+   * TGRLabel with Alpha Blending, Advanced Font.
+   * TGRSpeedButton <just a start, maybe port the TBX instead>
+   * TGRGroupBox  <just a start>
+   * TGRCheckBox  <just a start>
  * I need developers to help me port the standard controls to the GR32 Extension Component Framework.
 
 The Riceball's GR32 Extension Components Core Framework Feature:
@@ -47,8 +52,8 @@ The Riceball's GR32 Extension Components Core Framework Feature:
        * Alpha: the alpha blending value.
        * FileName: the wallpaper picture filename
        * Picture: TPicture
-     * TBackground Property: you can build very complex background here. 
-        it include two wallpaper properties and a Gradient property, they are alpha blending after you proper set.
+     * TBackground Property: you can build very complex composed background here. 
+        it include a wallpaper property, a texture and a Gradient property, they are alpha blending after you proper set.
        * Wallpaper: the first draw(if any)
        * Gradient: the second draw(if any)
        * Texture: the last draw(if any). Texture is also a wallpaper property.
@@ -94,6 +99,8 @@ Special thanks to:
 Note: 
 No Register function and Component Icon!
 I have to hack into GR32.pas to support my TFont32.
+you can apply the patch: gr32v183patch.txt(put Updater.exe and gr32v183Patch.upd to the graphics32 dir and run update.exe)
+
 here are my changes in GR32.pas:
 
 type
