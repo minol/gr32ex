@@ -99,6 +99,8 @@ Special thanks to:
 Note: 
 No Register function and Component Icon!
 I have to hack into GR32.pas to support my TFont32.
+hack into GR32_layers to support the MouseInControl , focused layer and keyboard event.
+
 you can apply the patch: gr32v183patch.txt(put Updater.exe and gr32v183Patch.upd to the graphics32 dir and run update.exe)
 
 here are my changes in GR32.pas:
