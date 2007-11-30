@@ -1,2 +1,12 @@
-For a list of contributors please have a look into the 
-Graphics32.chm file or the Graphics32 HTML documentation.
+GR_Interface:
+  Initial Developer: Roman Gudchenko(c)  mailto:roma@goodok.ru
+
+GR_Add_BlendModes:
+  Initial Developer: Michael Hansen
+
+GR_FilterEx:
+  Initial Developer: Riceball LEE
+  Vladimir Vasilyev <Vladimir@tometric.ru> http://www.gamedev.narod.ru
+  "Jens Weiermann" <wexmanAT@solidsoftwareDOT.de>
+  Patrick for his EnhanceDetail filter
+
