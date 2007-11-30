@@ -1,8 +1,8 @@
 GR_Interface:
-  Initial Developer: Roman Gudchenko(c)  mailto:roma@goodok.ru
+  Initial Developer: Roman Gudchenko(c)  (mailto:roma@goodok.ru)
 
 GR_Add_BlendModes:
-  Initial Developer: Michael Hansen
+  Initial Developer: Michael Hansen <dyster_tid AT hotmail.com>
 
 GR_FilterEx:
   Initial Developer: Riceball LEE
@@ -10,3 +10,21 @@ GR_FilterEx:
   "Jens Weiermann" <wexmanAT@solidsoftwareDOT.de>
   Patrick for his EnhanceDetail filter
 
+GR32_MathAddons: Single Arithmetic optimized functions.
+  Initial Developer: Marc LAFON
+  The Fast Code Project (http://www.fastcodeproject.org/)
+
+GR32_RasterizerEx:
+  Initial Developer: Marc LAFON
+
+GR32_PNG:
+  Initial Developer: Unkonwn
+
+
+Mike Lischke's G32Ex package:
+  GR32_ExtLayers.pas,GR32_Types, Res\*
+  Initial Developer: Mike Lischke (www.delphi-gems.com)
+
+PngImage package:
+  Gustavo Huffenbacher Daud <gubadaud@terra.com.br>
+  http://pngdelphi.sourceforge.net
