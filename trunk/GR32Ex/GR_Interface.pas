@@ -1,17 +1,10 @@
-{
- + RenderTextExW by riceball for Unicode
- + gRenderTextExW by riceball for Unicode
- + DrawGlyphW by riceball for Unicode
- + RenderFittedTextW by riceball for Unicode
-}
-unit G32_Interface;
+unit GR_Interface;
 {
   DEFINE rus = my native russian
   DEFINE eng = my poor english
 }
 
 {$I Setting.inc} // Graphic32 (www.g32.org) options
-{$I G32i.inc} // G32_Interface oprions
 
 //----------------------------------------------------------------------------------}
 //
@@ -57,6 +50,13 @@ unit G32_Interface;
  history
  -------
  version
+
+ version 0.18
+   + RenderTextExW by riceball for Unicode
+   + gRenderTextExW by riceball for Unicode
+   + DrawGlyphW by riceball for Unicode
+   + RenderFittedTextW by riceball for Unicode
+   * rename unit name to GR_Interface
 
  version 0.17
     1. new:  added gSpline_TangentNorm function:

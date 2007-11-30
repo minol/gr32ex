@@ -1,4 +1,4 @@
-unit GR32_Add_BlendModes;
+unit GR_Add_BlendModes;
 {
 
  This unit is distributed under same conditions as GR32.
