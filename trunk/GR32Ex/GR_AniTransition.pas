@@ -34,13 +34,8 @@ const
   cDefaultPlayTime = 400; //ms
 
 const
-
   { WARNINGS ! Do not translate this strings }
   SRandomSelection   = '[ RANDOM ] - Random selection';
-  //SBitmap            = '[ BITMAP ] - Bitmap Transition';
-  //SFade              = '[ FADE ] - ';
-  //SSlide             = '[ SLIDE ] - ';
-  //SManual            = '[ MANUAL ] - ';
 
 
 type

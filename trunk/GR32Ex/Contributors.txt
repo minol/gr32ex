@@ -17,9 +17,21 @@ GR32_MathAddons: Single Arithmetic optimized functions.
 GR32_RasterizerEx:
   Initial Developer: Marc LAFON
 
+GR32_TransformsEx:
+  Initial Developer: Marc LAFON
+
+GR32_TransformsWarp: Image warping / distortion
+  Initial Developer: Paul Bourke (http://astronomy.swin.edu.au/~pbourke/projection/imagewarp)
+
 GR32_PNG:
   Initial Developer: Unkonwn
 
+GR_Graphics:
+  Initial Developer: Riceball LEE
+  Kambiz R. Khojasteh(kambiz@delphiarea.com) for his gradient implementation.
+
+Other GR_*:
+  Initial Developer: Riceball LEE
 
 Mike Lischke's G32Ex package:
   GR32_ExtLayers.pas,GR32_Types, Res\*
