@@ -5,7 +5,7 @@ interface
 uses
   SysUtils, Windows, Classes, GR32, Graphics;
 
-procedure LoadBitmap32FromPNG(DestBitmap: TBitmap32; Filename: String; out AlphaChannelAvailable: Boolean); overload;
+procedure LoadBitmap32FromPNG(DestBitmap: TBitmap32; const Filename: String; out AlphaChannelAvailable: Boolean); overload;
 procedure LoadBitmap32FromPNG(DestBitmap: TBitmap32; SrcStream: TStream; out AlphaChannelAvailable: Boolean); overload;
 procedure SaveBitmap32ToPNG(SrcBitmap: TBitmap32; Filename: String; Paletted: Boolean; Transparent: Boolean = True; BackgroundColor: TColor = clWhite); overload;
 procedure SaveBitmap32ToPNG(SrcBitmap: TBitmap32; DestStream: TStream; Paletted: Boolean; Transparent: Boolean = True; BackgroundColor: TColor = clNone); overload;
@@ -76,7 +76,7 @@ begin
   end
 end;
 
-procedure LoadBitmap32FromPNG(DestBitmap: TBitmap32; Filename: String; out AlphaChannelAvailable: Boolean);
+procedure LoadBitmap32FromPNG(DestBitmap: TBitmap32; const Filename: String; out AlphaChannelAvailable: Boolean);
 var
   FileStream: TFileStream;
 begin
