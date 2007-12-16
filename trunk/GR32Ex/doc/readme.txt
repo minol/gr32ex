@@ -20,13 +20,13 @@ Feature:
  * General Animation Effects Engine(Water)
  * General Particle Engine(Star, Snow)
  * General Animation Transition effects
- * Composed Background supports
- * Alpha Blending Controls:
-   * TGRPanel with Alpha Blending, background and Advanced Font.
-   * TGRLabel with Alpha Blending, Advanced Font.
-   * TGRSpeedButton <just a start, maybe port the TBX instead>
-   * TGRGroupBox  <just a start>
-   * TGRCheckBox  <just a start>
+ * General GRControl Pack:
+   * Alpha Blending Controls:
+   * General Frame supports: Hot, Down, Normal state for frame
+   * Composed Background with Alpha Blending supports
+       * Wallpaper: the first draw(if any)
+       * Gradient: the second draw(if any)
+       * Texture: the last draw(if any). Texture is also a wallpaper property.
  * I need developers to help me port the standard controls to the GR32 Extension Component Framework.
 
 The Riceball's GR32 Extension Components Core Framework Feature:
