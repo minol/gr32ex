@@ -157,6 +157,8 @@ begin
   //Src.Bitmap[0].LoadFromFile(ExtractFilePath(Application.ExeName)+'image.jpg');
   Src.Bitmap[0].LoadFromFile(ExtractFilePath(Application.ExeName)+'zaka0.JPG');
   TLinearResampler.Create(src.Bitmap[0]);
+  //TDraftResampler.Create(src.Bitmap[0]);
+  //TNearestResampler.Create(src.Bitmap[0]);
   {    with TKernelResampler.Create(src.Bitmap[0]) as TKernelResampler do
         //Kernel := TSplineKernel.Create;
         Kernel := TMitchellKernel.Create;
