@@ -33,16 +33,10 @@ resourcestring
 const
   cDefaultPlayTime = 400; //ms
 
-const
-  { WARNINGS ! Do not translate this strings }
-  SRandomSelection   = '[ RANDOM ] - Random selection';
-
-
 type
 
   TGRTransitionProc = procedure;
   TGRCustomTransition = class;
-
 
 
   //TGRTransitionProcKind = (pkFade, pkSlide, pkManual);
@@ -74,11 +68,6 @@ type
   PGRTransitionRec = ^TGRTransitionRec;
   TGRTransitionRec = record
     Index: integer;
-    //MatrixWidth, MatrixHeight: integer;
-    //MatrixLen: integer;
-    //MatrixFade: PGRMatrixFade;
-    //CopyMatrixFade: PGRMatrixFade;
-    //MatrixSlide: PGRMatrixSlide;
     Animating, Drawing, Reserved: boolean;
     CurTime: single;
     Transition: TGRCustomTransition;
@@ -210,6 +199,10 @@ uses
 const
   cMaxTransitions = 200;
   cTimerInterval = 20;
+
+const
+  { WARNINGS ! Do not translate this strings }
+  SRandomSelection   = '[ RANDOM ] - Random selection';
 
 var
   FTimer: TSimpleTimer;
@@ -745,7 +738,6 @@ begin
 end;
 
 initialization
-  //SigFx := SigFx;
 
   TransitionTypeList := TStringList.Create;
   RegisterClass(TGRCustomTransition);
@@ -757,10 +749,6 @@ initialization
   FillChar(FCurrentTransitions, SizeOf(FCurrentTransitions), 0);
   FTransitionExecutor := TGRTransitionExecutor.Create;
   FTimer := TSimpleTimer.CreateEx(cTimerInterval, FTransitionExecutor.Execute);
-  //FTimer.OnTimer := FTransitionExecutor.Execute;
-  //FTimer.Interval := cTimerInterval;
-  //FTimer.Enabled := false;
-
 
 finalization
   FTimer.Free;
