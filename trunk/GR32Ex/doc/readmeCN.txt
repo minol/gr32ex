@@ -1,6 +1,85 @@
-The Riceball's GR32 Extension Controls Pack. Ver 0.1
+The Riceball's GR32 扩展开发控件包. Ver 0.1
 
 Writen by Riceball LEE(riceball@users.sourceforge.net)
+
+功能:
+ * 通用精灵动画引擎
+ * 通用动画特效引擎
+   * 水纹特效
+   * 通用粒子特效动画引擎
+     * 星空粒子特效
+     * 下雪粒子特效
+ * 支持半透明 GRControl 界面控件包:
+   * 控件半透明化:
+   * 界面控件定制图形化边框支持: 支持三态：Hot, Down, Normal
+   * 半透明的复合背景支持
+       * 墙纸 Wallpaper: 最先绘制（如果有的化）
+       * 渐变 Gradient:  其次绘制（如果有的化）
+       * 贴图 Texture:   最后绘制（如果有的化）
+
+在GR_AniGEffetcts单元中的 TGRAnimationEffects 类可以将动画绘制到 TCustomControl, TGraphicControl 和 TCustomForm，不过在标准GDI的控件上使用Repaint或Invalidate绘制，会有闪烁。
+另外它也可以绘制到 TCustomPaintBox32 上，在Image32上绘制不会引起闪烁。
+
+The Riceball's GR32 Extension 可视控件核心框架功能:
+ * 所有的GR可视控件都是从TGRCustomControl或TGRGraphicControl)派生的。 TGRCustomControl是有Window 句柄的WinControl。
+ * 控件半透明化:
+ * 半透明的复合背景支持
+ * 高级字体支持
+   * 贴图字体
+   * 轮廓字体
+   * 字体阴影
+   * 抗锯齿
+   * 半透明
+ * 许多有用辅助类：
+   * TCustomGraphicProperty(GR32_GraphUtils): you can add the perfect properties to your components too.
+    * GR32_Graphics Properties:
+     * TGradient 渐变属性类: (original writen by Kambiz R. Khojasteh(kambiz@delphiarea.com))
+       It is an extremely fast gradient fill control with 
+       a large set of styles. As built-in, TGradient can 
+       draw gradient in 23 styles and provides an easily 
+       method to define custom styles. In addition, this 
+       control can shift and/or rotate the gradient colors, 
+       which could be used for creating animated gradients.
+       * AlphaBegin (new by riceball)
+       * AlphaEnd (new by riceball)
+       * AlphaChannel: Boolean. whether treat the gradient as a alpha channel graph. (new by riceball)
+     * TWallpaper 墙纸属性类
+       * Style: wlpsCenter, wlpsTile, wlpsStretch
+       * Alpha: the alpha blending value.
+       * FileName: the wallpaper picture filename
+       * Picture: TPicture
+     * TBackground 背景属性类: you can build very complex composed background here. 
+        it include a wallpaper property, a texture and a Gradient property, they are alpha blending after you proper set.
+       * Wallpaper: the first draw(if any)
+       * Gradient: the second draw(if any)
+       * Texture: the last draw(if any). Texture is also a wallpaper property.
+       * Buffered: whether cache the result.
+     * TFont32 高级字体属性类: it supports Outline font, textured font or 3D Font with shadow. of cause it supports the antialiasing and transparency.
+       * 阴影效果 Shadow: TShadowEffect: the font shadow
+       * 抗锯齿质量 Quality: TFontQuality: antialiasing quality.
+       * 轮廓 Outline: Boolean: whether the text is outline only.
+       * 透明度Opacity: Byte: the alpha blending value.
+       * 行间距 LineSpacing: integer: Specifies the spacing between Lines.
+       * 字符间距 CharSpacing: integer: Specifies the spacing between characters. <Note: Not used yet>
+       * 背景图 Background: TBackground: The Font background Texture if any.
+       * fucntion TextExtent and TextExtentW
+       * fucntion RenderText and RenderTextW
+       * function DrawText: simulate the winapi. the following aFormat Options are supported: 
+           DT_CALCRECT, DT_TOP, DT_VCENTER, DT_BOTTOM, DT_LEFT, DT_CENTER, DT_RIGHT, DT_WORDBREAK, DT_NOPREFIX, DT_EXPANDTABS
+   * TCustomEffectProperty
+     * TShadowEffect
+       * Opacity: Byte: the alpha blending value.
+       * OffsetX: Integer: the shadow X offset
+       * OffsetY: Integer: the shadow Y offset
+       * Enabled: Bool
+       * Color: TColor
+       * Blur: Byte: the shadow blur.
+   * TBitmap32Ex: derived from TBitmap32, use the Font32.
+ * GR32_FilterEx: provide many 3X3 , 5X5 and 7x7 filters and add new standard filters easy and other useful proc.
+   * ApplyTransparentColor: set the specified color as Transparent.
+   * ApplyBlueChannelToAlpha: set the BlueChannel value as alpha channel value.
+   * ApplyBWImage: covnert a color image to two-color(black, white) image.
+   * ...
 
 the TGRCustomControl and TGRGraphicControl Ver 0.1 Buffer Mechanism:
 
@@ -15,79 +94,8 @@ How to set the transparent to the GRControls:
  1. GRControl.Transparent := true;
  2. GRControl.Color := clNone;
 
-Feature:
- * General Sprites Engine
- * General Animation Effects Engine(Water)
-   the TGRAnimationEffects(GR_AniGEffetcts) impl stdcontrol performance is very pool: invalidate the whole background every-time is not clever .
-     and this make the speed slow down.
-   the TGRAnimationEffects paint to the TImage32 is well.
- * General Particle Engine(Star, Snow)
- * General GRControl Pack:
-   * Alpha Blending Controls:
-   * General Frame supports: Hot, Down, Normal state for frame
-   * Composed Background with Alpha Blending supports
-       * Wallpaper: the first draw(if any)
-       * Gradient: the second draw(if any)
-       * Texture: the last draw(if any). Texture is also a wallpaper property.
- * I need developers to help me port the standard controls to the GR32 Extension Component Framework.
 
-The Riceball's GR32 Extension Components Core Framework Feature:
- * the controls(derived from TGRCustomControl or TGRGraphicControl) can support the alpha blending. All GRControl should be derived from.
- * the controls(derived from TGRBGCustomControl or TGRBGGraphicControl) can support the very complex background.
- * the controls(derived from TGRCustomControl or TGRGraphicControl) can supports the Advanced Font which supports Outline font, 
-    textured font or 3D Font with shadow. of cause it supports the antialiasing and transparency.
- * Many Useful Helper Classes
-   * TCustomGraphicProperty(GR32_GraphUtils): you can add the perfect properties to your components too.
-    * GR32_Graphics Properties:
-     * TGradient Property: (original writen by Kambiz R. Khojasteh(kambiz@delphiarea.com))
-       It is an extremely fast gradient fill control with 
-       a large set of styles. As built-in, TGradient can 
-       draw gradient in 23 styles and provides an easily 
-       method to define custom styles. In addition, this 
-       control can shift and/or rotate the gradient colors, 
-       which could be used for creating animated gradients.
-       * AlphaBegin (new by riceball)
-       * AlphaEnd (new by riceball)
-       * AlphaChannel: Boolean. whether treat the gradient as a alpha channel graph. (new by riceball)
-     * TWallpaper Property
-       * Style: wlpsCenter, wlpsTile, wlpsStretch
-       * Alpha: the alpha blending value.
-       * FileName: the wallpaper picture filename
-       * Picture: TPicture
-     * TBackground Property: you can build very complex composed background here. 
-        it include a wallpaper property, a texture and a Gradient property, they are alpha blending after you proper set.
-       * Wallpaper: the first draw(if any)
-       * Gradient: the second draw(if any)
-       * Texture: the last draw(if any). Texture is also a wallpaper property.
-       * Buffered: whether cache the result.
-     * TFont32 Property: it supports Outline font, textured font or 3D Font with shadow. of cause it supports the antialiasing and transparency.
-       * Shadow: TShadowEffect: the font shadow
-       * Quality: TFontQuality: antialiasing quality.
-       * Outline: Boolean: whether the text is outline only.
-       * Opacity: Byte: the alpha blending value.
-       * LineSpacing: integer: Specifies the spacing between Lines.
-       * CharSpacing: integer: Specifies the spacing between characters. <Note: Not used yet>
-       * Background: TBackground: The Font background Texture if any.
-       * fucntion TextExtent and TextExtentW
-       * fucntion RenderText and RenderTextW
-       * function DrawText: simulate the winapi. the following aFormat Options are supported: 
-           DT_CALCRECT, DT_TOP, DT_VCENTER, DT_BOTTOM, DT_LEFT, DT_CENTER, DT_RIGHT, DT_WORDBREAK, DT_NOPREFIX, DT_EXPANDTABS
-   * TCustomEffectProperty
-     * TShadowEffect
-       * Opacity: Byte: the alpha blending value.
-       * OffsetX: Integer: the shadow X offset
-       * OffsetY: Integer: the shadow Y offset
-       * Enabled: Bool
-       * Color: TColor
-       * Blur: Byte: the shadow blur.
-   * TBitmap32Ex: derived from TBitmap32, use the Font32.
- * GR32_FilterEx: provide many 3X3 and 5X5 filters and add new standard filters easy and other useful proc.
-   * ApplyTransparentColor: set the specified color as Transparent.
-   * ApplyBlueChannelToAlpha: set the BlueChannel value as alpha channel value.
-   * ApplyBWImage: covnert a color image to two-color(black, white) image.
-   * ...
-
-Special thanks to:
+特别感谢:
   GR32 Team(http://sourceforge.net/projects/graphics32) for their great GR32 Pack. No Them No this!
   Roman Gudchenko(c)  mailto:roma@goodok.ru for the G32_Interface.pas
   sharman1@uswest.net for the G32_WConvolution.pas
@@ -95,7 +103,7 @@ Special thanks to:
   Jens Weiermann <wexmanAT@solidsoftwareDOT.de>
   Vladimir Vasilyev <Vladimir@tometric.ru>
   Patrick
-  JinYu Zhou (zjy@cnpack.org)
+  周劲羽 (zjy@cnpack.org)
   Others I missed.
 
 
