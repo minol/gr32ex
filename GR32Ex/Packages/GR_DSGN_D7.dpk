@@ -33,6 +33,6 @@ requires
   GR_D7;
 
 contains
-  GR_ExReg in '..\GR_ExReg.pas';
+  GR_Reg in '..\GR_Reg.pas';
 
 end.
