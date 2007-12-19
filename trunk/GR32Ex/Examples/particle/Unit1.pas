@@ -123,8 +123,8 @@ begin
     end;
   
     Enabled := True;
-    MaxParticles := 250;
-    NumOfParticles := 150;
+    MaxParticles := 500;
+    NumOfParticles := 500;
   end;
 
   FEffEngine.Control := Image;
