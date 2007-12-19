@@ -30,6 +30,9 @@ GR_Graphics:
   Initial Developer: Riceball LEE
   Kambiz R. Khojasteh(kambiz@delphiarea.com) for his gradient implementation.
 
+uWaterEffect.pas
+  Initial Developer: JinYu Zhou (zjy@cnpack.org)
+
 Other GR_*:
   Initial Developer: Riceball LEE
 

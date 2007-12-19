@@ -1,4 +1,4 @@
-The Riceball's GR32 扩展开发控件包. Ver 0.1
+The GR32 扩展开发控件包. Ver 0.1
 
 Writen by Riceball LEE(riceball@users.sourceforge.net)
 
@@ -20,7 +20,7 @@ Writen by Riceball LEE(riceball@users.sourceforge.net)
 在GR_AniGEffetcts单元中的 TGRAnimationEffects 类可以将动画绘制到 TCustomControl, TGraphicControl 和 TCustomForm，不过在标准GDI的控件上使用Repaint或Invalidate绘制，会有闪烁。
 另外它也可以绘制到 TCustomPaintBox32 上，在Image32上绘制不会引起闪烁。
 
-The Riceball's GR32 Extension 可视控件核心框架功能:
+The GR32 Extension 可视控件核心框架功能:
  * 所有的GR可视控件都是从TGRCustomControl或TGRGraphicControl)派生的。 TGRCustomControl是有Window 句柄的WinControl。
  * 控件半透明化:
  * 半透明的复合背景支持

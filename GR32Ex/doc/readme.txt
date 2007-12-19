@@ -1,4 +1,4 @@
-The Riceball's GR32 Extension Controls Pack. Ver 0.1
+The GR32 Extension Controls Pack. Ver 0.1
 
 Writen by Riceball LEE(riceball@users.sourceforge.net)
 
@@ -31,7 +31,7 @@ Feature:
        * Texture: the last draw(if any). Texture is also a wallpaper property.
  * I need developers to help me port the standard controls to the GR32 Extension Component Framework.
 
-The Riceball's GR32 Extension Components Core Framework Feature:
+The GR32 Extension Components Core Framework Feature:
  * the controls(derived from TGRCustomControl or TGRGraphicControl) can support the alpha blending. All GRControl should be derived from.
  * the controls(derived from TGRBGCustomControl or TGRBGGraphicControl) can support the very complex background.
  * the controls(derived from TGRCustomControl or TGRGraphicControl) can supports the Advanced Font which supports Outline font, 
