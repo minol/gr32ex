@@ -7,8 +7,9 @@ uses
   ExtCtrls;
 
 type
-  TPNGButtonStyle = (pbsDefault, pbsFlat);
-  TPNGButtonLayout = (pbsImageAbove, pbsImageBellow);
+  TPNGButtonStyle = (pbsDefault, pbsFlat, pbsNoFrame);
+  TPNGButtonLayout = (pbsImageAbove, pbsImageBellow, pbsImageLeft,
+    pbsImageRight);
   TPNGButtonState = (pbsNormal, pbsDown, pbsDisabled);
 
   TPNGButton = class(TGraphicControl)
@@ -23,6 +24,7 @@ type
     fImageNormal: TPNGObject;
     fImageDisabled: TPNGObject;
     fImageOver: TPNGObject;
+    fOnMouseEnter, fOnMouseExit: TNotifyEvent;
     {Procedures for setting the property values}
     procedure SetButtonStyle(const Value: TPNGButtonStyle);
     procedure SetCaption(const Value: String);
@@ -43,12 +45,16 @@ type
     property ButtonStyle: TPNGButtonStyle read fButtonStyle
       write SetButtonStyle;
     property Enabled;
+    property ParentShowHint;
+    property ShowHint;
     {Default events}
     property OnMouseDown;
     property OnClick;
     property OnMouseUp;
     property OnMouseMove;
     property OnDblClick;
+    property OnMouseEnter: TNotifyEvent read fOnMouseEnter write fOnMouseEnter;
+    property OnMouseExit:  TNotifyEvent read fOnMouseExit  write fOnMouseExit;
   public
     {Public properties}
     property ButtonState: TPNGButtonState read FButtonState write SetButtonState;
@@ -138,6 +144,12 @@ begin
   if Enabled then ButtonState := pbsNormal else ButtonState := pbsDisabled
 end;
 
+{Returns the largest number}
+function Max(A, B: Integer): Integer;
+begin
+  if A > B then Result := A else Result := B
+end;
+
 {Button being painted}
 procedure TPNGButton.Paint;
 const
@@ -173,11 +185,13 @@ begin
   begin
     TextSize := Canvas.TextExtent(Caption);
     ImageSize.cy := ImageSize.Cy + 4;
-  end;
+  end else FillChar(TextSize, SizeOf(TextSize), #0);
 
   {Set the elements position}
   ImagePos.X := (Width - ImageSize.cx) div 2 + Slide[Pushed];
   TextPos.X := (Width - TextSize.cx) div 2 + Slide[Pushed];
+  TextPos.Y := (Height - TextSize.cy) div 2;
+  ImagePos.Y := (Height - ImageSize.cy) div 2;
   case ButtonLayout of
     pbsImageAbove: begin
       ImagePos.Y := (Height - ImageSize.cy - TextSize.cy) div 2;
@@ -186,6 +200,14 @@ begin
     pbsImageBellow: begin
       TextPos.Y := (Height - ImageSize.cy - TextSize.cy) div 2;
       ImagePos.Y := TextPos.Y + TextSize.cy;
+      end;
+    pbsImageLeft: begin
+      ImagePos.X := (Width - ImageSize.cx - TextSize.cx) div 2;
+      TextPos.X := ImagePos.X + ImageSize.cx + 5;
+      end;
+    pbsImageRight: begin
+      TextPos.X := (Width - ImageSize.cx - TextSize.cx) div 2;;
+      ImagePos.X := TextPos.X + TextSize.cx + 5;
     end
   end;
   ImagePos.Y := ImagePos.Y + Slide[Pushed];
@@ -200,7 +222,7 @@ begin
       else if IsMouseOver or (ButtonState = pbsDown) then
         Frame3D(Canvas, Area, clBtnHighlight, clBtnShadow, 1)
   end
-  else
+  else if ButtonStyle = pbsDefault then
     DrawButtonFace(Canvas, Area, 1, bsNew, TRUE, Pushed, FALSE);
 
   {Draws the elements}
@@ -307,16 +329,25 @@ end;
 {Mouse is now over the control}
 procedure TPNGButton.CMMouseEnter(var Message: TMessage);
 begin
-  fMouseOverControl := True;
-  Repaint
+  if Enabled then
+  begin
+    if Assigned(fOnMouseEnter) then fOnMouseEnter(Self);
+    fMouseOverControl := True;
+    Repaint
+  end
 end;
 
 {Mouse has left the control}
 procedure TPNGButton.CMMouseLeave(var Message: TMessage);
 begin
-  fMouseOverControl := False;
-  Repaint
+  if Enabled then
+  begin
+    if Assigned(fOnMouseExit) then FOnMouseExit(Self);
+    fMouseOverControl := False;
+    Repaint
+  end
 end;
+
 
 
 end.
