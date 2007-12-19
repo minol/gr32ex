@@ -1,6 +1,7 @@
 { Description
 the Genernal Animation Effects Engine.
-Supports the TCustomControl, TGraphicControl and TCustomForm
+Supports the TCustomPaintBox32, TCustomControl, TGraphicControl and TCustomForm
+  Note: it will flick on the TCustomControl, TGraphicControl and TCustomForm.
 }
 unit GR_AniGEffetcts;
 
@@ -18,6 +19,7 @@ uses
   , Forms
   //, Dialogs
   , GR32
+  , GR32_Image
   , GR_AniEffects
   , SimpleTimer
   ;  
@@ -25,7 +27,7 @@ uses
 type
   TGRAnimationEffects = class(TGRCustomAnimationEffects)
   private
-    FBuffer: TBitmap32;
+    FBuffer: TBitmap32; //for the Bitmap32 only
   protected
     FTimer: TSimpleTimer;
     FWinStyle: LongInt;
@@ -40,7 +42,6 @@ type
     destructor Destroy; override;
   end;
   
-
 implementation
 
 type
@@ -56,24 +57,21 @@ end;
 
 destructor TGRAnimationEffects.Destroy;
 begin
-  //FreeAndNil(FBuffer);
+  FreeAndNil(FBuffer);
   inherited Destroy;
 end;
 
 procedure TGRAnimationEffects.DoControlResize(Sender: TObject);
-var
-  DC: HDC;
 begin
-  {FDrawing := True;
-  with TControl(Sender) do
+	if Sender is TCustomPaintBox32 then
+  with TCustomPaintBox32(Sender) do
   try
-    DC := GetControlDC(FControl);
-    if DC <> 0 then
-    begin
-      FBuffer.SetSize(Width, Height);
-      Repaint;
-      BitBlt(FBuffer.Handle, 0, 0, FBuffer.Width, FBuffer.Height, DC, 0, 0, SRCCOPY);
-    end;
+    FDrawing := True;
+    if not Assigned(FBuffer) then FBuffer := TBitmap32.Create;
+    //Resize;
+    //Repaint;
+    //FBuffer.Assign(Buffer);
+    FBuffer.Delete;
   finally
     FDrawing := False;
   end;
@@ -91,17 +89,20 @@ begin
   {$endif}
   
   if DC <> 0 then
-  begin
+  try
   //FControl.Invalidate;
   //FControl.Update;
   //FControl.Refresh;
-    //if not FBuffer.Empty then
+   //if not FBuffer.Empty then
       //BitBlt(DC, 0, 0, FBuffer.Width, FBuffer.Height, FBuffer.Handle, 0, 0, SRCCOPY);
   
+    //FillRect(DC, FControl.ClientRect, $FFFFFFFF);
     DoControlPaint(FControl, DC);
     {$ifdef Debug}
     //TCustomControlAccess(FControl).Canvas.TextOut(0,0,'dddffdf');
     {$endif}
+  finally
+    //ReleaseDC(DC);
   end;
   
   
@@ -109,8 +110,8 @@ begin
 end;
 
 procedure TGRAnimationEffects.DoWMPaint(var Message: TWMPaint);
-var
-  DC: HDC;
+//var
+  //DC: HDC;
 begin
   {
   DC := GetControlDC(FControl);
@@ -123,7 +124,7 @@ begin
   
   
   //}
-  DoPaint;
+  //DoPaint;
 end;
 
 function TGRAnimationEffects.GetControlDC(aControl: TControl): HDC;
@@ -155,6 +156,7 @@ begin
   end
   else begin
     FreeAndNil(FTimer);
+    FreeAndNil(FBuffer);
     if (Value is TWinControl) then
     begin
       SetWindowLong(TWinControl(Value).Handle, GWl_Style, FWinStyle);
@@ -163,7 +165,9 @@ begin
   end;
   inherited HookControl(Value, Hooked);
   if Hooked then
+  begin
     FTimer.Enabled := True;
+  end;
 end;
 
 procedure TGRAnimationEffects.InternalDoTimer;
@@ -171,10 +175,28 @@ begin
   //InvalidateRect(TCustomControl(FControl).Handle, nil, false);
   //FControl.Update;
   
-  FControl.Invalidate;
-  FControl.Update;
+  //FControl.Invalidate;
+  //FControl.Update;
+  //FControl.Repaint;
   inherited InternalDoTimer;
-  DoPaint;
+  if FDrawing then exit;
+  if FControl is TCustomPaintBox32 then with FControl as TCustomPaintBox32 do
+  begin
+  	if not Assigned(FBuffer) or FBuffer.Empty then 
+  	begin
+  	  if not Assigned(FBuffer) then FBuffer := TBitmap32.Create;
+  	  FBuffer.Assign(Buffer);
+  	end
+  	else
+  	  Buffer.Assign(FBuffer);
+  	DoControlPaint(Buffer);
+  	Flush;
+ 	end
+ 	else
+ 	begin
+    FControl.Repaint;
+    DoPaint;
+  end;
 end;
 
 

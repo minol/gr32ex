@@ -9,6 +9,12 @@ uses
      , uWaterEffect
      ;
 
+const
+  csDefRandomDelay = 800;
+  csDefRandomBlob = 500;
+  csDefTrackBlob = 100;
+  csDefClickBlob = 250;
+
 type
   { Summary the water ripple animation effect. }
   TGRWaterAnimationEffect = class(TGRCustomAnimationEffect)
@@ -25,7 +31,8 @@ type
     procedure DoMouseDown(Button: TMouseButton; Shift: TShiftState; X, Y:
       Integer); override;
     procedure DoMouseMove(Shift: TShiftState; X, Y: Integer); override;
-    procedure DoPaint(Sender: TControl; DC: HDC); override;
+    procedure DoPaint(Sender: TControl; DC: HDC); overload;override;
+    procedure DoPaint(Sender: TBitmap32);overload; override;
     procedure DoResize(Sender: TControl); override;
     procedure DoTimer(MoveCount: TFloat); override;
     procedure SizeChanged(Sender: TControl); override;
@@ -114,6 +121,14 @@ begin
     else
       Blob(X-Left, Y-Top, 1, FTrackBlob);
   end;
+end;
+
+procedure TGRWaterAnimationEffect.DoPaint(Sender: TBitmap32);
+begin
+  BitBlt(FBmpSrc.Canvas.Handle, 0, 0, FBmpSrc.Width, FBmpSrc.Height, Sender.Handle, FLeft, FTop, SRCCOPY);
+  
+  FWater.Render(FBmpSrc, FBmpSrc);
+  BitBlt(Sender.Handle, FLeft, FTop, FBmpSrc.Width, FBmpSrc.Height, FBmpSrc.Canvas.Handle, 0, 0, SRCCOPY);
 end;
 
 procedure TGRWaterAnimationEffect.DoPaint(Sender: TControl; DC: HDC);
