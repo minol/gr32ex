@@ -21,7 +21,7 @@ uses
   , GR_GraphUtils
   , GR_StdCtrls
   , GR_Edits
-  , psvShine
+  //, psvShine
 {$IFDEF GR_FORM}
   , GR_Forms
 {$ENDIF}
@@ -40,7 +40,7 @@ type
     Label1: TGRLabel;
     gbMain: TGRGroupBox;
     Btn1: TGRButton;
-    Shine1: TpsvShine;
+    //Shine1: TpsvShine;
     StyleCtrl: TGRStyleController;
     Edit1: TGREdit;
     procedure DoClick(Sender: TObject);
