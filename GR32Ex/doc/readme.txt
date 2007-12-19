@@ -18,10 +18,10 @@ How to set the transparent to the GRControls:
 Feature:
  * General Sprites Engine
  * General Animation Effects Engine(Water)
-   the TGRAnimationEffects(GR_AniGEffetcts) impl performance is very pool: repaint the whole background every-time is not clever .
+   the TGRAnimationEffects(GR_AniGEffetcts) impl stdcontrol performance is very pool: invalidate the whole background every-time is not clever .
      and this make the speed slow down.
+   the TGRAnimationEffects paint to the TImage32 is well.
  * General Particle Engine(Star, Snow)
- * General Animation Transition effects
  * General GRControl Pack:
    * Alpha Blending Controls:
    * General Frame supports: Hot, Down, Normal state for frame
