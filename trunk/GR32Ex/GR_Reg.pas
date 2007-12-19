@@ -1,4 +1,4 @@
-unit GREx_Reg;
+unit GR_Reg;
 
 (* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1
