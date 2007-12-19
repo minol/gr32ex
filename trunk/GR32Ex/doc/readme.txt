@@ -2,26 +2,13 @@ The GR32 Extension Controls Pack. Ver 0.1
 
 Writen by Riceball LEE(riceball@users.sourceforge.net)
 
-the TGRCustomControl and TGRGraphicControl Ver 0.1 Buffer Mechanism:
-
-1. All things paint to FBuffer (include the parent background if need) 
-   repaint the FBuffer when the FBufferDirty is true.
-  related methods: PaintBuffer, PaintParentBackground
-2. paint itself to the FSelfBuffer if FSelfBufferDirty is true:
-  PaintSelfToBuffer:
-  PaintSelfTo(aBuffer): if FSelfBuffer not dirty then paint the FSelfBuffer to aBuffer
-
-How to set the transparent to the GRControls:
- 1. GRControl.Transparent := true;
- 2. GRControl.Color := clNone;
-
 Feature:
  * General Sprites Engine
- * General Animation Effects Engine(Water)
-   the TGRAnimationEffects(GR_AniGEffetcts) impl stdcontrol performance is very pool: invalidate the whole background every-time is not clever .
-     and this make the speed slow down.
-   the TGRAnimationEffects paint to the TImage32 is well.
- * General Particle Engine(Star, Snow)
+ * General Animation Effects Engine
+   * Water Animation Effects
+   * General Particle Engine
+     * Star Particle Animation Effects
+     * Snow Particle Animation Effects
  * General GRControl Pack:
    * Alpha Blending Controls:
    * General Frame supports: Hot, Down, Normal state for frame
@@ -87,7 +74,24 @@ The GR32 Extension Components Core Framework Feature:
    * ApplyBWImage: covnert a color image to two-color(black, white) image.
    * ...
 
-Special thanks to:
+the TGRCustomControl and TGRGraphicControl Ver 0.1 Buffer Mechanism:
+
+1. All things paint to FBuffer (include the parent background if need) 
+   repaint the FBuffer when the FBufferDirty is true.
+  related methods: PaintBuffer, PaintParentBackground
+2. paint itself to the FSelfBuffer if FSelfBufferDirty is true:
+  PaintSelfToBuffer:
+  PaintSelfTo(aBuffer): if FSelfBuffer not dirty then paint the FSelfBuffer to aBuffer
+
+How to set the transparent to the GRControls:
+ 1. GRControl.Transparent := true;
+ 2. GRControl.Color := clNone;
+
+Note:the TGRAnimationEffects(GR_AniGEffetcts) impl stdcontrol performance is very pool: invalidate the whole background every-time is not clever .
+     and this make the speed slow down.
+     the TGRAnimationEffects paint to the TImage32 is well.
+
+thanks to:
   GR32 Team(http://sourceforge.net/projects/graphics32) for their great GR32 Pack. No Them No this!
   Roman Gudchenko(c)  mailto:roma@goodok.ru for the G32_Interface.pas
   sharman1@uswest.net for the G32_WConvolution.pas
