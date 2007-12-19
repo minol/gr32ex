@@ -27,7 +27,7 @@ interface
 
 uses
   {$ifdef Debug}
-  DbugIntf,
+  //DbugIntf,
   {$endif} 
      Windows, Messages, Classes, Graphics
      //, Forms // Application
@@ -35,12 +35,6 @@ uses
      , Controls
      , GR32
      ;
-
-const
-  csDefRandomDelay = 800;
-  csDefRandomBlob = 500;
-  csDefTrackBlob = 100;
-  csDefClickBlob = 250;
 
 type
   TGRCustomAnimationEffect = class;
@@ -72,7 +66,8 @@ type
     FUpdating: Boolean;
     FWinStyle: LongInt;
     procedure AppIdle(Sender: TObject; var Done: Boolean);
-    procedure DoControlPaint(Sender: TControl; DC: HDC); virtual;
+    procedure DoControlPaint(Sender: TControl; DC: HDC); overload; virtual;
+    procedure DoControlPaint(Sender: TBitmap32); overload;virtual;
     procedure DoControlResize(Sender: TObject); virtual;
     procedure DoControlWndProc(var Message: TMessage); virtual;
     procedure DoMouseDown(var Message: TWMMouse; Button: TMouseButton);
@@ -120,7 +115,8 @@ type
     procedure DoMouseMove(Shift: TShiftState; X, Y: Integer); virtual;
     procedure DoMouseUp(Button: TMouseButton; Shift: TShiftState; X, Y:
       Integer); virtual;
-    procedure DoPaint(Sender: TControl; DC: HDC); virtual; abstract;
+    procedure DoPaint(Sender: TControl; DC: HDC); overload;virtual; abstract;
+    procedure DoPaint(Sender: TBitmap32); overload;virtual; abstract;
     { Summary the Owner.FControl size changed. }
     procedure DoResize(Sender: TControl); virtual;
     procedure DoTimer(MoveCount: TFloat); virtual;
@@ -196,6 +192,57 @@ begin
   if FEnabled then
     DoTimer(Sender);
 end;
+
+procedure TGRCustomAnimationEffects.DoControlPaint(Sender: TBitmap32);
+var
+  LItem: TGRCustomAnimationEffect;
+  i: Integer;
+  s: string;
+begin
+  {$ifdef Debug}
+  //SendDebug('Drawing:'+IntToStr(Integer(FDrawing)));
+  //SendDebug('Updating:'+IntToStr(Integer(FUpdating)));
+  {$endif}
+  
+  if not FDrawing then
+  try
+    FDrawing := True;
+  
+  
+    For i := 0 to Count -1 Do
+    begin
+      LItem := TGRCustomAnimationEffect(Items[i]);
+      if LItem.Enabled then
+        LItem.DoPaint(Sender);
+    end;
+  
+    {$ifdef Debug}
+    //Count The FPS
+    FFPSTime := GetTickCount;
+    if FFPSTime - FFPSOldTime >= 1000 then
+    begin
+      FFPS := FFPSCurrent;
+      FFPSCurrent := 0;
+      FFPSOldTime := FFPSTime;
+    end
+    else
+      Inc(FFPSCurrent);
+  
+    //FBuffer.PenColor := clBlack32;
+    //FBuffer.TextOut(0,0, 'FPS:'+ IntToStr(Trunc(MoveCount / 100)));
+      //FBuffer.RenderText(0,0, 'FPS:'+ IntToStr(FFPSCurrent), 0, clBlack32);
+      s := 'FPS:'+ IntToStr(FFPS);
+      Sender.FillRect(0,0,50,18, clWhite32);
+      Sender.Textout(0,0,s);
+    //-----}
+    {$endif}
+  
+  finally
+    //aCanvas.UnLock;
+    FDrawing := False;
+  end;
+end;
+//*)
 
 procedure TGRCustomAnimationEffects.DoControlPaint(Sender: TControl; DC: HDC);
 var

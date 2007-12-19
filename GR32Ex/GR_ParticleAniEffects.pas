@@ -159,8 +159,9 @@ type
     FParticleClass: TGRParticleClass;
     { Summary not used. }
     FParticles: TList;
-    procedure DoMouseMove(Shift: TShiftState; X, Y: Integer); override;
-    procedure DoPaint(Sender: TControl; DC: HDC); override;
+    procedure DoMouseMove(Shift: TShiftState; X, Y: Integer); overload;override;
+    procedure DoPaint(Sender: TControl; DC: HDC); overload;override;
+    procedure DoPaint(Sender: TBitmap32); override;
     procedure DoResize(Sender: TControl); override;
     procedure DoTimer(MoveCount: TFloat); override;
     procedure NewParticle(aParticle: TGRCustomParticle);
@@ -327,6 +328,52 @@ begin
       Blob(X-Left, Y-Top, 1, FTrackBlob);
   end;
   //}
+end;
+
+procedure TGRParticlesEffect.DoPaint(Sender: TBitmap32);
+  //var
+    //LBg: TBitmap32;
+    //s: string
+begin
+  {$ifdef debug}
+    CnDebugger.LogEnter('TGRParticlesEffect.DoPaint');
+  {$endif}
+  
+  //LBg := TBitmap32.Create;
+  try
+  
+  //LBg.SetSize(FWidth, FHeight);
+  //BitBlt(LBg.Handle, 0, 0, LBg.Width, LBg.Height, DC, FLeft, FTop, SRCCOPY);
+  //LBg.ResetAlpha;
+  
+  //BitBlt(FBuffer.Handle, 0, 0, FBuffer.Width, FBuffer.Height, DC, FLeft, FTop, SRCCOPY);
+  //FBuffer.ResetAlpha;
+  //Sender.DrawTo(FBuffer, 0,0, Rect(FLeft, FTop, FLeft+FBuffer.Width, FTop+FBuffer.Height));
+  try
+    Sprites.Draw(Sender);
+  //FParticle.Picture.DrawTo(FBuffer, 0,0);
+  except
+    {$ifdef debug}
+    On e: Exception do
+    begin
+      SendDebug(E.Message);
+      raise;
+    end;
+    {$endif}
+  end;
+  //FSprites.Draw(DC, Rect(0,0,Width, Height));
+  //FBuffer.DrawTo(LBG, 0, 0);
+  
+  
+  //BitBlt(DC, FLeft, FTop, FBuffer.Width, FBuffer.Height, FBuffer.Handle, 0, 0, SRCCOPY);
+  //*)
+  
+  finally
+    //LBg.Free;
+  {$ifdef debug}
+    CnDebugger.LogLeave('TGRParticlesEffect.DoPaint');
+  {$endif}
+  end;
 end;
 
 procedure TGRParticlesEffect.DoPaint(Sender: TControl; DC: HDC);
