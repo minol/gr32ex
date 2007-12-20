@@ -57,6 +57,7 @@ begin
   CallBack.Visible := False;
   //Image.Color := clGray;
   Image.Bitmap.LoadFromFile('res\sky.jpg');
+  //Image.Visible := False;
   //Image.DoubleBuffered :=True;
   //FBitmap := TBitmap.Create;
   //FBitmap32:= TBitmap32.Create;
@@ -130,12 +131,14 @@ begin
   end;
 
   FEffEngine.Control := Image;
+  //FEffEngine.Control := Self;
   FEffEngine.Enabled := True;
 
 end;
 
 destructor TForm1.Destroy;
 begin
+	FEffEngine.Enabled := False;
 	FreeAndNil(FStarSprites);
 	FreeAndNil(FSnowSprites);
 	FEffEngine.Free;
