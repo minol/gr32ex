@@ -100,6 +100,7 @@ thanks to:
   Vladimir Vasilyev <Vladimir@tometric.ru>
   Patrick
   JinYu Zhou (zjy@cnpack.org)
+  Troels Jakobsen - delphiuser@get2net.dk
   Others I missed.
 
 

@@ -36,6 +36,9 @@ uWaterEffect.pas
 Other GR_*:
   Initial Developer: Riceball LEE
 
+SimpleTimer
+  Initial Developer: Troels Jakobsen - delphiuser@get2net.dk
+
 Mike Lischke's G32Ex package:
   GR32_ExtLayers.pas,GR32_Types, Res\*
   Initial Developer: Mike Lischke (www.delphi-gems.com)

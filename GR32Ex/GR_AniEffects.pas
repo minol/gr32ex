@@ -8,11 +8,11 @@
 {*******************************************************}
 
 {$I Setting.inc}
-{$define debug}
+{$define debug} //Show FPS
 
 { Summary General Animation Graphic Effect Engine }
 { Description
-通用动画特效引擎, 用以实现背景特效，出现雪花阿，什么的。
+通用动画特效引擎抽象层, 用以实现各种动画特效，如：雪花，星空。
 
 Usage:
   FEff:= TRVBackEffects.Create;
@@ -21,6 +21,29 @@ Usage:
 
   FEff.Enabled := True;
 }
+
+(* ***** BEGIN LICENSE BLOCK *****
+ * Version: MPL 1.1
+ *
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
+ * The Original Code is GR_AniEffects
+ *
+ * The Initial Developer of the Original Code is Riceball LEE
+ * Portions created by Riceball LEE are Copyright (C) 2004-2007
+ * All Rights Reserved.
+ *
+ * Contributor(s):
+ *
+ * ***** END LICENSE BLOCK ***** *)
 unit GR_AniEffects;
 
 interface
