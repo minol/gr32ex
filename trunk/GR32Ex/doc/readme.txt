@@ -16,7 +16,11 @@ Feature:
        * Wallpaper: the first draw(if any)
        * Gradient: the second draw(if any)
        * Texture: the last draw(if any). Texture is also a wallpaper property.
- * I need developers to help me port the standard controls to the GR32 Extension Component Framework.
+ * Advanced Font
+   * Outline font
+   * Textured font 
+   * Shadow font
+   * Antialiasing and transparency.
 
 The GR32 Extension Components Core Framework Feature:
  * the controls(derived from TGRCustomControl or TGRGraphicControl) can support the alpha blending. All GRControl should be derived from.

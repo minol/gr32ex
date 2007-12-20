@@ -16,9 +16,17 @@ Writen by Riceball LEE(riceball@users.sourceforge.net)
        * 墙纸 Wallpaper: 最先绘制（如果有的化）
        * 渐变 Gradient:  其次绘制（如果有的化）
        * 贴图 Texture:   最后绘制（如果有的化）
+ * 高级字体支持
+   * 贴图字体
+   * 轮廓字体
+   * 字体阴影
+   * 抗锯齿
+   * 半透明
 
-在GR_AniGEffetcts单元中的 TGRAnimationEffects 类可以将动画绘制到 TCustomControl, TGraphicControl 和 TCustomForm，不过在标准GDI的控件上使用Repaint或Invalidate绘制，会有闪烁。
-另外它也可以绘制到 TCustomPaintBox32 上，在Image32上绘制不会引起闪烁。
+在GR_AniGEffetcts单元中的 TGRAnimationEffects 类可以通过钩挂控件的方式，将动画绘制到 TCustomControl, TGraphicControl 和 TCustomForm，不过在标准GDI的控件上使用Repaint或Invalidate绘制，会有闪烁。
+另外它也可以绘制到 TCustomPaintBox32 的派生类上如 TImage32，在Image32上绘制不会引起闪烁。
+
+粒子特效动画的例子在 Examples\particle\目录下，该例子同时渲染了水纹特效，下雪特效和星光特效。
 
 The GR32 Extension 可视控件核心框架功能:
  * 所有的GR可视控件都是从TGRCustomControl或TGRGraphicControl)派生的。 TGRCustomControl是有Window 句柄的WinControl。
@@ -30,41 +38,41 @@ The GR32 Extension 可视控件核心框架功能:
    * 字体阴影
    * 抗锯齿
    * 半透明
- * 许多有用辅助类：
+ * 许多有用的辅助类：
    * TCustomGraphicProperty(GR32_GraphUtils): you can add the perfect properties to your components too.
     * GR32_Graphics Properties:
-     * TGradient 渐变属性类: (original writen by Kambiz R. Khojasteh(kambiz@delphiarea.com))
+     * TGradient 渐变类: (original writen by Kambiz R. Khojasteh(kambiz@delphiarea.com))
        It is an extremely fast gradient fill control with 
        a large set of styles. As built-in, TGradient can 
        draw gradient in 23 styles and provides an easily 
        method to define custom styles. In addition, this 
        control can shift and/or rotate the gradient colors, 
        which could be used for creating animated gradients.
-       * AlphaBegin (new by riceball)
-       * AlphaEnd (new by riceball)
-       * AlphaChannel: Boolean. whether treat the gradient as a alpha channel graph. (new by riceball)
-     * TWallpaper 墙纸属性类
+       * AlphaBegin 起始的半透明度(new by riceball)
+       * AlphaEnd   结束的半透明度(new by riceball)
+       * AlphaChannel: Boolean. 是否将渐变作为Alpha通道使用. (new by riceball)
+     * TWallpaper 墙纸类
        * Style: wlpsCenter, wlpsTile, wlpsStretch
        * Alpha: the alpha blending value.
        * FileName: the wallpaper picture filename
        * Picture: TPicture
-     * TBackground 背景属性类: you can build very complex composed background here. 
+     * TBackground 背景类: 混合复合背景。
         it include a wallpaper property, a texture and a Gradient property, they are alpha blending after you proper set.
        * Wallpaper: the first draw(if any)
        * Gradient: the second draw(if any)
        * Texture: the last draw(if any). Texture is also a wallpaper property.
        * Buffered: whether cache the result.
-     * TFont32 高级字体属性类: it supports Outline font, textured font or 3D Font with shadow. of cause it supports the antialiasing and transparency.
-       * 阴影效果 Shadow: TShadowEffect: the font shadow
-       * 抗锯齿质量 Quality: TFontQuality: antialiasing quality.
-       * 轮廓 Outline: Boolean: whether the text is outline only.
-       * 透明度Opacity: Byte: the alpha blending value.
-       * 行间距 LineSpacing: integer: Specifies the spacing between Lines.
-       * 字符间距 CharSpacing: integer: Specifies the spacing between characters. <Note: Not used yet>
-       * 背景图 Background: TBackground: The Font background Texture if any.
-       * fucntion TextExtent and TextExtentW
-       * fucntion RenderText and RenderTextW
-       * function DrawText: simulate the winapi. the following aFormat Options are supported: 
+     * TFont32 高级字体类: it supports Outline font, textured font or 3D Font with shadow. of cause it supports the antialiasing and transparency.
+       * Shadow: TShadowEffect: 阴影效果
+       * Quality: TFontQuality: 抗锯齿质量.
+       * Outline: Boolean: 只输出字体轮廓
+       * Opacity: Byte: 透明度
+       * LineSpacing: integer: 行间距
+       * CharSpacing: integer: 字符间距. <Note: Not used yet>
+       * Background: TBackground: 字体贴图
+       * fucntion TextExtent and TextExtentW（Unicode版）
+       * fucntion RenderText and RenderTextW（Unicode版）
+       * function DrawText: 模拟WinAPI的DrawText函数。支持以下的格式化参数: 
            DT_CALCRECT, DT_TOP, DT_VCENTER, DT_BOTTOM, DT_LEFT, DT_CENTER, DT_RIGHT, DT_WORDBREAK, DT_NOPREFIX, DT_EXPANDTABS
    * TCustomEffectProperty
      * TShadowEffect
