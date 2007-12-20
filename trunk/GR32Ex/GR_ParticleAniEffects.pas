@@ -93,9 +93,9 @@ type
     property RandomLocation: Boolean read FRandomLocation write FRandomLocation;
     property RepeatCount: Integer read FRepeatCount write FRepeatCount;
     property Rotation: TFloat read FRotation write FRotation;
-    { Summary 自传率 X分量 }
+    { Summary 缩放率 X分量 }
     property ScaleX: TFloat read FScaleX write FScaleX;
-    { Summary 自传率 X分量 }
+    { Summary 缩放率 X分量 }
     property ScaleY: TFloat read FScaleY write FScaleY;
     { Summary 自传率 X分量 }
     property VelocityX: TFloat read FVelocityX write FVelocityX;
