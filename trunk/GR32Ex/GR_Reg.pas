@@ -13,13 +13,13 @@ unit GR_Reg;
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is Graphics32
+ * The Original Code is GR_Reg
  *
  * The Initial Developer of the Original Code is
  * Riceball LEE
  *
- * Portions created by the Initial Developer are Copyright (C) 2000-2004
- * the Initial Developer. All Rights Reserved.
+ * Portions created by Riceball LEE are Copyright (C) 2004-2007
+ * All Rights Reserved.
  *
  * Contributor(s):
  *

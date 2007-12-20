@@ -104,6 +104,7 @@ How to set the transparent to the GRControls:
   Vladimir Vasilyev <Vladimir@tometric.ru>
   Patrick
   ÖÜ¾¢Óð (zjy@cnpack.org)
+  Troels Jakobsen - delphiuser@get2net.dk
   Others I missed.
 
 

@@ -18,8 +18,8 @@ unit GR_FilterEx;
  * The Initial Developer of the Original Code is
  * Riceball LEE
  *
- * Portions created by the Initial Developer are Copyright (C) 2000-2004
- * the Initial Developer. All Rights Reserved.
+ * Portions created by the Riceball LEE are Copyright (C) 2004-2007
+ * All Rights Reserved.
  *
  * Contributor(s):
  *   Vladimir Vasilyev <Vladimir@tometric.ru> http://www.gamedev.narod.ru
