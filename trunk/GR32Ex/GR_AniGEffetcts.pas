@@ -49,7 +49,8 @@ uses
 type
   TGRAnimationEffects = class(TGRCustomAnimationEffects)
   private
-    FBuffer: TBitmap32; //for the Bitmap32 only
+    FBuffer: TBitmap32;
+    FTempBuffer: TBitmap32; //for TCustomControl, TGraphicControl and TCustomForm
   protected
     FTimer: TSimpleTimer;
     FWinStyle: LongInt;
@@ -74,26 +75,28 @@ type
 constructor TGRAnimationEffects.Create;
 begin
   inherited Create;
-  //FBuffer := TBitmap32.Create;
+  FBuffer := TBitmap32.Create;
 end;
 
 destructor TGRAnimationEffects.Destroy;
 begin
   FreeAndNil(FBuffer);
+  FreeAndNil(FTempBuffer);
   inherited Destroy;
 end;
 
 procedure TGRAnimationEffects.DoControlResize(Sender: TObject);
 begin
-	if Sender is TCustomPaintBox32 then
-  with TCustomPaintBox32(Sender) do
+	//if Sender is TCustomPaintBox32 then
+  //with TCustomPaintBox32(Sender) do
   try
     FDrawing := True;
-    if not Assigned(FBuffer) then FBuffer := TBitmap32.Create;
+    //if not Assigned(FBuffer) then FBuffer := TBitmap32.Create;
     //Resize;
     //Repaint;
     //FBuffer.Assign(Buffer);
     FBuffer.Delete;
+    FControl.Repaint;
   finally
     FDrawing := False;
   end;
@@ -115,11 +118,20 @@ begin
   //FControl.Invalidate;
   //FControl.Update;
   //FControl.Refresh;
-   //if not FBuffer.Empty then
-      //BitBlt(DC, 0, 0, FBuffer.Width, FBuffer.Height, FBuffer.Handle, 0, 0, SRCCOPY);
+   if FBuffer.Empty then
+   begin
+      FBuffer.SetSize(FControl.Width, FControl.Height);
+      //FControl.Repaint;
+      BitBlt(FBuffer.Handle, 0, 0, FBuffer.Width, FBuffer.Height, DC, 0, 0, SRCCOPY);
+      FBuffer.ResetAlpha;
+    end;
   
     //FillRect(DC, FControl.ClientRect, $FFFFFFFF);
-    DoControlPaint(FControl, DC);
+    //DoControlPaint(FControl, DC);
+    FTempBuffer.Assign(FBuffer);
+   	DoControlPaint(FTempBuffer);
+    BitBlt(DC, 0, 0, FControl.Width, FControl.Height, FTempBuffer.Handle, 0, 0, SRCCOPY);
+
     {$ifdef Debug}
     //TCustomControlAccess(FControl).Canvas.TextOut(0,0,'dddffdf');
     {$endif}
@@ -174,6 +186,7 @@ begin
       FWinStyle := GetWindowLong(TWinControl(Value).Handle, GWl_Style);
       LStyle := FWinStyle and (not WS_ClipChildren);
       SetWindowLong(TWinControl(Value).Handle, GWl_Style, LStyle);
+      FTempBuffer := TBitmap32.Create;
     end;
   end
   else begin
@@ -181,6 +194,7 @@ begin
     FreeAndNil(FBuffer);
     if (Value is TWinControl) then
     begin
+      FreeAndNil(FTempBuffer);
       SetWindowLong(TWinControl(Value).Handle, GWl_Style, FWinStyle);
       TWinControl(Value).Repaint;
     end;
@@ -217,7 +231,7 @@ begin
    	end
    	else
    	begin
-      FControl.Repaint;
+      //FControl.Repaint;
       DoPaint;
     end;
   end;
