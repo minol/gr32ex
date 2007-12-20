@@ -71,11 +71,11 @@ begin
 	    Enabled := False;
       Gradient.Enabled := True;
       Gradient.Style := gsPattern;
-      Gradient.PatternFile := 'button_Mask_Down.png';
-      Mask.LoadFromFile('button_Btn_Down_Mask.bmp');
+      Gradient.PatternFile := 'Background\button_Mask_Down.png';
+      Mask.LoadFromFile('Background\button_Btn_Down_Mask.bmp');
       //WallPaper.Style := wlpsTile;
       WallPaper.Style := wlpsStretch;
-      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'button_Btn_UP.png';
+      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'Background\button_Btn_UP.png';
       //WallPaper.Alpha := 200;
     finally
       EndUpdate;
@@ -119,12 +119,12 @@ begin
       Enabled := False;
       Gradient.Enabled := True;
       Gradient.Style := gsPattern;
-      Gradient.PatternFile := 'button_Mask_Down.png';
+      Gradient.PatternFile := 'Background\button_Mask_Down.png';
       Gradient.AlphaChannel := True;
-      Mask.LoadFromFile('button_Btn_Down_Mask.bmp');
+      Mask.LoadFromFile('Background\button_Btn_Down_Mask.bmp');
       //WallPaper.Style := wlpsTile;
       WallPaper.Style := wlpsStretch;
-      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'button_Btn_Hot.png';
+      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'Background\button_Btn_Hot.png';
       //WallPaper.Alpha := 120;
     finally
       EndUpdate;
@@ -143,11 +143,11 @@ begin
       BeginUpdate;
       Gradient.Enabled := True;
       Gradient.Style := gsPattern;
-      Gradient.PatternFile := 'button_Mask_Down.png';
-      Mask.LoadFromFile('button_Btn_Down_Mask.bmp');
+      Gradient.PatternFile := 'Background\button_Mask_Down.png';
+      Mask.LoadFromFile('Background\button_Btn_Down_Mask.bmp');
       //WallPaper.Style := wlpsTile;
       WallPaper.Style := wlpsStretch;
-      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'button_Btn_Down.png';
+      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'Background\button_Btn_Down.png';
       //WallPaper.Alpha := 120;
     finally
       EndUpdate;
@@ -163,7 +163,7 @@ begin
     Gradient.Style := gsNone;
     //WallPaper.Style := wlpsTile;
     WallPaper.Style := wlpsStretch;
-    WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'png.png';
+    WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'Background\png.png';
   finally
     EndUpdate;
   end;//}
@@ -197,7 +197,7 @@ begin
     Gradient.Style := gsNone;
     //WallPaper.Style := wlpsTile;
     WallPaper.Style := wlpsStretch;
-    WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'png1.png';
+    WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'Background\png1.png';
   finally
     EndUpdate;
   end; //}
@@ -271,7 +271,7 @@ begin
       with ImageFrame do
       begin
         Enabled := True;
-        PictureTop.LoadFromFile('2.png');
+        PictureTop.LoadFromFile('Background\2.png');
       end;
 
     end; //}
@@ -294,13 +294,13 @@ begin
       //Gradient.Enabled := True;
       Gradient.AlphaChannel := True;
       Gradient.Style := gsPattern;
-      Gradient.patternFile := ExtractFilePath(ParamStr(0)) + 'weightmap.jpg';
+      Gradient.patternFile := ExtractFilePath(ParamStr(0)) + 'Background\weightmap.jpg';
       Gradient.Tiled := True;
       WallPaper.Style := wlpsTile;
       //
-      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'Blue Lace 16.bmp';
+      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'Background\Blue Lace 16.bmp';
       Texture.Style := wlpsTile;
-      //Texture.FileName := ExtractFilePath(ParamStr(0))+ 'texture_b.jpg';
+      //Texture.FileName := ExtractFilePath(ParamStr(0))+ 'Background\texture_b.jpg';
       Texture.Alpha := 200;
     finally
       EndUpdate;
@@ -347,9 +347,9 @@ begin
       Gradient.AlphaChannel := True;
       Gradient.Tiled := True;
       WallPaper.Style := wlpsTile;
-      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'texture_a.jpg';
+      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'Background\texture_a.jpg';
       Texture.Style := wlpsTile;
-      Texture.FileName := ExtractFilePath(ParamStr(0))+ 'texture_b.jpg';
+      Texture.FileName := ExtractFilePath(ParamStr(0))+ 'Background\texture_b.jpg';
       //Texture.Alpha := 200;
     finally
       EndUpdate;
@@ -372,7 +372,7 @@ begin
       //Mask.LoadFromFile('Panel_Btn_Down_Mask.bmp');
       //WallPaper.Style := wlpsTile;
       WallPaper.Style := wlpsStretch;
-      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'valkyries.png';
+      WallPaper.FileName := ExtractFilePath(ParamStr(0))+ 'Background\valkyries.png';
     finally
       EndUpdate;
     end; //}
@@ -439,7 +439,7 @@ begin
     //AlphaBlendValue := 150;
     //Glyph.Transparent := True;
     //Glyph.TransparentMode := tmAuto;
-    LoadPicture(Glyph, '123.png');
+    LoadPicture(Glyph, 'Background\123.png');
     //Glyph.LoadFromFile('systray.bmp');
     //ApplyTransparentColor(Glyph, Glyph.Bits[0]);
     GroupIndex := 0;
