@@ -5,6 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls
+  , Jpeg
   , GR32, GR32_Resamplers, GR32_Image, GR32_System
   , GR32_Png
   , GR_AniEffects
@@ -54,7 +55,8 @@ begin
   OpenPlay.Visible := False;
   Snapshot.Visible := False;
   CallBack.Visible := False;
-  Image.Color := clGray;
+  //Image.Color := clGray;
+  Image.Bitmap.LoadFromFile('res\sky.jpg');
   //Image.DoubleBuffered :=True;
   //FBitmap := TBitmap.Create;
   //FBitmap32:= TBitmap32.Create;
@@ -124,7 +126,7 @@ begin
   
     Enabled := True;
     MaxParticles := 500;
-    NumOfParticles := 400;
+    NumOfParticles := 200;
   end;
 
   FEffEngine.Control := Image;
