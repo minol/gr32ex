@@ -200,25 +200,28 @@ begin
   //FControl.Invalidate;
   //FControl.Update;
   //FControl.Repaint;
-  inherited InternalDoTimer;
-  if FDrawing then exit;
-  if FControl is TCustomPaintBox32 then with FControl as TCustomPaintBox32 do
+
+  if not FDrawing then
   begin
-  	if not Assigned(FBuffer) or FBuffer.Empty then 
-  	begin
-  	  if not Assigned(FBuffer) then FBuffer := TBitmap32.Create;
-  	  FBuffer.Assign(Buffer);
-  	end
-  	else
-  	  Buffer.Assign(FBuffer);
-  	DoControlPaint(Buffer);
-  	Flush;
- 	end
- 	else
- 	begin
-    FControl.Repaint;
-    DoPaint;
+    if FControl is TCustomPaintBox32 then with FControl as TCustomPaintBox32 do
+    begin
+    	if not Assigned(FBuffer) or FBuffer.Empty then 
+    	begin
+    	  if not Assigned(FBuffer) then FBuffer := TBitmap32.Create;
+    	  FBuffer.Assign(Buffer);
+    	end
+    	else
+    	  Buffer.Assign(FBuffer);
+    	DoControlPaint(Buffer);
+    	Flush;
+   	end
+   	else
+   	begin
+      FControl.Repaint;
+      DoPaint;
+    end;
   end;
+  inherited InternalDoTimer;
 end;
 
 
