@@ -26,7 +26,7 @@ Writen by Riceball LEE(riceball@users.sourceforge.net)
 在GR_AniGEffetcts单元中的 TGRAnimationEffects 类可以通过钩挂控件的方式，将动画绘制到 TCustomControl, TGraphicControl 和 TCustomForm，不过在标准GDI的控件上使用Repaint或Invalidate绘制，会有闪烁。
 另外它也可以绘制到 TCustomPaintBox32 的派生类上如 TImage32，在Image32上绘制不会引起闪烁。
 
-粒子特效动画的例子在 Examples\particle\目录下，该例子同时渲染了水纹特效，下雪特效和星光特效。
+在Image32上的GDI绘制粒子特效动画的例子在 Examples\particle\目录下，该例子同时渲染了水纹特效，下雪特效和星光特效。
 
 The GR32 Extension 可视控件核心框架功能:
  * 所有的GR可视控件都是从TGRCustomControl或TGRGraphicControl)派生的。 TGRCustomControl是有Window 句柄的WinControl。
