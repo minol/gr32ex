@@ -134,9 +134,9 @@ end;
 
 destructor TForm1.Destroy;
 begin
-	FEffEngine.Free;
 	FreeAndNil(FStarSprites);
 	FreeAndNil(FSnowSprites);
+	FEffEngine.Free;
   //FBitmap.Free;
   //FBitmap32.Free;
   inherited;
