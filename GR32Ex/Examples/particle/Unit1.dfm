@@ -3,7 +3,7 @@ object Form1: TForm1
   Top = 114
   Width = 367
   Height = 242
-  Caption = 'Simple SnapShot'
+  Caption = 'the Particle Animation Effects - Demo'
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
