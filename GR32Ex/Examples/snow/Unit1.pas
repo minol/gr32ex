@@ -13,7 +13,7 @@ uses
   , GR_AniGEffetcts
   , GR_ParticleAniEffects
   //, GR_AniEffectWater
-  //, GR_ParticleStar
+  , GR_ParticleStar
   , GR_ParticleSnow
   , GR_DesktopControl
   , SimpleTimer
@@ -31,7 +31,7 @@ type
   private
     FDesktop: TGRDesktopControl;
     FEffEngine: TGRAnimationEffects;
-    //FStarSprites: TGRSprites;  
+    FStarSprites: TGRSprites;  
     FSnowSprites: TGRSprites;  
 
   public
@@ -57,9 +57,39 @@ begin
   CallBack.Visible := False;
   //Image.Color := clGray;
   //Image.Bitmap.LoadFromFile('res\sky.jpg');
-
+  Caption := 'Desktop Snowflake : Alt+F4 to Close';
   FEffEngine := TGRAnimationEffects.Create();
   FSnowSprites := TGRSprites.Create;  
+  FStarSprites := TGRSprites.Create;  
+
+  //the star particle animation effect
+  with TGRParticlesEffect.Create(FEffEngine) do
+  begin
+    Sprites := FStarSprites;
+    //UseCustomParticle(TGRSnowParticle);
+    UseCustomParticle(TGRStarParticle);
+    //Init the Particle property:
+    with Particle do
+    begin
+    	LPic := TPicture.Create;
+    	try
+      //Looped := False;
+      LPic.LoadFromFile('Res\pao.png');
+      if LPic.Graphic is TBitmap then
+      begin
+        TBitmap(LPic.Graphic).Transparent := True;
+        //TBitmap(LPic.Graphic).TransparentColor := clBlack;
+      end;
+      Picture.Assign(LPic);
+      finally
+        LPic.Free;
+      end;
+    end;
+
+    Enabled := True;
+    MaxParticles := 50;
+    NumOfParticles := 2;
+  end;
 
   //the snow particle animation effect
   with TGRParticlesEffect.Create(FEffEngine) do
@@ -90,11 +120,7 @@ begin
   end;
 
   FDesktop := TGRDesktopControl.Create(nil);
-  showMessage(intToStr(FDesktop.Width));
-  //showMessage(intToStr(FDesktop.Canvas.Width));
-  //Application.Terminate;
   FEffEngine.Control := FDesktop;
-  //FEffEngine.Control := Self;
   FEffEngine.Enabled := True;
 
 end;
@@ -104,6 +130,7 @@ begin
 	FEffEngine.Enabled := False;
 	FreeAndNil(FDesktop);
 	FreeAndNil(FSnowSprites);
+	FreeAndNil(FStarSprites);
 	FEffEngine.Free;
   //FBitmap.Free;
   //FBitmap32.Free;
