@@ -54,7 +54,7 @@ type
    end;
 
   {
-  TODO: when desktop paint changed, it should know.
+  TODO: Intercept the HWND:0 WM_Paint message.
   }
   TGRDesktopControl = class(TControl)
   private
