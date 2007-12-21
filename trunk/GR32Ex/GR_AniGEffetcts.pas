@@ -151,10 +151,13 @@ begin
   
   DC := GetControlDC(FControl);
   if (DC <> 0) then
-  begin
+  try
+    FDrawing := True;
     FBuffer.SetSize(FControl.Width, FControl.Height);
     BitBlt(FBuffer.Handle, 0, 0, FBuffer.Width, FBuffer.Height, DC, 0, 0, SRCCOPY);
     FBuffer.ResetAlpha;
+  finally
+    FDrawing := False;
   end;
   
   

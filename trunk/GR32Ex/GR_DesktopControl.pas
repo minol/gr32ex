@@ -53,6 +53,9 @@ type
      property Height: Integer read GetHeight;
    end;
 
+  {
+  TODO: when desktop paint changed, it should know.
+  }
   TGRDesktopControl = class(TControl)
   private
     FCanvas: TGRDesktopCanvas;
