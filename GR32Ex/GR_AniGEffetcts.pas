@@ -42,6 +42,7 @@ uses
   //, Dialogs
   , GR32
   , GR32_Image
+  , GR_DesktopControl
   , GR_AniEffects
   , SimpleTimer
   ;  
@@ -144,15 +145,16 @@ begin
 end;
 
 procedure TGRAnimationEffects.DoWMPaint(var Message: TWMPaint);
-//var
-  //DC: HDC;
+var
+  DC: HDC;
 begin
-  {
+  
   DC := GetControlDC(FControl);
   if (DC <> 0) then
   begin
     FBuffer.SetSize(FControl.Width, FControl.Height);
     BitBlt(FBuffer.Handle, 0, 0, FBuffer.Width, FBuffer.Height, DC, 0, 0, SRCCOPY);
+    FBuffer.ResetAlpha;
   end;
   
   
@@ -169,8 +171,10 @@ begin
   end
   else if aControl is TGraphicControl then
     Result := TGraphicControlAccess(aControl).Canvas.Handle
-  else if aCOntrol is TCustomForm then
+  else if aControl is TCustomForm then
     Result := TCustomForm(aControl).Canvas.Handle
+  else if aControl is TGRDesktopControl then 
+    Result := TGRDesktopControl(aControl).Canvas.Handle
   else Result := 0;
 end;
 
@@ -178,23 +182,25 @@ procedure TGRAnimationEffects.HookControl(Value: TControl; Hooked: Boolean);
 var
   LStyle: LongInt;
 begin
+	if not Assigned(Value) then exit;
   if Hooked then
   begin
     FTimer := TSimpleTimer.CreateEx(cMinIntervalValue, DoTimer);
+    if not (Value is TCustomPaintBox32) then FTempBuffer := TBitmap32.Create;
+
     if (Value is TWinControl) then
     begin
       FWinStyle := GetWindowLong(TWinControl(Value).Handle, GWl_Style);
       LStyle := FWinStyle and (not WS_ClipChildren);
       SetWindowLong(TWinControl(Value).Handle, GWl_Style, LStyle);
-      FTempBuffer := TBitmap32.Create;
     end;
   end
   else begin
     FreeAndNil(FTimer);
     FreeAndNil(FBuffer);
+    if not (Value is TCustomPaintBox32) then FreeAndNil(FTempBuffer);
     if (Value is TWinControl) then
     begin
-      FreeAndNil(FTempBuffer);
       SetWindowLong(TWinControl(Value).Handle, GWl_Style, FWinStyle);
       TWinControl(Value).Repaint;
     end;
