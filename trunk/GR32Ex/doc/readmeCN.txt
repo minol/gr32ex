@@ -117,10 +117,7 @@ How to set the transparent to the GRControls:
 
 Note: 
 No Register function and Component Icon!
-I have to hack into GR32.pas to support my TFont32.
-hack into GR32_layers to support the MouseInControl , focused layer and keyboard event.
-
-you can apply the patch: gr32v183patch.txt(put Updater.exe and gr32v183Patch.upd to the graphics32 dir and run update.exe)
+GR32单元的修改支持高级字体：你只需要将 Updater.exe 和 gr32v183Patch.upd 文件放在GR32目录下，然后运行 update.exe 即可应用该修改。
 
 here are my changes in GR32.pas:
 
