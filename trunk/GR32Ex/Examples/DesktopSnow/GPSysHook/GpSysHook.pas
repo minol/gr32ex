@@ -24,6 +24,12 @@
                        the production version.
 </pre>*)(*
    History:
+     2007-12-24
+       added the WH_GETMESSAGE, WH_CALLWNDPROCRET by Riceball LEE(riceballl@hotmail.com)
+         only hook Message < WM_USER
+     1.03a: 2005-04-18
+       - Changed mutex and file mapping security descriptors to allow for cross-desktop
+         process cooperation.
      1.03: 2001-11-08
        - Added support for filtering listeners.
      1.02: 2001-10-10
@@ -40,6 +46,8 @@
 {$IFDEF VER120}'Use Delphi 5 or newer to compile this DLL!'{$ENDIF VER120}//Delphi 4
 
 unit GpSysHook;
+
+{$Define Debug_GpSysHook}
 
 interface
 
@@ -77,10 +85,11 @@ uses
 
 implementation
 
-{$IFDEF Debug_GpSysHook}
 uses
-  SysUtils;
+{$IFDEF Debug_GpSysHook}
+  SysUtils,
 {$ENDIF Debug_GpSysHook}
+  GpSecurity;
 
 const
   //:Maximum number of receivers attached to each hook.
@@ -168,6 +177,26 @@ var
   //:Wrappers for all implemented hooks.
   Wrappers: TGpHookWrappers;
 
+{$IFDEF Debug_GpSysHook}
+{ Debugging }
+
+{:Debug logger. Sends one line to the c:\GpSysHook.log file.
+  @param   msg Message to be written to the debug file.
+}        
+procedure DebugLog(msg: string);
+var
+  f: textfile;
+begin
+  Assign(f,'c:\GpSysHook.log');
+  if not FileExists('c:\GpSysHook.log') then
+    Rewrite(f)
+  else
+    Append(f);
+  Writeln(f,FormatDateTime('yyyy-mm-dd"T"hh:mm:ss',Now)+' '+msg);
+  Close(f);
+end; { DebugLog }
+{$ENDIF Debug_GpSysHook}
+
 {:Shell hook callback.
 }
 function ShellHookCallback(code: integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
@@ -249,6 +278,78 @@ begin
   end;
 end; { CBTHookCallback }
 
+{:GetMSG hook callback.
+
+code
+    [in] Specifies whether the hook procedure must process the message. If code is HC_ACTION, the hook procedure must process the message. If code is less than zero, the hook procedure must pass the message to the CallNextHookEx function without further processing and should return the value returned by CallNextHookEx. 
+wParam
+    [in] Specifies whether the message has been removed from the queue. This parameter can be one of the following values.
+
+    PM_NOREMOVE
+        Specifies that the message has not been removed from the queue. (An application called the PeekMessage function, specifying the PM_NOREMOVE flag.)
+    PM_REMOVE
+        Specifies that the message has been removed from the queue. (An application called GetMessage, or it called the PeekMessage function, specifying the PM_REMOVE flag.)
+
+lParam
+    [in] Pointer to an TMSG structure that contains details about the message.
+}
+function MSGHookCallback(code: integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
+var
+  wrapper: TGpHookWrapper;
+begin
+  wrapper := Wrappers[htGetMessage];
+  Result := 0;
+  if assigned(wrapper) and assigned(wrapper.wrpShared) then begin
+    WaitForSingleObject(wrapper.wrpHookMutex, INFINITE);
+    try
+      if (PMsg(lParam).Message < WM_USER) then
+        if (code = HC_ACTION) or (code > 0) then
+          Wrappers.Broadcast(htGetMessage,code,wParam,lParam,Result);
+    finally ReleaseMutex(wrapper.wrpHookMutex); end;
+      Wrappers.CallNextHook(htGetMessage,code,wParam,lParam,Result);
+  end;
+end; { MSGHookCallback }
+
+{:CallWndRetProc hook callback.
+
+    nCode
+        [in] Specifies whether the hook procedure must process the message. If nCode is HC_ACTION, the hook procedure must process the message. If nCode is less than zero, the hook procedure must pass the message to the CallNextHookEx function without further processing and should return the value returned by CallNextHookEx. 
+    wParam
+        [in] Specifies whether the message is sent by the current process. If the message is sent by the current process, it is nonzero; otherwise, it is NULL. 
+    lParam
+        [in] Pointer to a CWPRETSTRUCT structure that contains details about the message. 
+
+Return Value
+
+    If nCode is less than zero, the hook procedure must return the value returned by CallNextHookEx.
+
+    If nCode is greater than or equal to zero, it is highly recommended that you call CallNextHookEx and return the value it returns; otherwise, other applications that have installed WH_CALLWNDPROCRET hooks will not receive hook notifications and may behave incorrectly as a result. If the hook procedure does not call CallNextHookEx, the return value should be zero. 
+}
+function WndRetHookCallback(code: integer; wParam: WPARAM; lParam: LPARAM): LRESULT; stdcall;
+var
+  wrapper: TGpHookWrapper;
+  vCWPStruct: TCWPStruct;
+begin
+{$IFDEF Debug_GpSysHook}
+//DebugLog('WndRetHook:' + IntToStr(lParam));
+{$ENDIF}
+  wrapper := Wrappers[htCallWndRetProc];
+  Result := 0;
+  if assigned(wrapper) and assigned(wrapper.wrpShared) then begin
+    WaitForSingleObject(wrapper.wrpHookMutex, INFINITE);
+    try
+      if (PCWPStruct(lParam).Message < WM_USER) then
+        //if (code = HC_ACTION) or (code > 0) then
+        begin
+        	vCWPStruct := PCWPStruct(lParam)^;
+          //Wrappers.Broadcast(htCallWndRetProc,code,wParam,Integer(@vCWPStruct),Result);
+          Wrappers.Broadcast(htCallWndRetProc,WM_USER+PCWPStruct(lParam)^.Message, PCWPStruct(lParam)^.wParam,PCWPStruct(lParam)^.lParam,Result);
+        end;
+    finally ReleaseMutex(wrapper.wrpHookMutex); end;
+      Wrappers.CallNextHook(htCallWndRetProc,code,wParam,lParam,Result);
+  end;
+end; { MSGHookCallback }
+
 (*Copied from the SysUtils to prevent exception handling etc from being loaded.*)
 function StrScan(const Str: PChar; Chr: Char): PChar; assembler;
 asm
@@ -299,26 +400,6 @@ begin
   Result := Copy(FileName, 1, I - 1) + Extension;
 end;
 (*End of SysUtils functions.*)
-
-{$IFDEF Debug_GpSysHook}
-{ Debugging }
-
-{:Debug logger. Sends one line to the c:\GpSysHook.log file.
-  @param   msg Message to be written to the debug file.
-}        
-procedure DebugLog(msg: string);
-var
-  f: textfile;
-begin
-  Assign(f,'c:\GpSysHook.log');
-  if not FileExists('c:\GpSysHook.log') then
-    Rewrite(f)
-  else
-    Append(f);
-  Writeln(f,FormatDateTime('yyyy-mm-dd"T"hh:mm:ss',Now)+' '+msg);
-  Close(f);
-end; { DebugLog }
-{$ENDIF Debug_GpSysHook}
 
 { TGpHookReceivers class-like interface }
 
@@ -540,13 +621,13 @@ begin
   wrpStatic.HookType := hookType;
   wrpStatic.HookCallback := hookCallback;
   Receivers_Clear(wrpReceivers);
-  wrpHookMutex := CreateMutex(nil, true, PChar(baseName + 'Mutex'));
+  wrpHookMutex := CreateMutex_AllowEveryone(true, PChar(baseName + 'Mutex'));
   if wrpHookMutex = 0 then
     wrpLastError := GetLastError
   else begin
     try
-      wrpMemFile := CreateFileMapping(INVALID_HANDLE_VALUE, nil,
-        PAGE_READWRITE, 0, SizeOf(TGpSharedHookData), PChar(baseName + 'Shared'));
+      wrpMemFile := CreateFileMapping_AllowEveryone(INVALID_HANDLE_VALUE, PAGE_READWRITE,
+        0, SizeOf(TGpSharedHookData), PChar(baseName + 'Shared'));
       if wrpMemFile = 0 then
         wrpLastError := GetLastError
       else begin
@@ -719,6 +800,10 @@ begin
     TGpHookWrapper.Create(strBaseName+'MOUSE', WH_MOUSE, @MouseHookCallback);
   wrpWrappers[htCBT] :=
     TGpHookWrapper.Create(strBaseName+'CBT', WH_CBT, @CBTHookCallback);
+  wrpWrappers[htGetMessage] :=
+    TGpHookWrapper.Create(strBaseName+'MSG', WH_GETMESSAGE, @MSGHookCallback);
+  wrpWrappers[htCallWndRetProc] :=
+    TGpHookWrapper.Create(strBaseName+'WndRet', WH_CALLWNDPROCRET, @WndRetHookCallback);
 end; { TGpHookWrappers.Create }
 
 {:Destroys wrappers for all supported hooks, removing all active listeners from

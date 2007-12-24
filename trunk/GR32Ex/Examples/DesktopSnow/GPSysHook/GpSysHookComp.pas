@@ -10,6 +10,8 @@
    Version           : 1.02
 </pre>*)(*
    History:
+     1.02a: 2007-05-30
+       - AllocateHwnd and DeallocateHwnd replaced with thread-safe versions.
      1.02: 2001-11-08
        - Added filtering support to the TGpKeyboardHook component.
      1.01: 2001-10-10
@@ -33,6 +35,7 @@ uses
   Classes,
   Controls,
   Forms,
+  Dialogs,
   GpSysHookCommon;
 
 type
@@ -50,7 +53,7 @@ type
   }
   TGpSysHook = class(TComponent)
   private
-    FOnMessage: TMessageEvent;
+    FOnHookMessage: TMessageEvent;
     FHookedWnd     : HWND;
     FActive      : boolean;
     FHookDLLName : string;
@@ -78,7 +81,7 @@ type
     //added by riceball
     //0 means catch the all windows message. the default is 0
     property HookedWnd: HWND read FHookedWnd write FHookedWnd;
-    property OnMessage: TMessageEvent read FOnMessage write FOnMessage;
+    property OnHookMessage: TMessageEvent read FOnHookMessage write FOnHookMessage;
     property  OnUnfiltered: TGpSysHookUnfilteredEvent
       read FOnUnfiltered write FOnUnfiltered;
   end; { TGpSysHook }
@@ -297,11 +300,33 @@ type
       read FOnSysCommand write FOnSysCommand;
   end; { TGpCBTHook }
 
+  {
+  CWPRETSTRUCT:
+    LRESULT lResult;
+    LPARAM lParam;
+    WPARAM wParam;
+    UINT message;
+    HWND hwnd;
+  }
+  TGpWndRetMessageEvent = procedure (Sender: TObject; const aMsg: TMessage) of object;
+  {:WH_CALLWNDPROCRET hook wrapper.
+  }
+  TGpWndRetHook = class(TGpSysHook)
+  protected
+    FOnMessage: TGpWndRetMessageEvent;
+    class function HookType: TGpHookType; override;
+    procedure ProcessMessage(var Message: TMessage); override;
+    procedure WndProc(var Message: TMessage);override;
+  published
+    property OnMessage: TGpWndRetMessageEvent read FOnMessage write FOnMessage;
+  end;
+
   procedure Register;
 
 implementation
 
 uses
+  DSiWin32,
   GpSysHookLoader;
 
 resourcestring
@@ -342,7 +367,9 @@ var
   aMsg: TMsg;
 begin
   Handled := False;
-  if Assigned(FOnMessage) then
+	//the Message.Msg - WM_USER is code field.
+
+  if Assigned(FOnHookMessage) then
   begin
     if Message.Msg < WM_USER then
       aMsg.hwnd := FListenerWnd
@@ -352,7 +379,7 @@ begin
     aMsg.wParam := Message.wParam;
     aMsg.lParam := Message.lParam;
     aMsg.time := GetTickCount;
-    FOnMessage(aMsg, Handled);
+    FOnHookMessage(aMsg, Handled);
   end;
   if not Handled then
   begin
@@ -409,22 +436,13 @@ begin
       if hookRes <> 0 then
         Result := HookErrorToStr(hookRes)
       else begin
-        {$IFDEF COMPILER6_UP}
-          {$IFDEF MSWINDOWS}   
-            FListenerWnd := Classes.AllocateHWnd(WndProc);
-          {$ENDIF}
-          {$IFDEF LINUX}   
-            FListenerWnd := WinUtils.AllocateHWnd(WndProc);
-          {$ENDIF}
-        {$ELSE}
-        FListenerWnd := AllocateHwnd(WndProc);
-        {$ENDIF}
+        FListenerWnd := DSiAllocateHwnd(WndProc);
         if FListenerWnd = 0 then
           Result := sFailedToCreateListeningWindow
         else begin
           hookRes := fnAttachReceiver(HookType,FListenerWnd,FIsFiltering, FHookedWnd);
           if hookRes <> 0 then begin
-            DeallocateHWnd(FListenerWnd);
+            DSiDeallocateHWnd(FListenerWnd);
             FListenerWnd := 0;
             Result := HookErrorToStr(hookRes);
           end
@@ -444,16 +462,7 @@ procedure TGpSysHook.Stop;
 begin
   if FActive then begin
     if FListenerWnd <> 0 then begin
-      {$IFDEF COMPILER6_UP}
-        {$IFDEF MSWINDOWS}   
-          Classes.DeallocateHWnd(FListenerWnd);
-        {$ENDIF}
-        {$IFDEF LINUX}
-          WinUtils.DeallocateHWnd(FListenerWnd);
-        {$ENDIF}   
-      {$ELSE}
-        DeallocateHWnd(FListenerWnd);
-      {$ENDIF}
+      DSiDeallocateHWnd(FListenerWnd);
       FListenerWnd := 0;
     end;
     UnloadHookDLL;
@@ -815,5 +824,35 @@ begin
     end;
   end;
 end; { TGpCBTHook.ProcessMessage }
+
+{ TGpWndRetHook }
+class function TGpWndRetHook.HookType: TGpHookType; 
+begin
+  Result := htCallWndRetProc;
+end;
+
+
+procedure TGpWndRetHook.WndProc(var Message: TMessage);
+begin
+  if Assigned(FOnMessage) then
+  begin
+    //FOnMessage(Self, PCWPStruct(Message.lParam)^);
+    if Message.Msg > WM_USER then
+    begin
+      Message.Msg := Message.Msg - WM_USER;
+      FOnMessage(Self, Message);
+    end;
+  end;
+end;
+//}
+
+procedure TGpWndRetHook.ProcessMessage(var Message: TMessage); 
+begin
+	Message.msg := Message.msg - WM_USER;
+  if Assigned(FOnMessage) then
+  begin
+    //FOnMessage(Self, PCWPStruct(Message.lParam)^);
+  end;
+end;
 
 end.

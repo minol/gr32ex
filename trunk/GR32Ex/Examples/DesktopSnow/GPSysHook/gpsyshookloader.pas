@@ -126,7 +126,9 @@ var
   begin
     if dllHandle <> 0 then begin
       Dec(dllCount);
-      if dllCount <= 0 then begin
+      //if dllCount <= 0 then 
+      begin
+      	
         FreeLibrary(dllHandle);
         dllHandle := 0;
         dllCount := 0;

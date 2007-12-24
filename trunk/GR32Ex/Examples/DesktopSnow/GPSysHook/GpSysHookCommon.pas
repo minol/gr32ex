@@ -36,6 +36,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    Version           : 1.02
 </pre>*)(*
    History:
+     2007-12-24
+       added the WH_GETMESSAGE, WH_CALLWNDPROCRET by Riceball LEE(riceballl@hotmail.com)
      1.02: 2001-10-10
        - Added CBT hook to the list of supported hooks.
      1.01: 2001-10-06
@@ -84,7 +86,11 @@ var
 
 type
   //:Implemented hooks.
-  TGpHookType = (htShell, htKeyboard, htMouse, htCBT);
+  {
+    htGetMessage: Installs a hook procedure that monitors messages posted to a message queue. For more information, see the GetMsgProc hook procedure.
+    htCallWndRetProc: Installs a hook procedure that monitors messages after they have been processed by the destination window procedure. For more information, see the CallWndRetProc hook procedure.
+  }
+  TGpHookType = (htShell, htKeyboard, htMouse, htCBT, htGetMessage, htCallWndRetProc);
 
 implementation
 
