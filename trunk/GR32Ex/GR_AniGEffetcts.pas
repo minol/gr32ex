@@ -36,6 +36,7 @@ uses
   DbugIntf,
   {$endif} 
   Windows, Messages
+  , SyncObjs
   , Classes, SysUtils
   , Graphics, Controls
   , Forms
@@ -50,6 +51,7 @@ uses
 type
   TGRAnimationEffects = class(TGRCustomAnimationEffects)
   private
+    FInterlock: TCriticalSection;
     FBuffer: TBitmap32;
     FTempBuffer: TBitmap32; //for TCustomControl, TGraphicControl and TCustomForm
   protected
@@ -64,6 +66,7 @@ type
   public
     constructor Create; override;
     destructor Destroy; override;
+    procedure BGRePaint;
   end;
   
 implementation
@@ -77,10 +80,12 @@ constructor TGRAnimationEffects.Create;
 begin
   inherited Create;
   FBuffer := TBitmap32.Create;
+  FInterlock := TCriticalSection.Create;
 end;
 
 destructor TGRAnimationEffects.Destroy;
 begin
+  FreeAndNil(FInterlock);
   FreeAndNil(FBuffer);
   FreeAndNil(FTempBuffer);
   inherited Destroy;
@@ -109,6 +114,8 @@ procedure TGRAnimationEffects.DoPaint;
 var
   DC: HDC;
 begin
+  FInterlock.Enter;
+ try
   DC := GetControlDC(FControl);
   {$ifdef Debug}
   //SendDebug('Paint.DC=' + IntToStr(DC));
@@ -140,28 +147,46 @@ begin
     //ReleaseDC(DC);
   end;
   
-  
   ///InvalidateRect(DC, nil, true);
+ finally  
+   FInterlock.Leave;
+ end;
 end;
 
-procedure TGRAnimationEffects.DoWMPaint(var Message: TWMPaint);
+procedure TGRAnimationEffects.BGRePaint;
 var
   DC: HDC;
 begin
-  
+  FInterlock.Enter;
+ try
   DC := GetControlDC(FControl);
   if (DC <> 0) then
   try
     FDrawing := True;
     FBuffer.SetSize(FControl.Width, FControl.Height);
+    if FControl is TGRDesktopControl then
+    begin
+      //RedrawWindow(GetDesktopWindow(), nil, 0, RDW_INVALIDATE or RDW_UPDATENOW or  RDW_ALLCHILDREN);
+      //InvalidateRect(GetDesktopWindow(), nil, true);
+      InvalidateRect(0, nil, true);
+      UpdateWindow(0);
+      //UpdateWindow(GetDesktopWindow());
+    end;
     BitBlt(FBuffer.Handle, 0, 0, FBuffer.Width, FBuffer.Height, DC, 0, 0, SRCCOPY);
     FBuffer.ResetAlpha;
   finally
     FDrawing := False;
   end;
-  
-  
-  
+ finally  
+   FInterlock.Leave;
+ end;
+end;
+
+procedure TGRAnimationEffects.DoWMPaint(var Message: TWMPaint);
+begin
+  BGRePaint;
+
+
   //}
   //DoPaint;
 end;
