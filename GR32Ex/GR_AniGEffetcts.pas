@@ -139,7 +139,7 @@ begin
         //InvalidateRect(GetDesktopWindow(), nil, true);
         InvalidateRect(0, nil, true);
         //UpdateWindow(0);
-        Sleep(1000);
+        Sleep(1444);
         //UpdateWindow(GetDesktopWindow());
       end;
       BitBlt(FBuffer.Handle, 0, 0, FBuffer.Width, FBuffer.Height, DC, 0, 0, SRCCOPY);
@@ -295,7 +295,7 @@ procedure TGRAnimationEffects.RequirePaint;
 begin
   FInterlock.Enter;
   try
-    FReqPaintTime := GetTickCount() + 1000;
+    FReqPaintTime := GetTickCount() + 660;
   finally  
     FInterlock.Leave;
   end;
