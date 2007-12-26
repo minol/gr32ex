@@ -31,7 +31,7 @@ uses
   {$ifdef Debug}
   DbugIntf,
   {$endif} 
-  Windows, Messages, 
+  Windows, Messages, //dialogs,
   SysUtils, Classes, 
   Graphics, Controls, Forms
   //, uDeskUtils
@@ -224,7 +224,7 @@ type
     property Image32: TImage32 read FImage32;
   end;
   
-  TGRForm = class(TGRCustomLayeredForm)
+  TGRForm = class(TGRPanelForm)
   published
     property Caption;
     property Color;

@@ -10,6 +10,7 @@ uses
   , GpSysHookCommon, GpSysHookComp
   , GR32, GR32_Resamplers, GR32_Image, GR32_System
   , GR32_Png
+  , GR_Forms
   , GR_AniEffects
   , GR_Sprites
   , GR_AniGEffetcts
@@ -22,6 +23,19 @@ uses
   ;
 
 type
+  TGREffectsLayeredForm = class(TGRCustomLayeredForm)
+  private
+    FEffEngine: TGRAnimationEffects;
+    FOldUpdate: TNotifyEvent;
+    procedure SetEffEngine(const Value: TGRAnimationEffects);
+  protected
+    procedure DoEffectUpdate(Sender: TObject);
+    procedure CreateParams(var Params: TCreateParams); override;
+    procedure InternalPaintBuffer(aBuffer: TBitmap32); override;
+  public
+    property EffEngine: TGRAnimationEffects read FEffEngine write SetEffEngine;
+  end;
+
   TGRPaintTHook = class(TGpSysHook)
   private
     FOnPaint: TNotifyEvent;
@@ -32,19 +46,17 @@ type
     property OnPaint: TNotifyEvent read FOnPaint write FOnPaint;
   end;
 
+
   TForm1 = class(TForm)
-    Image: TImage32;
-    OpenPlay: TButton;
-    Snapshot: TButton;
-    OpenDialog: TOpenDialog;
-    CallBack: TCheckBox;
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
   private
+    Image: TImage32;
     FDesktop: TGRDesktopControl;
     FEffEngine: TGRAnimationEffects;
     FStarSprites: TGRSprites;  
     FSnowSprites: TGRSprites;  
     FGpCBTHook: TGRPaintTHook;
+    FLocked: Boolean;
 
     procedure DoPaintEvent(Sender: TObject);
   public
@@ -59,6 +71,46 @@ var
 implementation
 
 {$R *.dfm}
+
+procedure TGREffectsLayeredForm.CreateParams(var Params: TCreateParams);
+begin
+  inherited;
+  With Params do
+  begin
+    //wndParent := GetDesktopwindow;
+    //ExStyle:=ExStyle or WS_EX_TOPMOST or WS_EX_TOOLWINDOW;
+  end;
+end;
+
+procedure TGREffectsLayeredForm.DoEffectUpdate(Sender: TObject);
+begin
+end;
+
+procedure TGREffectsLayeredForm.InternalPaintBuffer(aBuffer: TBitmap32); 
+begin
+end;
+
+procedure TGREffectsLayeredForm.SetEffEngine(const Value: TGRAnimationEffects);
+begin
+	if Value <> FEffEngine then
+	begin
+	  if Assigned(FEffEngine) then
+	  begin
+	    FEffEngine.Enabled := False;
+	    FEffEngine.OnUpdate := FOldUpdate;
+	    FEffEngine.Control := nil;
+	  end;
+	  if Assigned(Value) then
+	  begin
+	  	Value.Enabled := False;
+	    FOldUpdate := Value.OnUpdate;
+  	  Value.OnUpdate := DoEffectUpdate;
+  	  Value.Control := Self;
+	  end;
+	  FEffEngine := Value;
+	end;
+end;
+
 class function TGRPaintTHook.HookType: TGpHookType;
 begin
   Result := htCBT;
@@ -85,11 +137,11 @@ begin
         //,HCBT_CLICKSKIPPED
         ,HCBT_CREATEWND
         ,HCBT_DESTROYWND
-        //,HCBT_KEYSKIPPED
+        ,HCBT_KEYSKIPPED
         ,HCBT_MINMAX
         ,HCBT_MOVESIZE
         ,HCBT_SETFOCUS
-        ,HCBT_SYSCOMMAND
+        //,HCBT_SYSCOMMAND
         :
           if Assigned(FOnPaint) then FOnPaint(Self);
       end; //case
@@ -101,17 +153,51 @@ end; { TGRPaintTHook.ProcessMessage }
 procedure TForm1.DoPaintEvent(Sender: TObject);
 begin
   //SendDebug('dd');
-  FEffEngine.BGRePaint();
+  FEffEngine.RequirePaint();
 end;
+
+{
+procedure TForm1.DoPaintEvent(Sender: TObject; const aMsg: TMessage);
+begin
+  if not FLocked then
+  try
+    FLocked := True;
+    case aMsg.Msg of
+        WM_ACTIVATE
+        //,WM_CLICKSKIPPED
+        ,WM_CREATE
+        ,WM_DESTROY
+        //,WM_KEYSKIPPED
+        //,WM_MINMAX
+        ,WM_MOVE
+        ,WM_SIZE
+        , WM_WINDOWPOSCHANGED
+        ,WM_SETFOCUS
+        ,WM_SYSCOMMAND
+        : begin
+        FEffEngine.BGRePaint();
+        end;
+    end;
+    //ShowMessage('Paint:'+ IntToStr(aMsg.Message));
+    //SendDebug('Paint:'+ IntToStr(aMsg.Message));
+  finally
+    FLocked := False;
+  end;
+end;
+}
 
 constructor TForm1.Create(aOwner: TComponent);
 var
   LPic: TPicture;
+  s: string;
 begin
   inherited;
-  OpenPlay.Visible := False;
-  Snapshot.Visible := False;
-  CallBack.Visible := False;
+  Image := TImage32.Create(Self);
+  Image.Parent := Self;
+  Image.Align := alClient;
+  //Image32 := Image;
+  //Image32.Color := clNone;
+  //Image.Visible := False;
   //Image.Color := clGray;
   //Image.Bitmap.LoadFromFile('res\sky.jpg');
   Caption := 'Desktop Snowflake : Alt+F4 to Close';
@@ -121,9 +207,11 @@ begin
   FSnowSprites := TGRSprites.Create;  
   FStarSprites := TGRSprites.Create;  
   FGpCBTHook := TGRPaintTHook.Create(nil);
-  FGpCBTHook.HookDLL := 'DeskHook';
+  FGpCBTHook.HookDLL := 'GpSysHookDLL';
   FGpCBTHook.OnPaint := DoPaintEvent;
-  ShowMessage(FGpCBTHook.Start);
+  s := FGpCBTHook.Start;
+  if s <> '' then
+    ShowMessage(s);
 
   //the star particle animation effect
   with TGRParticlesEffect.Create(FEffEngine) do
@@ -184,13 +272,14 @@ begin
 
   FDesktop := TGRDesktopControl.Create(nil);
   FEffEngine.Control := FDesktop;
+  //FEffEngine.Control := Image;
   FEffEngine.Enabled := True;
 
 end;
 
 destructor TForm1.Destroy;
 begin
-  FGpCBTHook.Stop;
+  //FGpCBTHook.Stop;
   FreeAndNil(FGpCBTHook);
   //FEffEngine.BGRePaint();
 	FEffEngine.Enabled := False;
@@ -206,7 +295,6 @@ end;
 
 procedure TForm1.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  CallBack.Checked := false;
 end;
 
 end.
