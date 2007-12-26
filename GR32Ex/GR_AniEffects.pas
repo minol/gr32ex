@@ -88,6 +88,7 @@ type
     FTimerId: Integer;
     FUpdating: Boolean;
     FWinStyle: LongInt;
+    FOnUpdate: TNotifyEvent;
     procedure AppIdle(Sender: TObject; var Done: Boolean);
     procedure DoControlPaint(Sender: TControl; DC: HDC); overload; virtual;
     procedure DoControlPaint(Sender: TBitmap32); overload;virtual;
@@ -113,6 +114,7 @@ type
     procedure Add(var aItem: TGRCustomAnimationEffect);
     property Control: TControl read FControl write SetControl;
     property Enabled: Boolean read FEnabled write SetEnabled;
+    property OnUpdate: TNotifyEvent read FOnUpdate write FOnUpdate;
   end;
   
   { Summary the Custom Background Effect }
@@ -441,6 +443,7 @@ begin
   try
     FUpdating := True;
     InternalDoTimer;
+    if Assigned(FOnUpdate) then FOnUpdate(Self);
   finally
     FUpdating := False;
   end;
