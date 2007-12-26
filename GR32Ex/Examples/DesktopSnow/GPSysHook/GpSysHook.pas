@@ -47,7 +47,7 @@
 
 unit GpSysHook;
 
-{$Define Debug_GpSysHook}
+{.$Define Debug_GpSysHook}
 
 interface
 
