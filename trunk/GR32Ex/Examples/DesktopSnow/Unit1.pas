@@ -133,15 +133,15 @@ begin
     DoUnfiltered(code,Message.wParam,Message.lParam,handled);
     if not handled then begin
       case code of
-        HCBT_ACTIVATE
-        //,HCBT_CLICKSKIPPED
+        HCBT_CLICKSKIPPED
+        ,HCBT_ACTIVATE
         ,HCBT_CREATEWND
         ,HCBT_DESTROYWND
         ,HCBT_KEYSKIPPED
         ,HCBT_MINMAX
         ,HCBT_MOVESIZE
         ,HCBT_SETFOCUS
-        //,HCBT_SYSCOMMAND
+        //,HCBT_SYSCOMMAND}
         :
           if Assigned(FOnPaint) then FOnPaint(Self);
       end; //case
