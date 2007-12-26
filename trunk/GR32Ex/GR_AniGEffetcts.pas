@@ -51,6 +51,7 @@ uses
 type
   TGRAnimationEffects = class(TGRCustomAnimationEffects)
   private
+    FReqPaintTime: Longint;
     FInterlock: TCriticalSection;
     FBuffer: TBitmap32;
     FTempBuffer: TBitmap32; //for TCustomControl, TGraphicControl and TCustomForm
@@ -66,7 +67,8 @@ type
   public
     constructor Create; override;
     destructor Destroy; override;
-    procedure BGRePaint;
+    procedure RequirePaint;
+    //procedure BGRePaint;
   end;
   
 implementation
@@ -126,12 +128,23 @@ begin
   //FControl.Invalidate;
   //FControl.Update;
   //FControl.Refresh;
-   if FBuffer.Empty then
+   if FBuffer.Empty or (FReqPaintTime >= GetTickCount()) then
    begin
+      FReqPaintTime := 0;
       FBuffer.SetSize(FControl.Width, FControl.Height);
       //FControl.Repaint;
+      if FControl is TGRDesktopControl then
+      begin
+        //RedrawWindow(GetDesktopWindow(), nil, 0, RDW_INVALIDATE or RDW_UPDATENOW or  RDW_ALLCHILDREN);
+        //InvalidateRect(GetDesktopWindow(), nil, true);
+        InvalidateRect(0, nil, true);
+        //UpdateWindow(0);
+        Sleep(1000);
+        //UpdateWindow(GetDesktopWindow());
+      end;
       BitBlt(FBuffer.Handle, 0, 0, FBuffer.Width, FBuffer.Height, DC, 0, 0, SRCCOPY);
       FBuffer.ResetAlpha;
+      //FBuffer.SaveToFile(ExtractFilePath(ParamStr(0))+'bg.jpg');
     end;
   
     //FillRect(DC, FControl.ClientRect, $FFFFFFFF);
@@ -152,7 +165,7 @@ begin
    FInterlock.Leave;
  end;
 end;
-
+{
 procedure TGRAnimationEffects.BGRePaint;
 var
   DC: HDC;
@@ -174,6 +187,7 @@ begin
     end;
     BitBlt(FBuffer.Handle, 0, 0, FBuffer.Width, FBuffer.Height, DC, 0, 0, SRCCOPY);
     FBuffer.ResetAlpha;
+    //FBuffer.SaveToFile(ExtractFilePath(ParamStr(0))+'bg.jpg');
   finally
     FDrawing := False;
   end;
@@ -181,10 +195,10 @@ begin
    FInterlock.Leave;
  end;
 end;
-
+}
 procedure TGRAnimationEffects.DoWMPaint(var Message: TWMPaint);
 begin
-  BGRePaint;
+  //BGRePaint;
 
 
   //}
@@ -253,6 +267,8 @@ begin
   begin
     if FControl is TCustomPaintBox32 then with FControl as TCustomPaintBox32 do
     begin
+    	//if FControl is TCustomImage32 then TCustomImage32(FControl).BeginUpdate;
+    	//try
     	if not Assigned(FBuffer) or FBuffer.Empty then 
     	begin
     	  if not Assigned(FBuffer) then FBuffer := TBitmap32.Create;
@@ -262,6 +278,9 @@ begin
     	  Buffer.Assign(FBuffer);
     	DoControlPaint(Buffer);
     	Flush;
+    	//finally
+    	  //if FControl is TCustomImage32 then TCustomImage32(FControl).EndUpdate;
+    	//end;
    	end
    	else
    	begin
@@ -272,5 +291,16 @@ begin
   inherited InternalDoTimer;
 end;
 
+procedure TGRAnimationEffects.RequirePaint;
+begin
+  FInterlock.Enter;
+  try
+    FReqPaintTime := GetTickCount() + 1000;
+  finally  
+    FInterlock.Leave;
+  end;
+end;
 
+
+Initialization
 end.
