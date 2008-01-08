@@ -534,9 +534,9 @@ begin
       if FParticle.FRandomLocation then
       begin
         randTemp := RoundNormal(FParticle.FLifeTime);
-        randTemp := Random(randTemp);
-        for i2 := 0 to randTemp do
-            p.Move(1);
+        randTemp := Random(randTemp)+1;
+        //for i2 := 0 to randTemp do
+            p.Move(randTemp);
       end;
   
       //FParticles.Add(p);
