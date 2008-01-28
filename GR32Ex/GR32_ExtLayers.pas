@@ -1,4 +1,12 @@
 {
+history by riceball
+  * TTransformationLayer
+    + ChangeNotifiction
+    + AddChangeNotifiction
+    + RemoveChangeNotifiction
+  * TExtRubberBandLayer
+    + change the TExtRubberBandLayer when the childLayer changed
+
 Based on the newsgroup post (March 18, 2002,  news://news.g32.org/g32org.public.graphics32)
  <public@lischke-online.de ; <news:a755io$6t1$1@webserver9.elitedev.com>...
 ----
@@ -125,7 +133,7 @@ type
 
 const
   DefaultRubberbandOptions = [rboAllowCornerResize, rboAllowEdgeResize, rboAllowMove,
-    rboAllowRotation, rboShowFrame, rboShowHandles];
+    rboShowFrame, rboShowHandles];
 
 type
   TGridLayer = class;
@@ -143,6 +151,7 @@ type
     FGridLayer: TGridLayer;                      // Used to snap/align coordinates.
 
     FOnChange: TNotifyEvent;                     // For individual change events.
+    FChangeNotificationList: TList;
     procedure SetAngle(Value: Single);
     procedure SetGridLayer(const Value: TGridLayer);
     procedure SetPivot(const Value: TFloatPoint);
@@ -154,6 +163,10 @@ type
     procedure DoChange; virtual;
     function GetNativeSize: TSize; virtual;
     procedure Notification(ALayer: TCustomLayer); override;
+
+    procedure AddChangeNotification(ALayer: TTransformationLayer);
+    procedure RemoveChangeNotification(ALayer: TTransformationLayer);
+    procedure ChangeNotification(ALayer: TTransformationLayer); virtual;
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
@@ -287,6 +300,8 @@ type
     procedure Paint(Buffer: TBitmap32); override;
     function SnapPosition: Boolean;
     procedure UpdateChildLayer;
+
+    procedure ChangeNotification(ALayer: TTransformationLayer); override;
   public
     constructor Create(LayerCollection: TLayerCollection); override;
     destructor Destroy; override;
@@ -392,7 +407,31 @@ begin
   if Assigned(FGridLayer) then
     FGridLayer.RemoveNotification(Self);
   FTransformation.Free;
+  if Assigned(FChangeNotificationList) then FChangeNotificationList.Free;
   inherited;
+end;
+
+procedure TTransformationLayer.AddChangeNotification(ALayer: TTransformationLayer);
+begin
+  if not Assigned(FChangeNotificationList) then FChangeNotificationList := TList.Create;
+  FChangeNotificationList.Add(ALayer);
+end;
+
+procedure TTransformationLayer.RemoveChangeNotification(ALayer: TTransformationLayer);
+begin
+  if Assigned(FChangeNotificationList) then
+  begin
+    FChangeNotificationList.Remove(ALayer);
+    if FChangeNotificationList.Count = 0 then
+    begin
+      FChangeNotificationList.Free;
+      FChangeNotificationList := nil;
+    end;
+  end;
+end;
+
+procedure TTransformationLayer.ChangeNotification(ALayer: TTransformationLayer); 
+begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -488,8 +527,16 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 procedure TTransformationLayer.DoChange;
-
+var
+  i: integer;
 begin
+  if Assigned(FChangeNotificationList) then
+  begin
+    for i := FChangeNotificationList.Count - 1 downto 0 do
+    begin
+      TTransformationLayer(FChangeNotificationList[I]).ChangeNotification(Self);
+    end;
+  end;
   if Assigned(FOnChange) then
     FOnChange(Self);
 end;
@@ -1077,7 +1124,10 @@ destructor TExtRubberBandLayer.Destroy;
 
 begin
   if Assigned(FChildLayer) then
+  begin
     FChildLayer.RemoveNotification(Self);
+    FChildLayer.RemoveChangeNotification(Self);
+  end;
   inherited;
 end;
 
@@ -1087,7 +1137,10 @@ procedure TExtRubberBandLayer.SetChildLayer(const Value: TTransformationLayer);
 
 begin
   if Assigned(FChildLayer) then
+  begin
     FChildLayer.RemoveNotification(Self);
+    FChildLayer.RemoveChangeNotification(Self);
+  end;
   FChildLayer := Value;
   if Assigned(Value) then
   begin
@@ -1100,6 +1153,7 @@ begin
     FSkew := Value.Skew;
 
     FChildLayer.AddNotification(Self);
+    FChildLayer.AddChangeNotification(Self);
   end
   else
   begin
@@ -1405,6 +1459,7 @@ var
   ScaleX, ScaleY: Single;
 begin
   Result := rdsNone;
+  //if not Assigned(FChildLayer) then exit;
 
   // Transform coordinates into local space.
   Local := FTransformation.ReverseTransform(Point(X, Y));
@@ -1834,6 +1889,50 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
+
+procedure TExtRubberBandLayer.ChangeNotification(ALayer: TTransformationLayer);
+var
+  SomethingChanged: Boolean;
+
+  function Different(const F1, F2: TFloatPoint): Boolean;
+  begin
+    Result := False;
+    
+    If (F1.X <> F2.X) or (F1.Y <> F2.Y) then
+    begin
+      Result := True;
+      SomethingChanged := True;
+    end;
+  end;
+  
+begin
+  if Assigned(FChildLayer) then
+  begin
+    BeginUpdate; // Do not trigger FChildLayer.OnChange 5 times in a row....
+    Changing; // trigger for LayerCollection
+
+    SomethingChanged := False;
+
+    if FChildLayer.Angle <> Angle then
+    begin
+      Angle := FChildLayer.Angle;
+      SomethingChanged := True;
+    end;
+
+    if Different(FChildLayer.Skew, Skew) then Skew := FChildLayer.Skew;
+    if Different(FChildLayer.Position, Position) then Position := FChildLayer.Position;
+    if Different(FChildLayer.Scaling, Scaling) then Scaling := FChildLayer.Scaling;
+    if Different(FChildLayer.PivotPoint, PivotPoint) then PivotPoint := FChildLayer.PivotPoint;
+
+    EndUpdate;
+
+    if SomethingChanged then
+    begin
+      Changed; // trigger for LayerCollection
+      DoChange; // trigger for Layer
+    end;
+  end;
+end;
 
 procedure TExtRubberBandLayer.Notification(ALayer: TCustomLayer);
 
