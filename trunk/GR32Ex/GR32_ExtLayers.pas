@@ -1,6 +1,6 @@
 {
 history by riceball
-  * TTransformationLayer
+  + TCustomLayerEx
     + ChangeNotifiction
     + AddChangeNotifiction
     + RemoveChangeNotifiction
@@ -138,7 +138,22 @@ const
 type
   TGridLayer = class;
 
-  TTransformationLayer = class(TCustomLayer)
+  TCustomLayerEx = class(TCustomLayer)
+  protected
+    FOnChange: TNotifyEvent;                     // For individual change events.
+    FChangeNotificationList: TList;
+
+    procedure AddChangeNotification(ALayer: TCustomLayerEx);
+    procedure RemoveChangeNotification(ALayer: TCustomLayerEx);
+    procedure ChangeNotification(ALayer: TCustomLayerEx); virtual;
+    procedure DoChange; virtual;
+  public
+    destructor Destroy; override;
+
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
+  end;
+
+  TTransformationLayer = class(TCustomLayerEx)
   private
     FAngle: Single;                              // Given in degrees.
     FAlphaHit: Boolean;
@@ -150,8 +165,6 @@ type
     FPivotPoint: TFloatPoint;                    // Center of rotation and proportional scaling.
     FGridLayer: TGridLayer;                      // Used to snap/align coordinates.
 
-    FOnChange: TNotifyEvent;                     // For individual change events.
-    FChangeNotificationList: TList;
     procedure SetAngle(Value: Single);
     procedure SetGridLayer(const Value: TGridLayer);
     procedure SetPivot(const Value: TFloatPoint);
@@ -160,13 +173,9 @@ type
     procedure SetScaling(const Value: TFloatPoint);
     procedure SetSkew(const Value: TFloatPoint);
   protected
-    procedure DoChange; virtual;
     function GetNativeSize: TSize; virtual;
     procedure Notification(ALayer: TCustomLayer); override;
 
-    procedure AddChangeNotification(ALayer: TTransformationLayer);
-    procedure RemoveChangeNotification(ALayer: TTransformationLayer);
-    procedure ChangeNotification(ALayer: TTransformationLayer); virtual;
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
@@ -185,7 +194,6 @@ type
     property Scaling: TFloatPoint read FScaling write SetScaling;
     property Skew: TFloatPoint read FSkew write SetSkew;
 
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
 
   // The grid elements determine what will be painted of the grid layer.
@@ -301,7 +309,7 @@ type
     function SnapPosition: Boolean;
     procedure UpdateChildLayer;
 
-    procedure ChangeNotification(ALayer: TTransformationLayer); override;
+    procedure ChangeNotification(ALayer: TCustomLayerEx); override;
   public
     constructor Create(LayerCollection: TLayerCollection); override;
     destructor Destroy; override;
@@ -388,6 +396,62 @@ uses
 type
   TAffineTransformationAccess = class(TAffineTransformation);
 
+destructor TCustomLayerEx.Destroy;
+begin
+  if Assigned(FChangeNotificationList) then 
+  begin
+    FChangeNotificationList.Free;
+    FChangeNotificationList := nil;
+  end;
+  inherited;
+end;
+
+procedure TCustomLayerEx.AddChangeNotification(ALayer: TCustomLayerEx);
+begin
+  if not Assigned(FChangeNotificationList) then FChangeNotificationList := TList.Create;
+  FChangeNotificationList.Add(ALayer);
+end;
+
+procedure TCustomLayerEx.RemoveChangeNotification(ALayer: TCustomLayerEx);
+begin
+  if Assigned(FChangeNotificationList) then
+  begin
+    FChangeNotificationList.Remove(ALayer);
+    if FChangeNotificationList.Count = 0 then
+    begin
+      FChangeNotificationList.Free;
+      FChangeNotificationList := nil;
+    end;
+  end;
+end;
+
+procedure TCustomLayerEx.DoChange;
+var
+  i: integer;
+begin
+  if Assigned(FChangeNotificationList) then
+  begin
+    for i := FChangeNotificationList.Count - 1 downto 0 do
+    begin
+      if Assigned(FChangeNotificationList[i]) then
+      try
+        TTransformationLayer(FChangeNotificationList[i]).ChangeNotification(Self);
+      except
+        FChangeNotificationList.Delete(i);
+      end;
+    end;
+  end;
+  if Assigned(FOnChange) then
+    FOnChange(Self);
+end;
+
+//----------------------------------------------------------------------------------------------------------------------
+
+procedure TCustomLayerEx.ChangeNotification(ALayer: TCustomLayerEx); 
+begin
+end;
+
+
 //----------------- TTransformationLayer ---------------------------------------------------------------------------------
 
 constructor TTransformationLayer.Create(ALayerCollection: TLayerCollection);
@@ -407,31 +471,7 @@ begin
   if Assigned(FGridLayer) then
     FGridLayer.RemoveNotification(Self);
   FTransformation.Free;
-  if Assigned(FChangeNotificationList) then FChangeNotificationList.Free;
   inherited;
-end;
-
-procedure TTransformationLayer.AddChangeNotification(ALayer: TTransformationLayer);
-begin
-  if not Assigned(FChangeNotificationList) then FChangeNotificationList := TList.Create;
-  FChangeNotificationList.Add(ALayer);
-end;
-
-procedure TTransformationLayer.RemoveChangeNotification(ALayer: TTransformationLayer);
-begin
-  if Assigned(FChangeNotificationList) then
-  begin
-    FChangeNotificationList.Remove(ALayer);
-    if FChangeNotificationList.Count = 0 then
-    begin
-      FChangeNotificationList.Free;
-      FChangeNotificationList := nil;
-    end;
-  end;
-end;
-
-procedure TTransformationLayer.ChangeNotification(ALayer: TTransformationLayer); 
-begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -526,22 +566,6 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TTransformationLayer.DoChange;
-var
-  i: integer;
-begin
-  if Assigned(FChangeNotificationList) then
-  begin
-    for i := FChangeNotificationList.Count - 1 downto 0 do
-    begin
-      TTransformationLayer(FChangeNotificationList[I]).ChangeNotification(Self);
-    end;
-  end;
-  if Assigned(FOnChange) then
-    FOnChange(Self);
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
 
 function TTransformationLayer.GetNativeSize: TSize;
 
@@ -1140,6 +1164,7 @@ begin
   begin
     FChildLayer.RemoveNotification(Self);
     FChildLayer.RemoveChangeNotification(Self);
+    //Self.RemoveNotification(FChildLayer);
   end;
   FChildLayer := Value;
   if Assigned(Value) then
@@ -1154,6 +1179,7 @@ begin
 
     FChildLayer.AddNotification(Self);
     FChildLayer.AddChangeNotification(Self);
+    //Self.AddNotification(FChildLayer);
   end
   else
   begin
@@ -1890,7 +1916,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.ChangeNotification(ALayer: TTransformationLayer);
+procedure TExtRubberBandLayer.ChangeNotification(ALayer: TCustomLayerEx);
 var
   SomethingChanged: Boolean;
 
@@ -1929,18 +1955,20 @@ begin
     if SomethingChanged then
     begin
       Changed; // trigger for LayerCollection
-      DoChange; // trigger for Layer
+      //DoChange; // trigger for Layer
     end;
   end;
 end;
 
 procedure TExtRubberBandLayer.Notification(ALayer: TCustomLayer);
-
 begin
   inherited;
 
   if ALayer = FChildLayer then
+  begin
     FChildLayer := nil;
+    
+  end;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
