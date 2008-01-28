@@ -1906,7 +1906,7 @@ var
   end;
   
 begin
-  if Assigned(FChildLayer) then
+  if Assigned(FChildLayer) and not FIsDragging then
   begin
     BeginUpdate; // Do not trigger FChildLayer.OnChange 5 times in a row....
     Changing; // trigger for LayerCollection
