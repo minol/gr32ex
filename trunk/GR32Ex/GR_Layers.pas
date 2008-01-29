@@ -30,10 +30,14 @@ interface
 uses
   Windows, Messages,
   SysUtils, Classes
+  , GR32
+  , GR32_Resamplers
+  , GR32_Containers
   , GR32_Layers
+  , GR32_RepaintOpt
+  , GR32_Image
   , GR32_ExtLayers
   ;
-
 
 type
   TGRLayerCollection = class(TLayerCollection)
@@ -41,37 +45,101 @@ type
 
   TGRLayerContainer = class(TCustomLayerEx)
   protected
-    FLayers: TGRLayerCollection;
-    FBitmap : TBitmap32;
-    CachedXForm: TCoordXForm;
-    FOnResize: TNotifyEvent;
+    FLeft: Integer;
+    FTop: Integer;
+    FWidth: Integer;
+    FHeight: Integer;
+    FBuffer: TBitmap32;
+    FBufferOversize: Integer;
+    FBufferValid: Boolean;
+    FForceFullRepaint: Boolean;
+    FRepaintOptimizer: TCustomRepaintOptimizer;
+    FRepaintMode: TRepaintMode;
 
-    procedure BitmapChanged(const Area: TRect); virtual;
-    procedure BitmapResizeHandler(Sender: TObject);
-    procedure BitmapChangeHandler(Sender: TObject);
-    procedure BitmapAreaChangeHandler(Sender: TObject; const Area: TRect; const Info: Cardinal);
-    procedure BitmapDirectAreaChangeHandler(Sender: TObject; const Area: TRect; const Info: Cardinal);
+    FLayers: TGRLayerCollection;
+
+
+    FInvalidRects: TRectList;
+    FScaleX: Single;
+    FScaleY: Single;
+    FScaleMode: TScaleMode;
+    FUpdateCount: Integer;
+
+    CachedBitmapRect: TRect;
+    CachedXForm: TCoordXForm;
+    CacheValid: Boolean;
+    OldSzX, OldSzY: Integer;
+
+    procedure SetRepaintMode(const Value: TRepaintMode); virtual;
+    function GetBitmapRect: TRect;
+
+    function  CustomRepaint: Boolean; virtual;
+    procedure DoPaintBuffer; virtual;
+    procedure UpdateCache; virtual;
+    property  UpdateCount: Integer read FUpdateCount;
+    procedure InvalidateCache;
+    procedure Invalidate;
+    function  InvalidRectsAvailable: Boolean; virtual;
+    procedure DoPrepareInvalidRects; virtual;
+    procedure ResetInvalidRects;
+    procedure Paint(aBuffer: TBitmap32); override;
+
     procedure LayerCollectionChangeHandler(Sender: TObject);
     procedure LayerCollectionGDIUpdateHandler(Sender: TObject);
     procedure LayerCollectionGetViewportScaleHandler(Sender: TObject; var ScaleX, ScaleY: Single);
     procedure LayerCollectionGetViewportShiftHandler(Sender: TObject; var ShiftX, ShiftY: Single);
+
+    property  BufferValid: Boolean read FBufferValid write FBufferValid;
+    property  InvalidRects: TRectList read FInvalidRects;
   public
-    constructor Create(aLayerCollection: TLayerCollection);
-    property OnResize: TNotifyEvent read FOnResize write FOnResize;
+    constructor Create(aLayerCollection: TLayerCollection);override;
+    destructor Destroy;override;
+    function  GetViewportRect: TRect; virtual;
+
+    property Left: Integer read FLeft write FLeft;
+    property Top: Integer read FTop write FTop;
+    property Width: Integer read FWidth write FWidth;
+    property Height: Integer read FHeight write FHeight;
+    property Buffer: TBitmap32 read FBuffer;
+    property RepaintMode: TRepaintMode read FRepaintMode write SetRepaintMode default rmFull;
   end;
 
 
 implementation
 
+uses
+  Math, TypInfo, GR32_MicroTiles;
+
+const
+  DefaultRepaintOptimizerClass: TCustomRepaintOptimizerClass = TMicroTilesRepaintOptimizer;
+  UnitXForm: TCoordXForm = (
+    ScaleX: $10000;
+    ScaleY: $10000;
+    ShiftX: 0;
+    ShiftY: 0;
+    RevScaleX: 65536;
+    RevScaleY: 65536);
+
+type
+  TBitmap32Access = class(TBitmap32);
+  TLayerAccess = class(TCustomLayer);
+
 { TGRLayerContainer }
 
 constructor TGRLayerContainer.Create(aLayerCollection: TLayerCollection);
 begin
-  FBitmap := TBitmap32.Create;
-  FBitmap.OnResize := BitmapResizeHandler;
+  inherited;
+  FBuffer := TBitmap32.Create;
+  FBufferOversize := 40;
+  FForceFullRepaint := True;
+  FInvalidRects := TRectList.Create;
+  FRepaintOptimizer := DefaultRepaintOptimizerClass.Create(Buffer, InvalidRects);
+  Height := 192;
+  Width := 192;
+
   
-  FLayers := TLayerCollection.Create(Self);
-  with TLayerCollectionAccess(FLayers) do
+  FLayers := TGRLayerCollection.Create(Self);
+  with FLayers do
   begin
 {$IFDEF DEPRECATEDMODE}
     CoordXForm := @CachedXForm;
@@ -86,89 +154,12 @@ begin
   RepaintMode := rmFull;
 end;
 
-procedure TGRLayerContainer.BitmapResizeHandler(Sender: TObject);
+destructor TGRLayerContainer.Destroy;
 begin
-  if Assigned(FOnResize) then FOnResize(Sender);;
-end;
-
-procedure TGRLayerContainer.BitmapChangeHandler(Sender: TObject);
-begin
-  FRepaintOptimizer.Reset;
-  BitmapChanged(Bitmap.Boundsrect);
-end;
-
-procedure TGRLayerContainer.BitmapAreaChangeHandler(Sender: TObject; const Area: TRect; const Info: Cardinal);
-var
-  T, R: TRect;
-  Width, Tx, Ty, I, J: Integer;
-begin
-  if Sender = FBitmap then
-  begin
-    T := Area;
-    Width := Trunc(FBitmap.Resampler.Width) + 1;
-    InflateArea(T, Width, Width);
-    T.TopLeft := BitmapToControl(T.TopLeft);
-    T.BottomRight := BitmapToControl(T.BottomRight);
-
-    if FBitmapAlign <> baTile then
-      FRepaintOptimizer.AreaUpdateHandler(Self, T, AREAINFO_RECT)
-    else
-    begin
-      with CachedBitmapRect do
-      begin
-        Tx := Buffer.Width div Right;
-        Ty := Buffer.Height div Bottom;
-        for J := 0 to Ty do
-          for I := 0 to Tx do
-          begin
-            R := T;
-            OffsetRect(R, Right * I, Bottom * J);
-            FRepaintOptimizer.AreaUpdateHandler(Self, R, AREAINFO_RECT);
-          end;
-      end;
-    end;
-  end;
-
-  BitmapChanged(Area);
-end;
-
-procedure TGRLayerContainer.BitmapDirectAreaChangeHandler(Sender: TObject; const Area: TRect; const Info: Cardinal);
-var
-  T, R: TRect;
-  Width, Tx, Ty, I, J: Integer;
-begin
-  if Sender = FBitmap then
-  begin
-    T := Area;
-    Width := Trunc(FBitmap.Resampler.Width) + 1;
-    InflateArea(T, Width, Width);
-    T.TopLeft := BitmapToControl(T.TopLeft);
-    T.BottomRight := BitmapToControl(T.BottomRight);
-
-    if FBitmapAlign <> baTile then
-      InvalidRects.Add(T)
-    else
-    begin
-      with CachedBitmapRect do
-      begin
-        Tx := Buffer.Width div Right;
-        Ty := Buffer.Height div Bottom;
-        for J := 0 to Ty do
-          for I := 0 to Tx do
-          begin
-            R := T;
-            OffsetRect(R, Right * I, Bottom * J);
-            InvalidRects.Add(R);
-          end;
-      end;
-    end;
-  end;
-
-  if FUpdateCount = 0 then
-  begin
-    if not(csCustomPaint in ControlState) then Repaint;
-    if Assigned(FOnChange) then FOnChange(Self);
-  end;
+  FRepaintOptimizer.Free;
+  FInvalidRects.Free;
+  FBuffer.Free;
+  inherited;
 end;
 
 procedure TGRLayerContainer.LayerCollectionChangeHandler(Sender: TObject);
@@ -178,7 +169,7 @@ end;
 
 procedure TGRLayerContainer.LayerCollectionGDIUpdateHandler(Sender: TObject);
 begin
-  Paint;
+  Changed;
 end;
 
 procedure TGRLayerContainer.LayerCollectionGetViewportScaleHandler(Sender: TObject; var ScaleX, ScaleY: Single);
@@ -195,9 +186,172 @@ begin
   ShiftY := CachedXForm.ShiftY;
 end;
 
-procedure TGRLayerContainer.BitmapChanged(const Area: TRect);
+procedure TGRLayerContainer.UpdateCache;
 begin
-  Changed;
+  if CacheValid then Exit;
+  CachedBitmapRect := GetBitmapRect;
+  CachedXForm := UnitXForm;
+  CacheValid := True;
+end;
+
+function TGRLayerContainer.InvalidRectsAvailable: Boolean;
+begin
+  // avoid calling inherited, we have a totally different behaviour here...
+  DoPrepareInvalidRects;
+  Result := FInvalidRects.Count > 0;
+end;
+
+procedure TGRLayerContainer.InvalidateCache;
+begin
+  if FRepaintOptimizer.Enabled then FRepaintOptimizer.Reset;
+  CacheValid := False;
+end;
+
+procedure TGRLayerContainer.Invalidate;
+begin
+  BufferValid := False;
+  CacheValid := False;
+end;
+
+procedure TGRLayerContainer.DoPrepareInvalidRects;
+begin
+  if FRepaintOptimizer.Enabled and not FForceFullRepaint then
+    FRepaintOptimizer.PerformOptimization;
+end;
+
+function TGRLayerContainer.GetBitmapRect: TRect;
+begin
+    with Result do
+    begin
+      Left := 0;
+      Right := 0;
+      Top := 0;
+      Bottom := 0;
+    end
+end;
+
+procedure TGRLayerContainer.Paint(aBuffer: TBitmap32);
+var
+  I: Integer;
+  vRect: TRect;
+begin
+  if FRepaintOptimizer.Enabled then
+  begin
+{$IFDEF CLX}
+    if CustomRepaint then DoPrepareInvalidRects;
+{$ENDIF}
+    FRepaintOptimizer.BeginPaint;
+  end;
+
+  if not FBufferValid then
+  begin
+{$IFDEF CLX}
+    TBitmap32Access(FBuffer).ImageNeeded;
+{$ENDIF}
+    DoPaintBuffer;
+{$IFDEF CLX}
+    TBitmap32Access(FBuffer).CheckPixmap;
+{$ENDIF}
+  end;
+
+  FBuffer.Lock;
+  try
+    if FInvalidRects.Count > 0 then
+      for i := 0 to FInvalidRects.Count - 1 do
+      begin
+        vRect := FInvalidRects[i]^;
+        with vRect do
+          BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
+      end
+    else begin
+      vRect := GetViewportRect;
+      with vRect do
+        BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
+    end;
+  finally
+    FBuffer.Unlock;
+  end;
+
+  
+  if FRepaintOptimizer.Enabled then
+    FRepaintOptimizer.EndPaint;
+  ResetInvalidRects;
+  FForceFullRepaint := False;
+end;
+
+function TGRLayerContainer.CustomRepaint: Boolean;
+begin
+  Result := FRepaintOptimizer.Enabled and not FForceFullRepaint and
+    FRepaintOptimizer.UpdatesAvailable;
+end;
+
+procedure TGRLayerContainer.DoPaintBuffer;
+var
+  I, J: Integer;
+begin
+  if FRepaintOptimizer.Enabled then
+    FRepaintOptimizer.BeginPaintBuffer;
+
+  UpdateCache;
+
+
+  Buffer.BeginUpdate;
+  if FInvalidRects.Count = 0 then
+  begin
+    Buffer.ClipRect := GetViewportRect;
+
+    for I := 0 to FLayers.Count - 1 do
+      if (FLayers.Items[I].LayerOptions and LOB_VISIBLE) <> 0 then
+        TLayerAccess(FLayers.Items[I]).DoPaint(Buffer);
+  end
+  else
+  begin
+    for J := 0 to FInvalidRects.Count - 1 do
+    begin
+      Buffer.ClipRect := FInvalidRects[J]^;
+      for I := 0 to FLayers.Count - 1 do
+        if (FLayers.Items[I].LayerOptions and LOB_VISIBLE) <> 0 then
+          TLayerAccess(FLayers.Items[I]).DoPaint(Buffer);
+    end;
+
+    Buffer.ClipRect := GetViewportRect;
+  end;
+  Buffer.EndUpdate;
+
+  if FRepaintOptimizer.Enabled then
+    FRepaintOptimizer.EndPaintBuffer;
+
+  // avoid calling inherited, we have a totally different behaviour here...
+  FBufferValid := True;
+end;
+
+function TGRLayerContainer.GetViewportRect: TRect;
+begin
+  // returns position of the buffered area within the control bounds
+  with Result do
+  begin
+    // by default, the whole control is buffered
+    Left := 0;
+    Top := 0;
+    Right := Width;
+    Bottom := Height;
+  end;
+end;
+
+procedure TGRLayerContainer.SetRepaintMode(const Value: TRepaintMode);
+begin
+  if Assigned(FRepaintOptimizer) then
+  begin
+    FRepaintOptimizer.Enabled := Value = rmOptimizer;
+
+    FRepaintMode := Value;
+    Invalidate;
+  end;
+end;
+
+procedure TGRLayerContainer.ResetInvalidRects;
+begin
+  FInvalidRects.Clear;
 end;
 
 initialization
