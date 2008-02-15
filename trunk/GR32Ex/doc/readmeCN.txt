@@ -154,3 +154,5 @@ begin
   Result := TFont.Create;
 end;
 
+* 发现为何不能拖动Layer：必须是click(MouseDown, MouseUp)选中，然后在按住MouseDown拖动！即使重载MouseDown也不行！
+
