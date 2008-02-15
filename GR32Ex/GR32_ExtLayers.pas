@@ -6,6 +6,7 @@ history by riceball
     + RemoveChangeNotifiction
   * TExtRubberBandLayer
     + change the TExtRubberBandLayer when the childLayer changed
+    * [bug] can not drap it(click then drag) directly before fixed
 
 Based on the newsgroup post (March 18, 2002,  news://news.g32.org/g32org.public.graphics32)
  <public@lischke-online.de ; <news:a755io$6t1$1@webserver9.elitedev.com>...
@@ -117,7 +118,10 @@ unit GR32_ExtLayers;
 interface
 
 uses
-  Windows, Classes, Controls, Forms, Graphics,       
+ {$IFDEF Debug}
+ DbugIntf,
+ {$ENDIF}
+  Windows, SysUtils, Classes, Controls, Forms, Graphics,       
   GR32_Types, GR32, GR32_Layers, GR32_Transforms;
 
 type
@@ -1169,6 +1173,7 @@ begin
   FChildLayer := Value;
   if Assigned(Value) then
   begin
+    //Changing;
     FSize := Value.GetNativeSize;
     FAngle := Value.Angle;
     FPosition := Value.Position;
@@ -1179,6 +1184,7 @@ begin
 
     FChildLayer.AddNotification(Self);
     FChildLayer.AddChangeNotification(Self);
+    //Changed;
     //Self.AddNotification(FChildLayer);
   end
   else
@@ -1192,6 +1198,8 @@ begin
     FScaling := FloatPoint(1, 1);
     FSkew := FloatPoint(0, 0);
   end;
+  //fixed bug: can not drag here (rb)
+  UpdateTransformation;
 
   if FChildLayer <> nil then
     LayerOptions := LayerOptions or LOB_NO_UPDATE
@@ -1290,6 +1298,9 @@ var
   Local: TPoint;
 begin
   Result := Visible and inherited DoHitTest(X, Y);
+ {$IFDEF Debug}
+  SendDebug('DoHitTest='+IntToStr(Integer(Result))+' X='+IntToStr(X)+' Y='+IntToStr(Y));
+ {$ENDIF}
 
   if Result and not (rboAllowRotation in FOptions) then
   begin
@@ -1298,7 +1309,16 @@ begin
     with FTransformation do
       Local := ReverseTransform(Point(X, Y));
 
+ {$IFDEF Debug}
+  SendDebug(' Local.X='+IntToStr(Local.X)+' Y='+IntToStr(Local.Y));
+  SendDebug(' Sizel.left='+IntToStr(-FThreshold)+' right='+IntToStr(FSize.cx + FThreshold));
+ {$ENDIF}
+
     Result := PtInRect(Rect(-FThreshold, -FThreshold, FSize.cx + FThreshold, FSize.cy + FThreshold), Local);
+
+   {$IFDEF Debug}
+    sendDebug('DoHitTest.PtInRect='+IntToStr(Integer(Result)));
+   {$ENDIF}
   end;
 end;
 
@@ -1597,9 +1617,18 @@ end;
 procedure TExtRubberBandLayer.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 
 begin
+  //update the DragState first.
+  FDragState := GetHitCode(X, Y, Shift);
   FIsDragging := FDragState <> rdsNone;
+ {$IFDEF Debug}
+  sendDebug('MouseDown: IsDrag='+IntTOStr(Integer(FIsDragging)));
+  sendDebug('X='+IntToStr(X)+' Y='+IntToStr(Y));
+ {$ENDIF}
   if FIsDragging then
   begin
+ {$IFDEF Debug}
+  sendDebug('...IsDrag');
+ {$ENDIF}
     FOldPosition := FPosition;
     FOldScaling := FScaling;
     FOldPivot := FPivotPoint;
