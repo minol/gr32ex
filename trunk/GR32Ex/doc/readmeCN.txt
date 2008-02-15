@@ -156,3 +156,43 @@ end;
 
 * 发现为何不能拖动Layer：必须是click(MouseDown, MouseUp)选中，然后在按住MouseDown拖动！即使重载MouseDown也不行！
 
+procedure TCustomImage32.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  Layer: TCustomLayer;
+begin
+  inherited;
+
+  if TabStop and CanFocus then SetFocus;
+  
+  if Layers.MouseEvents then
+    Layer := TLayerCollectionAccess(Layers).MouseDown(Button, Shift, X, Y) //在用MouseDown(..., Layer)之前已经调用。
+  else
+    Layer := nil;
+
+  // lock the capture only if mbLeft was pushed or any mouse listener was activated
+  if (Button = mbLeft) or (TLayerCollectionAccess(Layers).MouseListener <> nil) then
+    MouseCapture := True;
+
+  MouseDown(Button, Shift, X, Y, Layer); //根本不会再调用 Layers.MouseDown，所以你要在自己的类中重新处理。
+end;
+
+
+
+procedure TImage32Ex.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer);
+begin
+  if (Layer is TTransformationLayer) then
+  begin
+    Selection := TTransformationLayer(Layer);
+    if Assigned(FRubberBand) then
+    begin
+      Layers.MouseListener := nil;
+      Layer := TLayerCollectionAccess(Layers).MouseDown(Button, Shift, X, Y); // 重新处理 here
+    end;
+  end
+  else 
+    Selection := nil;
+  inherited;
+ {$IFDEF Debug}
+  if Assigned(Layer) then sendDebug('Image32Ex.MouseDown Layer=' + Layer.ClassName);
+ {$ENDIF}
+end;
