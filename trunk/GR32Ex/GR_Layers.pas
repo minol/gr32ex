@@ -40,6 +40,41 @@ uses
   ;
 
 type
+  TGRLayerControlClass = class of TGRLayerControl;
+  TGRLayerControl = class(TExtBitmapLayer)
+  protected
+    FWidth: Integer;
+    FHeight: Integer;
+
+    function GetLeft: Integer;
+    function GetTop: Integer;
+    procedure SetLeft(const Value: Integer);
+    procedure SetTop(const Value: Integer);
+    procedure SetHeight(const Value: Integer);
+    procedure SetWidth(const Value: Integer);
+
+    function GetNativeSize: TSize; override;
+
+  published
+    property Left:Integer read GetLeft write SetLeft;
+    property Top:Integer read GetTop write SetTop;
+    property Width:Integer read FWidth write SetWidth;
+    property Height:Integer read FHeight write SetHeight;
+
+    property Name;
+    property Bitmap;
+    property Cropped;
+    property DrawMode;
+    property Angle;
+    property Skew;
+    property PivotPoint;
+    property ScaledViewport;
+    property Scaling;
+    property OnMouseDown;
+    property OnMouseMove;
+    property OnMouseUp;
+  end;
+
   TGRLayerCollection = class(TLayerCollection)
   end;
 
@@ -105,6 +140,9 @@ type
   end;
 
 
+procedure RegisterLayerControl(const aLayerControlClass: TGRLayerControlClass);
+function GLayerControlClasses: TThreadList;
+
 implementation
 
 uses
@@ -124,6 +162,29 @@ type
   TBitmap32Access = class(TBitmap32);
   TLayerAccess = class(TCustomLayer);
 
+var
+  FLayerControlClasses: TThreadList;
+
+procedure RegisterLayerControl(const aLayerControlClass: TGRLayerControlClass);
+begin
+  with GLayerControlClasses.LockList do
+  try
+    if IndexOf(aLayerControlClass) < 0 then
+      Add(aLayerControlClass);
+  finally
+    FLayerControlClasses.UnlockList;
+  end;
+end;
+
+function GLayerControlClasses: TThreadList;
+begin
+  if not Assigned(FLayerControlClasses) then
+  begin
+    FLayerControlClasses := TThreadList.Create;
+  end;
+  Result := FLayerControlClasses;
+end;
+
 { TGRLayerContainer }
 
 constructor TGRLayerContainer.Create(aLayerCollection: TLayerCollection);
@@ -137,7 +198,7 @@ begin
   Height := 192;
   Width := 192;
 
-  
+
   FLayers := TGRLayerCollection.Create(Self);
   with FLayers do
   begin
@@ -354,5 +415,79 @@ begin
   FInvalidRects.Clear;
 end;
 
+{ TGRLayerControl }
+
+function TGRLayerControl.GetLeft: Integer;
+begin
+  Result := Trunc(FPosition.X);
+end;
+
+function TGRLayerControl.GetNativeSize: TSize;
+begin
+  if (FWidth <> 0) and (FHeight <> 0) then
+  begin
+    Result.cx := FWidth;
+    Result.cy := FHeight;
+  end
+  else
+    Result := Inherited GetNativeSize();
+end;
+
+function TGRLayerControl.GetTop: Integer;
+begin
+  Result := Trunc(FPosition.Y);
+end;
+
+procedure TGRLayerControl.SetHeight(const Value: Integer);
+begin
+  if FHeight <> value then
+  begin
+    Changing;
+    FHeight := Value;
+    Changed;
+
+    DoChange;
+  end;
+end;
+
+procedure TGRLayerControl.SetLeft(const Value: Integer);
+begin
+  if Trunc(FPosition.X) <> value then
+  begin
+    Changing;
+    FPosition.X := Value;
+    Changed;
+
+    DoChange;
+  end;
+end;
+
+procedure TGRLayerControl.SetTop(const Value: Integer);
+begin
+  if Trunc(FPosition.Y) <> value then
+  begin
+    Changing;
+    FPosition.Y := Value;
+    Changed;
+
+    DoChange;
+  end;
+end;
+
+procedure TGRLayerControl.SetWidth(const Value: Integer);
+begin
+  if FWidth <> value then
+  begin
+    Changing;
+    FWidth := Value;
+    Changed;
+
+    DoChange;
+  end;
+end;
+
+
 initialization
+finalization
+  FreeAndNil(FLayerControlClasses);
 end.

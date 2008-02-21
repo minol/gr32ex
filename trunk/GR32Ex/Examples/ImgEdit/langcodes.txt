@@ -1,0 +1,12 @@
+[de] German
+[en] English
+[es] Spanish
+[fr] French
+[fi] Finnish
+[ja] Japanese
+[ko] Korean
+[pt_BR] Brazilian Portuguese
+[ru] Russian
+[sr_Cyrillic] Serbian Cyrillic
+[sr_Latin] Serbian Latin
+[zh_CN] Chinese

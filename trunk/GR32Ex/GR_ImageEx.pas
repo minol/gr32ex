@@ -11,7 +11,7 @@
  * for the specific language governing rights and limitations under the
  * License.
  *
- * The Original Code is GR_Sprites
+ * The Original Code is GR_ImageEx
  *
  * The Initial Developer of the Original Code is Riceball LEE
  * Portions created by Riceball LEE are Copyright (C) 2004-2007
@@ -39,7 +39,9 @@ uses
   //Dialogs,
 {$ENDIF}
   Classes, SysUtils,
-  GR32_Image, GR32_Layers, GR32;
+  GR32_Image, GR32_Layers, GR32
+  , GR32_ExtLayers
+  ;
 
 type
   TImage32Ex = class(TImage32)
@@ -72,6 +74,17 @@ type
   published
     property Enabled;
     property Transparent: Boolean read FTransparent write SetTransparent;
+  end;
+
+  TImage32Editor = class(TImage32Ex)
+  protected
+    FRubberBand: TExtRubberBandLayer;
+    FSelection: TTransformationLayer;
+
+    procedure SetSelection(Value: TTransformationLayer);
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer); reintroduce; overload;override;
+  public
+    property Selection: TTransformationLayer read FSelection write SetSelection;
   end;
 
 procedure Register;
@@ -229,9 +242,67 @@ begin
   End; // If
 end;
 
+{ TImage32Editor }
+procedure TImage32Editor.SetSelection(Value: TTransformationLayer);
+begin
+  if Value is TExtRubberBandLayer then exit;
+  if Value <> FSelection then
+  begin
+    if FRubberBand <> nil then
+    begin
+      FRubberBand.ChildLayer := nil;
+      Invalidate;
+    end;
+
+    FSelection := Value;
+
+    if Value <> nil then
+    begin
+ {$IFDEF Debug}
+  sendDebug('SetSelection=' + Value.ClassName);
+ {$ENDIF}
+      //Value.BringToFront;
+      if FRubberBand = nil then
+      begin
+        FRubberBand := TExtRubberBandLayer.Create(Layers);
+        FRubberBand.Options := [rboAllowMove, rboShowFrame];
+      end;
+      //else 
+        //FRubberBand.BringToFront;
+      FRubberBand.Index := Value.Index + 1;
+      FRubberBand.ChildLayer := Value;
+    end;
+  end;
+end;
+
+type
+  TExtRubberBandLayerAccess = class(TExtRubberBandLayer);
+  TLayerCollectionAccess = class(TLayerCollection);
+
+procedure TImage32Editor.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer);
+begin
+  if (Layer is TTransformationLayer) then
+  begin
+    Selection := TTransformationLayer(Layer);
+    if Assigned(FRubberBand) then
+    begin
+      Layers.MouseListener := nil;
+      Layer := TLayerCollectionAccess(Layers).MouseDown(Button, Shift, X, Y);
+    end;
+  end
+  else
+  begin
+    Selection := nil;
+    inherited MouseDown(Button, Shift, X, Y, Layer);
+  end;
+ {$IFDEF Debug}
+  if Assigned(Layer) then sendDebug('Image32Ex.MouseDown Layer=' + Layer.ClassName);
+ {$ENDIF}
+end;
+
 procedure Register;
 begin
-  RegisterComponents('Graphics32', [TImage32Ex]);
+  RegisterComponents('Graphics32', [TImage32Ex, TImage32Editor]);
 end;
 
 end.
