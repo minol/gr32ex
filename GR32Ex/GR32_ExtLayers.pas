@@ -121,7 +121,7 @@ uses
  {$IFDEF Debug}
  DbugIntf,
  {$ENDIF}
-  Windows, SysUtils, Classes, Controls, Forms, Graphics,       
+  Windows, SysUtils, Classes, Types, Controls, Forms, Graphics,       
   GR32_Types, GR32, GR32_Layers, GR32_Transforms;
 
 type
@@ -158,7 +158,7 @@ type
   end;
 
   TTransformationLayer = class(TCustomLayerEx)
-  private
+  protected
     FAngle: Single;                              // Given in degrees.
     FAlphaHit: Boolean;
     FTransformation: TAffineTransformation;
