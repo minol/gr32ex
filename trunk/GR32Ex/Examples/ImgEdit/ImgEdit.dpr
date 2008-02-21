@@ -2,7 +2,7 @@ program ImgEdit;
 
 uses
   Forms,
-  MainForm in 'MainForm.pas' {frmMain},
+  MainForm in 'MainForm.pas' {frmMain};
 
 {$R *.res}
 

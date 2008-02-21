@@ -50,6 +50,9 @@ type
 
     procedure SetTransparent(const Value: Boolean);
     procedure WMKillFocus(var Message: TMessage); message WM_KILLFOCUS;
+
+    procedure ReadData(aReader: TReader);
+    procedure WriteData(aWriter: TWriter);
   protected
     FIsDragging: Boolean;
     FLastShift: TShiftState;
@@ -69,6 +72,8 @@ type
     procedure KeyPress(var Key: Char); override;
     procedure KeyUp(var Key: Word; Shift: TShiftState); override;
     procedure WndProc(var Message: TMessage);override;
+
+    procedure DefineProperties(Filer: TFiler); override;
   public
     procedure ExecClearBackgnd(Dest: TBitmap32; StageNum: Integer); override;
   published
@@ -91,8 +96,16 @@ procedure Register;
 
 implementation
 
-Type
+uses
+  GR_Layers;
+
+type
   TLayerHack = class(TCustomLayer);
+  TLayerCollectionAccess = class(TLayerCollection);
+  TExtRubberBandLayerAccess = class(TExtRubberBandLayer);
+  TReaderAccess = class(TReader);
+  TWriterAccess = class(TWriter);
+
   TMyShiftState  = (ssShift, ssAlt, ssCtrl, ssLeft, ssRight, ssMiddle, ssDouble);
   TMyShiftStates = set of TMyShiftState;
 
@@ -100,6 +113,74 @@ Type
 function IsMouseButtonDown(Shift: TMyShiftStates; Button: TMyShiftState): Boolean;
 begin
   Result := (Button in Shift) and not (ssDouble in Shift);
+end;
+
+{ TImage32Ex }
+procedure TImage32Ex.DefineProperties(Filer: TFiler);
+  function DoWrite: Boolean;
+  begin
+    if Filer.Ancestor <> nil then
+      Result := not (Filer.Ancestor is TImage32Ex)
+    else
+      Result := Layers.Count > 0;
+  end;
+begin
+  inherited;
+  Filer.DefineProperty('Layers', ReadData, WriteData, DoWrite);
+end;
+
+procedure TImage32Ex.ReadData(aReader: TReader);
+var
+  vItem: TGRLayerControl;
+  vLayerControlClass: TGRLayerControlClass;
+  vS: string;
+begin
+  TLayerCollectionAccess(Layers).BeginUpdate;
+  with TReaderAccess(aReader) do
+  try
+    if not EndOfList then Layers.Clear;
+    while not EndOfList do
+    begin
+      if NextValue in [vaInt8, vaInt16, vaInt32] then ReadInteger;
+      vS := ReadString;
+      vLayerControlClass := GetLayerControlClass(vS);
+
+      Assert(Assigned(vLayerControlClass),  vS + ' not Registered');
+
+      vItem := vLayerControlClass.Create(Layers);
+      ReadListBegin;
+      while not EndOfList do ReadProperty(vItem);
+      ReadListEnd;
+    end;
+    ReadListEnd;
+  finally
+    TLayerCollectionAccess(Layers).EndUpdate;
+  end;
+end;
+
+procedure TImage32Ex.WriteData(aWriter: TWriter);
+var
+  I: Integer;
+  OldAncestor: TPersistent;
+begin
+  TLayerCollectionAccess(Layers).BeginUpdate;
+  with TWriterAccess(aWriter) do
+  try
+    OldAncestor := Ancestor;
+    Ancestor := nil;
+    WriteValue(vaCollection);
+    for I := 0 to Layers.Count - 1 do
+    begin
+      WriteString(Layers[I].ClassName);
+      WriteListBegin;
+      WriteProperties(Layers[I]);
+      WriteListEnd;
+    end;
+    WriteListEnd;
+  finally
+    aWriter.Ancestor := OldAncestor;
+    TLayerCollectionAccess(Layers).EndUpdate;
+  end;
 end;
 
 procedure TImage32Ex.ExecClearBackgnd(Dest: TBitmap32; StageNum: Integer);
@@ -274,10 +355,6 @@ begin
     end;
   end;
 end;
-
-type
-  TExtRubberBandLayerAccess = class(TExtRubberBandLayer);
-  TLayerCollectionAccess = class(TLayerCollection);
 
 procedure TImage32Editor.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer);
 begin

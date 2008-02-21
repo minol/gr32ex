@@ -141,6 +141,7 @@ type
 
 
 procedure RegisterLayerControl(const aLayerControlClass: TGRLayerControlClass);
+function GetLayerControlClass(const aClassName: string): TGRLayerControlClass;
 function GLayerControlClasses: TThreadList;
 
 implementation
@@ -164,6 +165,23 @@ type
 
 var
   FLayerControlClasses: TThreadList;
+
+function GetLayerControlClass(const aClassName: string): TGRLayerControlClass;
+var
+  I: integer;
+begin
+  with GLayerControlClasses.LockList do
+  try
+    for I := 0 to Count - 1 do
+    begin
+      Result := TGRLayerControlClass(Items[I]);
+      if Result.ClassName = aClassName then exit;
+    end;
+  finally
+    FLayerControlClasses.UnlockList;
+  end;
+  Result := nil;
+end;
 
 procedure RegisterLayerControl(const aLayerControlClass: TGRLayerControlClass);
 begin
