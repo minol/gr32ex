@@ -75,6 +75,31 @@ type
     property OnMouseUp;
   end;
 
+  TGRAniFrameEvent = procedure(const Sender: TGRLayerControl; const MoveCount: Longword; var Done: Boolean) of object;
+  TGRLayerAnimator = class(TThread)
+  protected
+    FIsPaused: Boolean;
+    FLastTick: Longword;
+    FLayer: TGRLayerControl;
+    FOnFrame: TGRAniFrameEvent;
+    function DrawFrame(const MoveCount: Longword): Boolean; virtual;
+    procedure Execute; override;
+  public
+    constructor Create(const aLayer: TGRLayerControl);
+    procedure Start;
+    property OnFrame: TGRAniFrameEvent read FOnFrame write FOnFrame;
+  end;
+
+  TGRLayerAnimator_Sample = class(TGRLayerAnimator)
+  protected
+    FCurStep: Integer;
+    FOldTop: Integer;
+    FMaxStep: Integer;
+    function DrawFrame(const MoveCount: Longword): Boolean; override;
+  public
+    constructor Create(const aLayer: TGRLayerControl; const aMaxStep: Integer);
+  end;
+
   TGRLayerCollection = class(TLayerCollection)
   end;
 
@@ -150,6 +175,7 @@ uses
   Math, TypInfo, GR32_MicroTiles;
 
 const
+  cAniIntervalCount = 33; //ms
   DefaultRepaintOptimizerClass: TCustomRepaintOptimizerClass = TMicroTilesRepaintOptimizer;
   UnitXForm: TCoordXForm = (
     ScaleX: $10000;
@@ -504,6 +530,65 @@ begin
   end;
 end;
 
+{ TGRLayerAnimator }
+function TGRLayerAnimator.DrawFrame(const MoveCount: Longword): Boolean; 
+begin
+  Result := Assigned(FOnFrame);
+  if Result then FOnFrame(FLayer, MoveCount, Result);
+end;
+
+procedure TGRLayerAnimator.Execute; 
+var
+  vDone: Boolean;
+begin
+  
+  while not Terminated do
+  begin
+    vDone := DrawFrame(GetTickCount - FLastTick);
+    FLastTick := GetTickCount;
+    if vDone then break;
+    Sleep(cAniIntervalCount);
+    if FIsPaused then Suspend;
+  end;
+end;
+
+constructor TGRLayerAnimator.Create(const aLayer: TGRLayerControl);
+begin
+  Assert(Assigned(aLayer), 'the layer must be Assigned');
+  Inherited Create(True);
+  FLayer := aLayer;  
+end;
+
+procedure TGRLayerAnimator.Start;
+begin
+  FLastTick := GetTickCount();
+  Resume;
+end;
+
+{ TGRLayerAnimator_Sample }
+constructor TGRLayerAnimator_Sample.Create(const aLayer: TGRLayerControl; const aMaxStep: Integer);
+begin
+  Inherited Create(aLayer);
+  FMaxStep := aMaxStep;
+end;
+
+function TGRLayerAnimator_Sample.DrawFrame(const MoveCount: Longword): Boolean; 
+begin
+  Result := FCurStep < (FMaxStep * 2);
+  if Result then
+  begin 
+    FLayer.BeginUpdate;
+    try
+      Inc(FCurStep);
+      if FCurStep > FMaxStep then
+        FLayer.Top := FLayer.Top - 1
+      else
+        FLayer.Top := FLayer.Top + 1;
+    finally
+      FLayer.EndUpdate;
+    end;
+  end;
+end;
 
 initialization
 finalization

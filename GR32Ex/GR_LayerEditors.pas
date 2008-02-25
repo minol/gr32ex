@@ -97,10 +97,11 @@ function ShowLayerControlEditor(const aLayer: TGRLayerControl): Boolean;
 var
   vEditorClass: TGRLayerEditorClass;
 begin
-  vEditorClass := GetLayerControlEditorClass(aLayerControl);
-  if Assigned(vEditorClass) then
+  vEditorClass := GetLayerControlEditorClass(aLayer);
+  Result := Assigned(vEditorClass);
+  if Result then
   begin
-    vEditorClass.execute(aLayerControl);
+    vEditorClass.execute(aLayer);
   end
   else
     showmessage(rsNoLayerEditorError);

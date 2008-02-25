@@ -76,6 +76,10 @@ type
     procedure DefineProperties(Filer: TFiler); override;
   public
     procedure ExecClearBackgnd(Dest: TBitmap32; StageNum: Integer); override;
+    procedure LoadFromStream(const aStream: TStream);virtual;
+    procedure SaveToStream(const aStream: TStream);virtual;
+    procedure LoadFromFile(const aFileName: string);
+    procedure SaveToFile(const aFileName: string);
   published
     property Enabled;
     property Transparent: Boolean read FTransparent write SetTransparent;
@@ -116,6 +120,38 @@ begin
 end;
 
 { TImage32Ex }
+procedure TImage32Ex.LoadFromStream(const aStream: TStream);
+begin
+end;
+
+procedure TImage32Ex.SaveToStream(const aStream: TStream);
+begin
+end;
+
+procedure TImage32Ex.LoadFromFile(const aFileName: string);
+var
+  vStream: TFileStream;
+begin
+  vStream := TFileStream.Create(aFileName, fmOpenRead or fmShareDenyNone);
+  try
+    LoadFromStream(vStream);
+  finally
+    vStream.Free;
+  end;
+end;
+
+procedure TImage32Ex.SaveToFile(const aFileName: string);
+var
+  vStream: TFileStream;
+begin
+  vStream := TFileStream.Create(aFileName, fmOpenRead or fmShareDenyNone);
+  try
+    SaveToStream(vStream);
+  finally
+    vStream.Free;
+  end;
+end;
+
 procedure TImage32Ex.DefineProperties(Filer: TFiler);
   function DoWrite: Boolean;
   begin
