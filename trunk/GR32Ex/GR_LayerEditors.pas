@@ -32,6 +32,9 @@ uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   , GR_Layers
   ;
 
+resourcestring
+  rsNoLayerEditorError = 'no editor error';
+
 type
   TGRLayerEditorClass = class of TGRLayerEditor;
   TGRLayerEditor = class(TForm)
@@ -60,6 +63,7 @@ type
 
 procedure RegisterLayerControlEditor(const aEditor: TGRLayerEditorClass);
 function GetLayerControlEditorClass(const aLayer: TGRLayerControl): TGRLayerEditorClass;
+function ShowLayerControlEditor(const aLayer: TGRLayerControl): Boolean;
 
 implementation
 
@@ -87,6 +91,19 @@ begin
   with FLayerControlEditorClasses do
     if IndexOf(aEditor) < 0 then
       Add(aEditor);
+end;
+
+function ShowLayerControlEditor(const aLayer: TGRLayerControl): Boolean;
+var
+  vEditorClass: TGRLayerEditorClass;
+begin
+  vEditorClass := GetLayerControlEditorClass(aLayerControl);
+  if Assigned(vEditorClass) then
+  begin
+    vEditorClass.execute(aLayerControl);
+  end
+  else
+    showmessage(rsNoLayerEditorError);
 end;
 
 { TGRLayerEditor }
