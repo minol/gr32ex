@@ -63,6 +63,7 @@ type
 
     property Name;
     property Bitmap;
+    property Cursor;
     property Cropped;
     property DrawMode;
     property Angle;
@@ -70,6 +71,7 @@ type
     property PivotPoint;
     property ScaledViewport;
     property Scaling;
+    property Visible;
     property OnMouseDown;
     property OnMouseMove;
     property OnMouseUp;

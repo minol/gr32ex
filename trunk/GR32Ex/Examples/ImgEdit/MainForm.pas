@@ -17,6 +17,8 @@ uses
   GR32_Image,
   GR_ImageEx,
   GR_Layers,
+  GR32_PNG,
+  Jpeg,
   { gettext }
   gnugettext;
 
@@ -41,15 +43,14 @@ type
     mCut: TSpTBXItem;
     mCopy: TSpTBXItem;
     mPaste: TSpTBXItem;
-    SpTBXSeparatorItem2: TSpTBXSeparatorItem;
     mSelectAll: TSpTBXItem;
     SpTBXSeparatorItem3: TSpTBXSeparatorItem;
-    mFind: TSpTBXItem;
+    mDel: TSpTBXItem;
     TntActionList1: TTntActionList;
-    aNew: TTntAction;
-    aOpen: TTntAction;
-    aSave: TTntAction;
-    aExit: TTntAction;
+    actNew: TTntAction;
+    actOpen: TTntAction;
+    actSave: TTntAction;
+    actExit: TTntAction;
     actCut: TTntAction;
     actCopy: TTntAction;
     actPaste: TTntAction;
@@ -80,12 +81,11 @@ type
     SpTBXPopupMenu1: TSpTBXPopupMenu;
     mStandardToolbar: TSpTBXItem;
     mFormattingToolbar: TSpTBXItem;
-    mNavigationToolbar: TSpTBXItem;
     mCommandsLog: TSpTBXItem;
     mmmHelp: TSpTBXItem;
     mAbout: TSpTBXItem;
     mPrint: TSpTBXItem;
-    aPrint: TTntAction;
+    actPrint: TTntAction;
     actSelectPointer: TTntAction;
     pGroupItem1: TTBGroupItem;
     SpTBXSeparatorItem10: TSpTBXSeparatorItem;
@@ -123,7 +123,7 @@ type
     SpTBXTabItem1: TSpTBXTabItem;
     tbsDesign: TSpTBXTabSheet;
     actDel: TTntAction;
-    procedure ActionsExecute(Sender: TObject);
+    pnlOptions: TSpTBXDockablePanel;
     procedure FormShow(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure tLayoutSaveClick(Sender: TObject);
@@ -136,6 +136,10 @@ type
     procedure actPasteExecute(Sender: TObject);
     procedure actCopyExecute(Sender: TObject);
     procedure actCutExecute(Sender: TObject);
+    procedure actExitExecute(Sender: TObject);
+    procedure actSaveExecute(Sender: TObject);
+    procedure actOpenExecute(Sender: TObject);
+    procedure actNewExecute(Sender: TObject);
   private
     { Private declarations }
     //procedure NotifyClipObjFree(Sender: TObject);
@@ -181,6 +185,8 @@ begin
   FillLayoutList('LastLayout');
 
   tbxCustomizer.MenuBar := tbMenuBar;
+  tLanguages.ItemIndex := 1;
+  tLanguagesItemClick(nil);
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
@@ -215,19 +221,14 @@ var
   S: string;
 begin
   S := TntDialogs.WideInputBox(_('Save Layout'), _('Save current layout as:'), '');
-  if S <> '' then begin
+  if S <> '' then 
+  begin
     TBXCustomizer.SaveLayout(FIniPath, S);
     FillLayoutList(S);
   end;
 end;
 
 { Actions }
-
-procedure TfrmMain.ActionsExecute(Sender: TObject);
-begin
-  //if Sender is TAction then
-    //Memo1.Lines.Add(TAction(Sender).Caption + ' ' + _('Executed'));
-end;
 
 procedure TfrmMain.aCustomizeExecute(Sender: TObject);
 begin
@@ -250,14 +251,16 @@ var
 begin
   // Get the ISO language code
   L := Length(LanguageCode);
-  if (L > 2) and (LanguageCode[1] = '[') then begin
+  if (L > 2) and (LanguageCode[1] = '[') then 
+  begin
     I := Pos(']', LanguageCode);
     if (I > 0) then
       LanguageCode := Copy(LanguageCode, 2, I - 2);
   end;
 
   // Override Delphi's automatic ResourceString conversion to Ansi
-  if UnicodeResourceStrings then begin
+  if UnicodeResourceStrings then 
+  begin
     TntSystem.InstallTntSystemUpdates;
     // Override TNT's LoadResString function
     // This is necessary because dxGetText uses a different
@@ -265,7 +268,8 @@ begin
     TntSystem.WideCustomLoadResString := MyWideCustomLoadResString;
   end;
 
-  if ShellFont then begin
+  if ShellFont then 
+  begin
     if  (Win32Platform = VER_PLATFORM_WIN32_NT) and (Win32MajorVersion >= 5) then
       DefFontData.Name := 'MS Shell Dlg 2'
     else
@@ -293,15 +297,18 @@ var
 begin
   // Get the ISO language code
   L := Length(LanguageCode);
-  if (L > 2) and (LanguageCode[1] = '[') then begin
+  if (L > 2) and (LanguageCode[1] = '[') then 
+  begin
     I := Pos(']', LanguageCode);
     if (I > 0) then
       LanguageCode := Copy(LanguageCode, 2, I - 2);
   end;
 
-  if LanguageCode <> gnugettext.GetCurrentLanguage then begin
+  if LanguageCode <> gnugettext.GetCurrentLanguage then 
+  begin
     gnugettext.UseLanguage(LanguageCode);
-    for I := Low(AComponents) to High(AComponents) do begin
+    for I := Low(AComponents) to High(AComponents) do 
+    begin
       C := AComponents[I];
       SpBeginUpdateAllToolbars(C);
       try
@@ -318,7 +325,8 @@ var
   I: integer;
 begin
   I := tLanguages.ItemIndex;
-  if I > -1 then begin
+  if I > -1 then 
+  begin
     tLanguages.Text := tLanguages.Items[I];
     // Change language and retranslate
     SpDxGetTextChangeLanguage(tLanguages.Text, [Self]);
@@ -328,8 +336,7 @@ end;
 procedure TfrmMain.FormCreate(Sender: TObject);
 begin
   SpDxGetTextInitialize('en', [Self], True, True);
-  tLanguages.Items.LoadFromFile('langcodes.txt');
-  tLanguages.ItemIndex := 1;
+  tLanguages.Items.LoadFromFile('lang.ini');
 end;
 
 constructor TfrmMain.Create(aComponent: TComponent);
@@ -401,7 +408,7 @@ end;
 
 procedure TfrmMain.actPasteExecute(Sender: TObject);
 begin
-  //
+  if Assigned(ClipObj) then
 end;
 
 procedure TfrmMain.actCopyExecute(Sender: TObject);
@@ -426,6 +433,26 @@ begin
   begin
     FClipObj := Value;
   end;
+end;
+
+procedure TfrmMain.actExitExecute(Sender: TObject);
+begin
+  Close;
+end;
+
+procedure TfrmMain.actSaveExecute(Sender: TObject);
+begin
+  //
+end;
+
+procedure TfrmMain.actOpenExecute(Sender: TObject);
+begin
+  //
+end;
+
+procedure TfrmMain.actNewExecute(Sender: TObject);
+begin
+  //
 end;
 
 end.

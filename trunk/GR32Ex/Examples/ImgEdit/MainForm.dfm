@@ -24,7 +24,7 @@ object frmMain: TfrmMain
     Cursor = crSizeWE
   end
   object SpTBXSplitter2: TSpTBXSplitter
-    Left = 754
+    Left = 629
     Top = 73
     Height = 477
     Cursor = crSizeWE
@@ -33,7 +33,7 @@ object frmMain: TfrmMain
   object tabMain: TSpTBXTabControl
     Left = 12
     Top = 73
-    Width = 742
+    Width = 617
     Height = 477
     Align = alClient
     Color = clBtnFace
@@ -52,7 +52,7 @@ object frmMain: TfrmMain
     object tbsDesign: TSpTBXTabSheet
       Left = 0
       Top = 22
-      Width = 742
+      Width = 617
       Height = 455
       Caption = 'Design'
       ImageIndex = -1
@@ -112,25 +112,26 @@ object frmMain: TfrmMain
         Caption = '&File'
         object mNew: TSpTBXItem
           Caption = 'New'
-          Action = aNew
+          Action = actNew
         end
         object mOpen: TSpTBXItem
           Caption = 'Open...'
-          Action = aOpen
+          Action = actOpen
         end
         object mSave: TSpTBXItem
           Caption = 'Save'
-          Action = aSave
+          Action = actSave
         end
         object mPrint: TSpTBXItem
           Caption = 'Print'
-          Action = aPrint
+          Action = actPrint
+          Visible = False
         end
         object SpTBXSeparatorItem1: TSpTBXSeparatorItem
         end
         object mExit: TSpTBXItem
           Caption = 'Exit'
-          Action = aExit
+          Action = actExit
         end
       end
       object mEdit: TSpTBXSubmenuItem
@@ -147,21 +148,21 @@ object frmMain: TfrmMain
           Caption = 'Paste'
           Action = actPaste
         end
-        object SpTBXSeparatorItem2: TSpTBXSeparatorItem
-        end
         object mSelectAll: TSpTBXItem
           Caption = 'Select All'
           Action = aSelectAll
+          Visible = False
         end
         object SpTBXSeparatorItem3: TSpTBXSeparatorItem
         end
-        object mFind: TSpTBXItem
-          Caption = 'Find'
-          Action = aFind
+        object mDel: TSpTBXItem
+          Caption = 'Delete'
+          Action = actDel
         end
       end
       object SpTBXSubmenuItem1: TSpTBXSubmenuItem
         Caption = '&Format'
+        Visible = False
         object mBold: TSpTBXItem
           Caption = 'Bold'
           Action = aBold
@@ -205,12 +206,15 @@ object frmMain: TfrmMain
           Caption = '&Sidebar'
           object mCommandsLog: TSpTBXItem
             Caption = '&Commands Log'
+            Visible = False
           end
           object mOptions: TSpTBXItem
             Caption = '&Options'
+            Control = pnlOptions
           end
           object mmHelp: TSpTBXItem
             Caption = '&Help'
+            Visible = False
           end
         end
         object mToolbars: TSpTBXSubmenuItem
@@ -224,10 +228,8 @@ object frmMain: TfrmMain
             Control = tbLayouts
           end
           object mFormattingToolbar: TSpTBXItem
-            Caption = '&Formatting Toolbar'
-          end
-          object mNavigationToolbar: TSpTBXItem
-            Caption = '&Navigation Toolbar'
+            Caption = '&Components Toolbar'
+            Control = tbComponentPallete
           end
         end
       end
@@ -292,11 +294,18 @@ object frmMain: TfrmMain
     Position = dpxLeft
   end
   object SpTBXMultiDock2: TSpTBXMultiDock
-    Left = 759
+    Left = 634
     Top = 73
-    Width = 7
+    Width = 132
     Height = 477
     Position = dpxRight
+    object pnlOptions: TSpTBXDockablePanel
+      Left = 0
+      Top = 0
+      Caption = 'Options'
+      DockPos = 0
+      TabOrder = 0
+    end
   end
   object dockBottom: TSpTBXDock
     Left = 0
@@ -1251,31 +1260,31 @@ object frmMain: TfrmMain
     Images = ilMain
     Left = 224
     Top = 352
-    object aNew: TTntAction
+    object actNew: TTntAction
       Category = 'Files'
       Caption = 'New'
       ImageIndex = 14
       ShortCut = 16462
-      OnExecute = ActionsExecute
+      OnExecute = actNewExecute
     end
-    object aOpen: TTntAction
+    object actOpen: TTntAction
       Category = 'Files'
       Caption = 'Open...'
       ImageIndex = 15
       ShortCut = 16463
-      OnExecute = ActionsExecute
+      OnExecute = actOpenExecute
     end
-    object aSave: TTntAction
+    object actSave: TTntAction
       Category = 'Files'
       Caption = 'Save'
       ImageIndex = 16
       ShortCut = 16467
-      OnExecute = ActionsExecute
+      OnExecute = actSaveExecute
     end
-    object aExit: TTntAction
+    object actExit: TTntAction
       Category = 'Files'
       Caption = 'Exit'
-      OnExecute = ActionsExecute
+      OnExecute = actExitExecute
     end
     object actCut: TTntAction
       Category = 'Edit'
@@ -1302,71 +1311,60 @@ object frmMain: TfrmMain
       Category = 'Edit'
       Caption = 'Select All'
       ShortCut = 16449
-      OnExecute = ActionsExecute
     end
     object aFind: TTntAction
       Category = 'Edit'
       Caption = 'Find'
       ImageIndex = 12
       ShortCut = 16454
-      OnExecute = ActionsExecute
     end
     object aBold: TTntAction
       Category = 'Format'
       Caption = 'Bold'
       ImageIndex = 4
       ShortCut = 16450
-      OnExecute = ActionsExecute
     end
     object aItalic: TTntAction
       Category = 'Format'
       Caption = 'Italic'
       ImageIndex = 5
       ShortCut = 16457
-      OnExecute = ActionsExecute
     end
     object aUnderline: TTntAction
       Category = 'Format'
       Caption = 'Underline'
       ImageIndex = 6
       ShortCut = 16469
-      OnExecute = ActionsExecute
     end
     object aLeftJustify: TTntAction
       Category = 'Format'
       Caption = 'Left Justify'
       ImageIndex = 0
-      OnExecute = ActionsExecute
     end
     object aRightJustify: TTntAction
       Category = 'Format'
       Caption = 'Right Justify'
       ImageIndex = 2
-      OnExecute = ActionsExecute
     end
     object aCentered: TTntAction
       Category = 'Format'
       Caption = 'Centered'
       ImageIndex = 1
-      OnExecute = ActionsExecute
     end
     object aBullets: TTntAction
       Category = 'Format'
       Caption = 'Bullets'
       ImageIndex = 7
-      OnExecute = ActionsExecute
     end
     object aNumberedBullets: TTntAction
       Category = 'Format'
       Caption = 'Numbered Bullets'
       ImageIndex = 8
-      OnExecute = ActionsExecute
     end
-    object aPrint: TTntAction
+    object actPrint: TTntAction
       Category = 'Files'
       Caption = 'Print'
       ImageIndex = 17
-      OnExecute = ActionsExecute
     end
     object actSelectPointer: TTntAction
       Category = 'Navigation'
@@ -1414,7 +1412,7 @@ object frmMain: TfrmMain
     Top = 384
     object cPrint: TSpTBXItem
       Caption = 'Print'
-      Action = aPrint
+      Action = actPrint
     end
     object cLeftJustify: TSpTBXItem
       Caption = 'Left Justify'
@@ -1439,7 +1437,6 @@ object frmMain: TfrmMain
     object cFavs: TSpTBXItem
       Caption = 'Favs'
       ImageIndex = 25
-      OnClick = ActionsExecute
     end
     object cSelectAll: TSpTBXItem
       Caption = 'Select All'
@@ -1447,7 +1444,7 @@ object frmMain: TfrmMain
     end
     object cExit: TSpTBXItem
       Caption = 'Exit'
-      Action = aExit
+      Action = actExit
     end
   end
 end
