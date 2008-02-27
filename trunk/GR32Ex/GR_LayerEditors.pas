@@ -45,6 +45,7 @@ type
     btnOpenPic: TSpeedButton;
     edtLeft: TLabeledEdit;
     edtTop: TLabeledEdit;
+    edtName: TLabeledEdit;
     procedure btnOKClick(Sender: TObject);
     procedure btnOpenPicClick(Sender: TObject);
     procedure NumberKeyPressOnly(Sender: TObject; var Key: Char);
@@ -113,6 +114,7 @@ procedure TGRLayerEditor.SetLayerControl(const Value: TGRLayerControl);
 begin
   FLayerControl := Value;
   FImage.Bitmap.Assign(FLayerControl.Bitmap);
+  edtName.Text := FLayerControl.Name;
   edtLeft.Text := IntToStr(FLayerControl.Left);
   edtTop.Text := IntToStr(FLayerControl.Top);
 end;
@@ -121,6 +123,7 @@ procedure TGRLayerEditor.btnOKClick(Sender: TObject);
 begin
  //save the properties to layer control.
   FLayerControl.Bitmap.Assign(FImage.Bitmap);
+  FLayerControl.Name := edtName.Text;
   FLayerControl.Left := StrToInt(edtLeft.Text);
   FLayerControl.Top := StrToInt(edtTop.Text);
 end;

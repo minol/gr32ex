@@ -53,7 +53,7 @@ object GRLayerEditor: TGRLayerEditor
   end
   object edtLeft: TLabeledEdit
     Left = 136
-    Top = 20
+    Top = 68
     Width = 121
     Height = 21
     EditLabel.Width = 19
@@ -64,7 +64,7 @@ object GRLayerEditor: TGRLayerEditor
   end
   object edtTop: TLabeledEdit
     Left = 132
-    Top = 64
+    Top = 112
     Width = 121
     Height = 21
     EditLabel.Width = 18
@@ -72,6 +72,16 @@ object GRLayerEditor: TGRLayerEditor
     EditLabel.Caption = 'Top'
     TabOrder = 3
     OnKeyPress = NumberKeyPressOnly
+  end
+  object edtName: TLabeledEdit
+    Left = 135
+    Top = 21
+    Width = 121
+    Height = 21
+    EditLabel.Width = 27
+    EditLabel.Height = 13
+    EditLabel.Caption = 'Name'
+    TabOrder = 4
   end
   object dlgOpenPicture: TOpenPictureDialog
     Left = 112

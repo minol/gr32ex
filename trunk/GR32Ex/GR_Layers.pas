@@ -55,6 +55,8 @@ type
 
     function GetNativeSize: TSize; override;
 
+  public
+    constructor Create(ALayerCollection: TLayerCollection);override;
   published
     property Left:Integer read GetLeft write SetLeft;
     property Top:Integer read GetTop write SetTop;
@@ -72,6 +74,7 @@ type
     property ScaledViewport;
     property Scaling;
     property Visible;
+    property MouseEvents;
     property OnMouseDown;
     property OnMouseMove;
     property OnMouseUp;
@@ -205,10 +208,10 @@ begin
       Result := TGRLayerControlClass(Items[I]);
       if Result.ClassName = aClassName then exit;
     end;
+    Result := nil;
   finally
     FLayerControlClasses.UnlockList;
   end;
-  Result := nil;
 end;
 
 procedure RegisterLayerControl(const aLayerControlClass: TGRLayerControlClass);
@@ -462,6 +465,13 @@ begin
 end;
 
 { TGRLayerControl }
+
+constructor TGRLayerControl.Create(
+  ALayerCollection: TLayerCollection);
+begin
+  inherited;
+  LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE; 
+end;
 
 function TGRLayerControl.GetLeft: Integer;
 begin
