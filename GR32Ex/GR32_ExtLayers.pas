@@ -143,6 +143,9 @@ type
   TGridLayer = class;
 
   TCustomLayerEx = class(TCustomLayer)
+  private
+    function GetCaptured: Boolean;
+    procedure SetCaptured(const Value: Boolean);
   protected
     FOnChange: TNotifyEvent;                     // For individual change events.
     FChangeNotificationList: TList;
@@ -153,7 +156,7 @@ type
     procedure DoChange; virtual;
   public
     destructor Destroy; override;
-
+    property Captured: Boolean read GetCaptured write SetCaptured;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
 
@@ -2531,5 +2534,20 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
+
+function TCustomLayerEx.GetCaptured: Boolean;
+begin
+  Result := FLayerOptions and LOB_NO_CAPTURE = 0;
+end;
+
+procedure TCustomLayerEx.SetCaptured(const Value: Boolean);
+begin
+  if Value then
+    LayerOptions := LayerOptions or LOB_NO_CAPTURE
+  else
+  begin
+    LayerOptions := LayerOptions and not LOB_NO_CAPTURE
+  end;
+end;
 
 end.

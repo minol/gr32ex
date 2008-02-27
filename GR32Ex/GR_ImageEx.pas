@@ -122,10 +122,12 @@ end;
 { TImage32Ex }
 procedure TImage32Ex.LoadFromStream(const aStream: TStream);
 begin
+  aStream.ReadComponent(Self);
 end;
 
 procedure TImage32Ex.SaveToStream(const aStream: TStream);
 begin
+  aStream.WriteComponent(Self);
 end;
 
 procedure TImage32Ex.LoadFromFile(const aFileName: string);
@@ -144,7 +146,7 @@ procedure TImage32Ex.SaveToFile(const aFileName: string);
 var
   vStream: TFileStream;
 begin
-  vStream := TFileStream.Create(aFileName, fmOpenRead or fmShareDenyNone);
+  vStream := TFileStream.Create(aFileName, fmCreate or fmShareDenyWrite);
   try
     SaveToStream(vStream);
   finally
@@ -175,6 +177,8 @@ begin
   with TReaderAccess(aReader) do
   try
     if not EndOfList then Layers.Clear;
+    //Assert(NextValue = vaCollection, 'NOT Layers Collection');
+    //ReadValue;
     while not EndOfList do
     begin
       if NextValue in [vaInt8, vaInt16, vaInt32] then ReadInteger;
@@ -204,9 +208,11 @@ begin
   try
     OldAncestor := Ancestor;
     Ancestor := nil;
-    WriteValue(vaCollection);
+    //WriteValue(vaCollection);
     for I := 0 to Layers.Count - 1 do
     begin
+      if (Layers[I] is TExtRubberBandLayer) or (Layers[I] is TGridLayer) then
+        continue;
       WriteString(Layers[I].ClassName);
       WriteListBegin;
       WriteProperties(Layers[I]);
