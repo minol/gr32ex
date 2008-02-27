@@ -183,6 +183,7 @@ type
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
+    procedure Assign(Source: TPersistent);override;
 
     procedure GetLayerTransformation(var Transformation: TAffineTransformation);
     function GetTransformedTargetRect: TFloatRect;
@@ -351,6 +352,8 @@ type
     procedure SetName(const Value: WideString);
     procedure SetDrawMode(const Value: TLayerDrawMode);
   public
+    procedure Assign(Source: TPersistent);override;
+
     property DrawMode: TLayerDrawMode read FDrawMode write SetDrawMode;
     property Locked: Boolean read FLocked write FLocked;
     property Name: WideString read FName write SetName;
@@ -364,6 +367,7 @@ type
     procedure SetTextColor(const Value: TColor32);
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
+    procedure Assign(Source: TPersistent);override;
 
     property Text: WideString read FText write SetText;
     property TextColor: TColor32 read FTextColor write SetTextColor default clBlack32;
@@ -383,6 +387,7 @@ type
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
+    procedure Assign(Source: TPersistent);override;
 
     procedure PaintTo(Buffer: TBitmap32; const R: TRect);
 
@@ -476,6 +481,26 @@ begin
     FGridLayer.RemoveNotification(Self);
   FTransformation.Free;
   inherited;
+end;
+
+//----------------------------------------------------------------------------------------------------------------------
+procedure TTransformationLayer.Assign(Source: TPersistent);
+begin
+  if Source is TTransformationLayer then
+    with Source as TTransformationLayer do
+    begin
+      Changing;
+      Self.FAngle := FAngle;
+      Self.GridLayer := GridLayer;
+      Self.FPivotPoint := FPivotPoint;
+      Self.FScaled := FScaled;
+      Self.FScaling := FScaling;
+      Self.FSkew := FSkew;
+
+      Changed; // Layer collection.
+      DoChange; // Layer only.
+    end;
+  inherited Assign(Source);
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -2293,6 +2318,19 @@ begin
 end;
 
 //----------------- TPropertyLayer -------------------------------------------------------------------------------------
+procedure TPropertyLayer.Assign(Source: TPersistent);
+begin
+  if Source is TPropertyLayer then
+    with Source as TPropertyLayer do
+    begin
+      Changing;
+      Self.FName := FName;
+      Self.FDrawMode := FDrawMode;
+      Self.FLocked := FLocked;
+      Changed;
+    end;
+  inherited Assign(Source);
+end;
 
 procedure TPropertyLayer.SetDrawMode(const Value: TLayerDrawMode);
 
@@ -2326,6 +2364,19 @@ begin
   inherited;
 
   FTextColor := clBlack32;
+end;
+
+procedure TTextLayer.Assign(Source: TPersistent);
+begin
+  if Source is TTextLayer then
+    with Source as TTextLayer do
+    begin
+      Changing;
+      Self.FText := FText;
+      Self.FTextColor := FTextColor;
+      Changed;
+    end;
+  inherited Assign(Source);
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -2375,6 +2426,18 @@ begin
   inherited;
 end;
 
+procedure TExtBitmapLayer.Assign(Source: TPersistent);
+begin
+  if Source is TExtBitmapLayer then
+    with Source as TExtBitmapLayer do
+    begin
+      Changing;
+      Self.FBitmap.Assign(FBitmap);
+      Self.FCropped := FCropped;
+      Changed;
+    end;
+  inherited Assign(Source);
+end;
 //----------------------------------------------------------------------------------------------------------------------
 
 procedure TExtBitmapLayer.BitmapChanged(Sender: TObject);
