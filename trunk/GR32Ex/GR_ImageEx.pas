@@ -93,6 +93,7 @@ type
 
     procedure SetSelection(Value: TTransformationLayer);
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer); reintroduce; overload;override;
+    procedure KeyDown(var Key: Word; Shift: TShiftState); override;
   public
     procedure LoadFromStream(const aStream: TStream);override;
     procedure RemoveSelectedLayer();
@@ -126,13 +127,31 @@ end;
 
 { TImage32Ex }
 procedure TImage32Ex.LoadFromStream(const aStream: TStream);
+{var
+  vReader: TReader;
+  //}
 begin
   aStream.ReadComponent(Self);
+{  vReader := TReader.Create(aStream, 4096);
+  try
+    vReader.ReadRootComponent(Self);
+  finally
+    vReader.Free;
+  end; //}
 end;
 
 procedure TImage32Ex.SaveToStream(const aStream: TStream);
+{var
+  vWriter: TWriter;
+  //}
 begin
   aStream.WriteComponent(Self);
+{  vWriter := TWriter.Create(aStream, 4096);
+  try
+    vWriter.WriteDescendent(Self, nil);
+  finally
+    vWriter.Free;
+  end; //}
 end;
 
 procedure TImage32Ex.LoadFromFile(const aFileName: string);
@@ -147,6 +166,45 @@ begin
   end;
 end;
 
+function ComponentToStr(Component: TComponent): string;
+var
+  BinStream:TMemoryStream;
+  StrStream: TStringStream;
+  s: string;
+begin
+  BinStream := TMemoryStream.Create;
+  try
+    StrStream := TStringStream.Create(s);
+    try
+      BinStream.WriteComponent(Component);
+      BinStream.Seek(0, soFromBeginning);
+      //try
+      ObjectBinaryToText(BinStream, StrStream);
+      //except
+      //  on E:Exception do
+      //end;
+      StrStream.Seek(0, soFromBeginning);
+      Result:= StrStream.DataString;
+    finally
+      StrStream.Free;
+
+    end;
+  finally
+    BinStream.Free
+  end;
+end;
+
+procedure SaveStrToFile(const aFileName, s: string);
+begin
+  with TStringList.Create do
+  try
+    Text := s;
+    SaveToFile(aFileName);
+  finally
+    Free;
+  end;
+end;
+
 procedure TImage32Ex.SaveToFile(const aFileName: string);
 var
   vStream: TFileStream;
@@ -157,6 +215,7 @@ begin
   finally
     vStream.Free;
   end;
+  SaveStrToFile(aFileName+'.txt', ComponentToStr(Self));
 end;
 
 procedure TImage32Ex.DefineProperties(Filer: TFiler);
@@ -181,19 +240,21 @@ begin
   TLayerCollectionAccess(Layers).BeginUpdate;
   with TReaderAccess(aReader) do
   try
-    if not EndOfList then Layers.Clear;
-    //Assert(NextValue = vaCollection, 'NOT Layers Collection');
-    //ReadValue;
+    //if not EndOfList then 
+    Layers.Clear;
+    Assert(NextValue = vaCollection, 'NOT Layers Collection');
+    ReadValue; //skip vaCollection flag
     while not EndOfList do
     begin
       if NextValue in [vaInt8, vaInt16, vaInt32] then ReadInteger;
+      ReadListBegin;
+      vS := ReadStr;
       vS := ReadString;
-      vLayerControlClass := GetLayerControlClass(vS);
+      vLayerControlClass := GetPlayingLayerControlClass(vS);
 
       Assert(Assigned(vLayerControlClass),  vS + ' not Registered');
 
       vItem := vLayerControlClass.Create(Layers);
-      ReadListBegin;
       while not EndOfList do ReadProperty(vItem);
       ReadListEnd;
     end;
@@ -213,13 +274,14 @@ begin
   try
     OldAncestor := Ancestor;
     Ancestor := nil;
-    //WriteValue(vaCollection);
+    WriteValue(vaCollection);
     for I := 0 to Layers.Count - 1 do
     begin
       if (Layers[I] is TExtRubberBandLayer) or (Layers[I] is TGridLayer) then
         continue;
-      WriteString(Layers[I].ClassName);
       WriteListBegin;
+      WriteStr('Class');
+      WriteString(Layers[I].ClassName);
       WriteProperties(Layers[I]);
       WriteListEnd;
     end;
@@ -371,6 +433,15 @@ begin
 end;
 
 { TImage32Editor }
+
+procedure TImage32Editor.KeyDown(var Key: Word; Shift: TShiftState);
+begin
+  inherited;
+  case Key of
+    VK_ESCAPE: if Assigned(FRubberBand) and Assigned(FSelection) then
+      FRubberBand.Cancel;
+  end;
+end;
 procedure TImage32Editor.LoadFromStream(const aStream: TStream);
 begin
   inherited;
@@ -435,8 +506,8 @@ begin
         FRubberBand.Options := [rboAllowMove, rboShowFrame];
       end;
       //else 
-        //FRubberBand.BringToFront;
-      FRubberBand.Index := Value.Index + 1;
+        FRubberBand.BringToFront;
+      //FRubberBand.Index := Value.Index + 1;
       FRubberBand.ChildLayer := Value;
     end;
   end;
