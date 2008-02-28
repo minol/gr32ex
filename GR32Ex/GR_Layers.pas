@@ -43,6 +43,7 @@ type
   TGRLayerControlClass = class of TGRLayerControl;
   TGRLayerControl = class(TExtBitmapLayer)
   protected
+    FIsBitmapEmpty: Boolean;
     FWidth: Integer;
     FHeight: Integer;
 
@@ -54,6 +55,8 @@ type
     procedure SetWidth(const Value: Integer);
 
     function GetNativeSize: TSize; override;
+    procedure Paint(Buffer: TBitmap32); override;
+    function CanStoreBitmap: Boolean;
 
   public
     constructor Create(ALayerCollection: TLayerCollection);override;
@@ -92,6 +95,7 @@ type
   public
     constructor Create(const aLayer: TGRLayerControl);
     procedure Start;
+    property Paused: Boolean read FIsPaused write FIsPaused;
     property OnFrame: TGRAniFrameEvent read FOnFrame write FOnFrame;
   end;
 
@@ -177,7 +181,7 @@ function GLayerControlClasses: TThreadList;
 implementation
 
 uses
-  Math, TypInfo, GR32_MicroTiles;
+  Math, TypInfo, GR32_MicroTiles, GR_ImageEx;
 
 const
   cAniIntervalCount = 33; //ms
@@ -471,8 +475,13 @@ constructor TGRLayerControl.Create(
 begin
   inherited;
   LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE; 
+  FIsBitmapEmpty := False;
 end;
 
+function TGRLayerControl.CanStoreBitmap: Boolean;
+begin
+  Result := not Bitmap.Empty and not FIsBitmapEmpty;
+end;
 function TGRLayerControl.GetLeft: Integer;
 begin
   Result := Trunc(FPosition.X);
@@ -492,6 +501,20 @@ end;
 function TGRLayerControl.GetTop: Integer;
 begin
   Result := Trunc(FPosition.Y);
+end;
+
+procedure TGRLayerControl.Paint(Buffer: TBitmap32);
+begin
+  if Bitmap.Empty then
+  begin
+    FIsBitmapEmpty := True;
+    Bitmap.SetSize(Width, Height);
+    if (LayerCollection.Owner is TImage32Editor) then
+      Bitmap.Clear(SetAlpha(clWhite32, $3F))
+    else
+      Bitmap.Clear(0);
+  end;
+  inherited;
 end;
 
 procedure TGRLayerControl.SetHeight(const Value: Integer);

@@ -150,3 +150,6 @@ begin
   Result := TFont.Create;
 end;
 
+layers animation:
+ * Path Animator: Line,spline (closed): key point Animation, related path or absoluted path animation.
+ * distortion animator: keyframe animation.
