@@ -38,7 +38,7 @@ uses
   Windows, Messages, Controls, Graphics, Forms, 
   //Dialogs,
 {$ENDIF}
-  Classes, SysUtils,
+  Classes, SysUtils, Menus
   GR32_Image, GR32_Layers, GR32
   , GR32_ExtLayers
   ;
@@ -89,10 +89,15 @@ type
   protected
     FRubberBand: TExtRubberBandLayer;
     FSelection: TTransformationLayer;
+    FPopupMenu: TPopupMenu;
 
     procedure SetSelection(Value: TTransformationLayer);
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer); reintroduce; overload;override;
   public
+    procedure LoadFromStream(const aStream: TStream);override;
+    procedure RemoveSelectedLayer();
+
+    property PopupMenu: TPopupMenu read FPopupMenu write FPopupMenu;
     property Selection: TTransformationLayer read FSelection write SetSelection;
   end;
 
@@ -366,6 +371,45 @@ begin
 end;
 
 { TImage32Editor }
+procedure TImage32Editor.LoadFromStream(const aStream: TStream);
+begin
+  inherited;
+  FSelection := nil;
+end;
+
+procedure TImage32Editor.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer);
+begin
+  if (Layer is TTransformationLayer) then
+  begin
+    Selection := TTransformationLayer(Layer);
+    if Assigned(FRubberBand) then
+    begin
+      Layers.MouseListener := nil;
+      Layer := TLayerCollectionAccess(Layers).MouseDown(Button, Shift, X, Y);
+    end;
+  end
+  else
+  begin
+    Selection := nil;
+    inherited MouseDown(Button, Shift, X, Y, Layer);
+  end;
+ {$IFDEF Debug}
+  if Assigned(Layer) then sendDebug('Image32Ex.MouseDown Layer=' + Layer.ClassName);
+ {$ENDIF}
+end;
+
+procedure TImage32Editor.RemoveSelectedLayer;
+var
+  vSelected: TTransformationLayer;
+begin
+  vSelected := FSelection;
+  if Assigned(vSelected) then
+  begin
+    Selection := nil;
+    vSelected.Free;
+  end;
+end;
+
 procedure TImage32Editor.SetSelection(Value: TTransformationLayer);
 begin
   if Value is TExtRubberBandLayer then exit;
@@ -396,27 +440,6 @@ begin
       FRubberBand.ChildLayer := Value;
     end;
   end;
-end;
-
-procedure TImage32Editor.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer);
-begin
-  if (Layer is TTransformationLayer) then
-  begin
-    Selection := TTransformationLayer(Layer);
-    if Assigned(FRubberBand) then
-    begin
-      Layers.MouseListener := nil;
-      Layer := TLayerCollectionAccess(Layers).MouseDown(Button, Shift, X, Y);
-    end;
-  end
-  else
-  begin
-    Selection := nil;
-    inherited MouseDown(Button, Shift, X, Y, Layer);
-  end;
- {$IFDEF Debug}
-  if Assigned(Layer) then sendDebug('Image32Ex.MouseDown Layer=' + Layer.ClassName);
- {$ENDIF}
 end;
 
 procedure Register;
