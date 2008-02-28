@@ -323,7 +323,7 @@ type
     destructor Destroy; override;
 
     procedure Cancel;
-    
+
     property ChildLayer: TTransformationLayer read FChildLayer write SetChildLayer;
     property DragState: TRubberbandDragState read FDragState;
     property HandleSize: Integer read FHandleSize write SetHandleSize default 3;
@@ -2024,7 +2024,17 @@ begin
   if ALayer = FChildLayer then
   begin
     FChildLayer := nil;
-    
+    FSize.cx := 1;
+    FSize.cy := 1;
+    FAngle := 0;
+    FPosition := FloatPoint(0, 0);
+    FPivotPoint := FloatPoint(0, 0);
+    FScaled := False;
+    FScaling := FloatPoint(1, 1);
+    FSkew := FloatPoint(0, 0);
+    UpdateTransformation;
+
+    LayerOptions := LayerOptions and not LOB_NO_UPDATE;
   end;
 end;
 
@@ -2416,6 +2426,7 @@ begin
   inherited;
 
   FBitmap := TBitmap32.Create;
+  FBitmap.DrawMode := dmBlend;
   FBitmap.OnChange := BitmapChanged;
 end;
 
