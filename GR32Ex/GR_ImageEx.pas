@@ -166,45 +166,6 @@ begin
   end;
 end;
 
-function ComponentToStr(Component: TComponent): string;
-var
-  BinStream:TMemoryStream;
-  StrStream: TStringStream;
-  s: string;
-begin
-  BinStream := TMemoryStream.Create;
-  try
-    StrStream := TStringStream.Create(s);
-    try
-      BinStream.WriteComponent(Component);
-      BinStream.Seek(0, soFromBeginning);
-      //try
-      ObjectBinaryToText(BinStream, StrStream);
-      //except
-      //  on E:Exception do
-      //end;
-      StrStream.Seek(0, soFromBeginning);
-      Result:= StrStream.DataString;
-    finally
-      StrStream.Free;
-
-    end;
-  finally
-    BinStream.Free
-  end;
-end;
-
-procedure SaveStrToFile(const aFileName, s: string);
-begin
-  with TStringList.Create do
-  try
-    Text := s;
-    SaveToFile(aFileName);
-  finally
-    Free;
-  end;
-end;
-
 procedure TImage32Ex.SaveToFile(const aFileName: string);
 var
   vStream: TFileStream;
@@ -215,7 +176,7 @@ begin
   finally
     vStream.Free;
   end;
-  SaveStrToFile(aFileName+'.txt', ComponentToStr(Self));
+  //SaveStrToFile(aFileName+'.txt', ComponentToStr(Self));
 end;
 
 procedure TImage32Ex.DefineProperties(Filer: TFiler);

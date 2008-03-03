@@ -37,13 +37,13 @@ uses
   , GR32_RepaintOpt
   , GR32_Image
   , GR32_ExtLayers
+  , GR_Animation
   ;
 
 type
   TGRLayerControlClass = class of TGRLayerControl;
   TGRLayerControl = class(TExtBitmapLayer)
   protected
-    FIsBitmapEmpty: Boolean;
     FWidth: Integer;
     FHeight: Integer;
 
@@ -56,7 +56,8 @@ type
 
     function GetNativeSize: TSize; override;
     procedure Paint(Buffer: TBitmap32); override;
-    function CanStoreBitmap: Boolean;
+    procedure BitmapChanged(Sender: TObject); override;
+    function DoHitTest(X, Y: Integer): Boolean;override;
 
   public
     constructor Create(ALayerCollection: TLayerCollection);override;
@@ -81,6 +82,16 @@ type
     property OnMouseDown;
     property OnMouseMove;
     property OnMouseUp;
+  end;
+
+  TGRAnimationLayer = class(TGRLayerControl)
+  protected
+    FAnimation: TGRAnimation;
+    procedure SetAnimation(const Value: TGRAnimation);
+  public
+    constructor Create(ALayerCollection: TLayerCollection);override;
+    destructor Destroy; override;
+    property Animation: TGRAnimation read FAnimation write SetAnimation;
   end;
 
   TGRAniFrameEvent = procedure(const Sender: TGRLayerControl; const MoveCount: Longword; var Done: Boolean) of object;
@@ -475,13 +486,31 @@ constructor TGRLayerControl.Create(
 begin
   inherited;
   LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE; 
-  FIsBitmapEmpty := False;
 end;
 
-function TGRLayerControl.CanStoreBitmap: Boolean;
+procedure TGRLayerControl.BitmapChanged(Sender: TObject);
 begin
-  Result := not Bitmap.Empty and not FIsBitmapEmpty;
+  inherited;
+  if not Bitmap.Empty then
+    Changed;
 end;
+
+function TGRLayerControl.DoHitTest(X, Y: Integer): Boolean;
+var
+  B: TPoint;
+begin
+  B := FTransformation.ReverseTransform(Point(X, Y));
+
+  if Bitmap.Empty then
+    Result := PtInRect(Rect(0, 0, FWidth, FHeight), B)
+  else
+  begin
+    Result := PtInRect(Rect(0, 0, Bitmap.Width, Bitmap.Height), B);
+    if Result and AlphaHit and (Bitmap.PixelS[B.X, B.Y] and $FF000000 = 0) then
+      Result := False;
+  end;
+end;
+
 function TGRLayerControl.GetLeft: Integer;
 begin
   Result := Trunc(FPosition.X);
@@ -504,10 +533,12 @@ begin
 end;
 
 procedure TGRLayerControl.Paint(Buffer: TBitmap32);
+var
+  vIsEmpty: Boolean;
 begin
-  if Bitmap.Empty then
+  vIsEmpty := Bitmap.Empty;
+  if vIsEmpty then
   begin
-    FIsBitmapEmpty := True;
     Bitmap.SetSize(Width, Height);
     if (LayerCollection.Owner is TImage32Editor) then
       Bitmap.Clear(SetAlpha(clWhite32, $3F))
@@ -515,6 +546,7 @@ begin
       Bitmap.Clear(0);
   end;
   inherited;
+  if vIsEmpty and not Bitmap.Empty then Bitmap.Delete;
 end;
 
 procedure TGRLayerControl.SetHeight(const Value: Integer);
@@ -563,6 +595,34 @@ begin
 
     DoChange;
   end;
+end;
+
+{ TGRAnimationLayer }
+constructor TGRAnimationLayer.Create(LayerCollection: TLayerCollection);
+begin
+  inherited;
+  FAnimation := nil;//TGRAnimation.Create(Self);
+end;
+
+destructor TGRAnimationLayer.Destroy;
+begin
+  FreeAndNil(FAnimation);
+  inherited;
+end;
+
+procedure TGRAnimationLayer.SetAnimation(const Value: TGRAnimation);
+var
+  vNewAni: TGRAnimation;
+begin
+  vNewAni := nil;
+  if Value <> nil then
+  begin
+    vNewAni := TGRAnimation(Value.ClassType).Create(Self);
+    vNewAni.Assign(Value);
+  end;
+  FreeAndNil(FAnimation);
+  FAnimation := vNewAni;
+  Changed;
 end;
 
 { TGRLayerAnimator }

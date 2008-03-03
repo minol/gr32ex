@@ -348,7 +348,7 @@ type
   );
 
   TPropertyLayer = class(TTransformationLayer)
-  private
+  protected
     FName: WideString;
     FLocked: Boolean;
     FDrawMode: TLayerDrawMode;
@@ -363,7 +363,7 @@ type
   end;
 
   TTextLayer = class(TPropertyLayer)
-  private
+  protected
     FText: WideString;
     FTextColor: TColor32;
     procedure SetText(const Value: WideString);
@@ -377,16 +377,17 @@ type
   end;
 
   TExtBitmapLayer = class(TPropertyLayer)
-  private
+  protected
     FBitmap: TBitmap32;
     FCropped: Boolean;
-    procedure BitmapChanged(Sender: TObject);
     procedure SetCropped(Value: Boolean);
     procedure SetBitmap(Value: TBitmap32);
   protected
     function DoHitTest(X, Y: Integer): Boolean; override;
     function GetNativeSize: TSize; override;
     procedure Paint(Buffer: TBitmap32); override;
+
+    procedure BitmapChanged(Sender: TObject);virtual;
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
@@ -399,6 +400,8 @@ type
   end;
 
 //----------------------------------------------------------------------------------------------------------------------
+function ComponentToStr(const Component: TComponent): string;
+procedure SaveStrToFile(const aFileName, s: string);
 
 implementation
 
@@ -407,6 +410,45 @@ uses
 
 type
   TAffineTransformationAccess = class(TAffineTransformation);
+
+function ComponentToStr(const Component: TComponent): string;
+var
+  BinStream:TMemoryStream;
+  StrStream: TStringStream;
+  s: string;
+begin
+  BinStream := TMemoryStream.Create;
+  try
+    StrStream := TStringStream.Create(s);
+    try
+      BinStream.WriteComponent(Component);
+      BinStream.Seek(0, soFromBeginning);
+      //try
+      ObjectBinaryToText(BinStream, StrStream);
+      //except
+      //  on E:Exception do
+      //end;
+      StrStream.Seek(0, soFromBeginning);
+      Result:= StrStream.DataString;
+    finally
+      StrStream.Free;
+
+    end;
+  finally
+    BinStream.Free
+  end;
+end;
+
+procedure SaveStrToFile(const aFileName, s: string);
+begin
+  with TStringList.Create do
+  try
+    Text := s;
+    SaveToFile(aFileName);
+  finally
+    Free;
+  end;
+end;
 
 destructor TCustomLayerEx.Destroy;
 begin
@@ -455,6 +497,21 @@ begin
   end;
   if Assigned(FOnChange) then
     FOnChange(Self);
+end;
+
+function TCustomLayerEx.GetCaptured: Boolean;
+begin
+  Result := FLayerOptions and LOB_NO_CAPTURE = 0;
+end;
+
+procedure TCustomLayerEx.SetCaptured(const Value: Boolean);
+begin
+  if Value then
+    LayerOptions := LayerOptions or LOB_NO_CAPTURE
+  else
+  begin
+    LayerOptions := LayerOptions and not LOB_NO_CAPTURE
+  end;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -2545,20 +2602,5 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
-
-function TCustomLayerEx.GetCaptured: Boolean;
-begin
-  Result := FLayerOptions and LOB_NO_CAPTURE = 0;
-end;
-
-procedure TCustomLayerEx.SetCaptured(const Value: Boolean);
-begin
-  if Value then
-    LayerOptions := LayerOptions or LOB_NO_CAPTURE
-  else
-  begin
-    LayerOptions := LayerOptions and not LOB_NO_CAPTURE
-  end;
-end;
 
 end.
