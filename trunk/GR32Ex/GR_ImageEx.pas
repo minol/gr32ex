@@ -41,6 +41,7 @@ uses
   Classes, SysUtils, Menus
   GR32_Image, GR32_Layers, GR32
   , GR32_ExtLayers
+  , GR_Layers
   ;
 
 type
@@ -80,6 +81,8 @@ type
     procedure SaveToStream(const aStream: TStream);virtual;
     procedure LoadFromFile(const aFileName: string);
     procedure SaveToFile(const aFileName: string);
+    procedure LoadFromString(const s: string);
+    function ToString: string;
   published
     property Enabled;
     property Transparent: Boolean read FTransparent write SetTransparent;
@@ -97,6 +100,7 @@ type
   public
     procedure LoadFromStream(const aStream: TStream);override;
     procedure RemoveSelectedLayer();
+    function CreateLayer(const aClass: TGRLayerClass): TGRLayer;
 
     property PopupMenu: TPopupMenu read FPopupMenu write FPopupMenu;
     property Selection: TTransformationLayer read FSelection write SetSelection;
@@ -107,7 +111,7 @@ procedure Register;
 implementation
 
 uses
-  GR_Layers;
+  GR_LayerEditors;
 
 type
   TLayerHack = class(TCustomLayer);
@@ -177,6 +181,31 @@ begin
     vStream.Free;
   end;
   //SaveStrToFile(aFileName+'.txt', ComponentToStr(Self));
+end;
+
+procedure TImage32Ex.LoadFromString(const s: string);
+var
+  vStrStream:TStringStream;
+  vBinStream: TMemoryStream;
+begin
+  vStrStream := TStringStream.Create(s);
+  try
+    vBinStream := TMemoryStream.Create;
+    try
+      ObjectTextToBinary(vStrStream, vBinStream);
+      vBinStream.Seek(0, soFromBeginning);
+      LoadFromStream(vBinStream);
+    finally
+      vBinStream.Free;
+    end;
+  finally
+    vStrStream.Free;
+  end;
+end;
+
+function TImage32Ex.ToString: string;
+begin
+    Result := ComponentToStr(Self);
 end;
 
 procedure TImage32Ex.DefineProperties(Filer: TFiler);
@@ -394,6 +423,28 @@ begin
 end;
 
 { TImage32Editor }
+
+function TImage32Editor.CreateLayer(const aClass: TGRLayerClass): TGRLayer;
+var
+  P: TPoint;
+begin
+  with GetViewportRect do
+    P := ControlToBitmap(Point((Right + Left) div 2, (Top + Bottom) div 2));
+  Result := aClass.Create(Layers);
+  Result.Left := P.X;
+  Result.Top := P.Y;
+  if TGRLayerEditor.Execute(TResult) then
+  begin
+    if Result.Bitmap.Empty then
+    begin
+      Result.Width := 32;
+      Result.Height := 32;
+    end;
+    Selection := Result;
+  end
+  else
+    FreeAndNil(Result);
+end;
 
 procedure TImage32Editor.KeyDown(var Key: Word; Shift: TShiftState);
 begin
