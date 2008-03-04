@@ -5,6 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, Menus, ImgList, ActnList, ComCtrls,
+  Jpeg,
   TntActnList, TntDialogs, TntStdCtrls,
   { TB2K }
   TB2Dock, TB2Toolbar, TB2Item, TB2ExtItems,
@@ -15,10 +16,9 @@ uses
   GR32,
   GR32_Layers,
   GR32_Image,
-  GR_ImageEx,
-  GR_Layers,
   GR32_PNG,
-  Jpeg,
+  GR_Layers, 
+  GR_ImageEx,
   { gettext }
   gnugettext;
 
@@ -26,7 +26,7 @@ type
   TfrmMain = class(TForm)
     ilMain: TImageList;
     dockTop: TSpTBXDock;
-    SpTBXMultiDock1: TSpTBXMultiDock;
+    dockLeft: TSpTBXMultiDock;
     SpTBXMultiDock2: TSpTBXMultiDock;
     dockBottom: TSpTBXDock;
     tbStandard: TSpTBXToolbar;
@@ -46,7 +46,7 @@ type
     mSelectAll: TSpTBXItem;
     SpTBXSeparatorItem3: TSpTBXSeparatorItem;
     mDel: TSpTBXItem;
-    TntActionList1: TTntActionList;
+    ActionList: TTntActionList;
     actNew: TTntAction;
     actOpen: TTntAction;
     actSave: TTntAction;
@@ -78,7 +78,7 @@ type
     mOptions: TSpTBXItem;
     mmHelp: TSpTBXItem;
     mToolbars: TSpTBXSubmenuItem;
-    SpTBXPopupMenu1: TSpTBXPopupMenu;
+    pmCustomize: TSpTBXPopupMenu;
     mStandardToolbar: TSpTBXItem;
     mFormattingToolbar: TSpTBXItem;
     mCommandsLog: TSpTBXItem;
@@ -108,11 +108,10 @@ type
     tabMain: TSpTBXTabControl;
     tSkins: TSpTBXSubmenuItem;
     SpTBXSkinGroupItem1: TSpTBXSkinGroupItem;
-    pEmbeddedCustomize: TSpTBXItem;
     aCustomize: TTntAction;
     aEmbeddedCustomize: TTntAction;
     SpTBXSeparatorItem13: TSpTBXSeparatorItem;
-    SpTBXSplitter1: TSpTBXSplitter;
+    sptLeft: TSpTBXSplitter;
     SpTBXSplitter2: TSpTBXSplitter;
     tLanguages: TSpTBXComboBox;
     TBControlItem1: TTBControlItem;
@@ -120,10 +119,21 @@ type
     TBControlItem4: TTBControlItem;
     SpTBXStatusBar1: TSpTBXStatusBar;
     tbComponentPallete: TSpTBXToolbar;
-    SpTBXTabItem1: TSpTBXTabItem;
+    tbiDesign: TSpTBXTabItem;
     tbsDesign: TSpTBXTabSheet;
     actDel: TTntAction;
     pnlOptions: TSpTBXDockablePanel;
+    dlgOpen: TOpenDialog;
+    dlgSave: TSaveDialog;
+    pmLayer: TSpTBXPopupMenu;
+    TBGroupItem1: TTBGroupItem;
+    SpTBXSeparatorItem2: TSpTBXSeparatorItem;
+    SpTBXItem1: TSpTBXItem;
+    SpTBXItem2: TSpTBXItem;
+    Button1: TButton;
+    Button2: TButton;
+    tbiSource: TSpTBXTabItem;
+    tbsSource: TSpTBXTabSheet;
     procedure FormShow(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure tLayoutSaveClick(Sender: TObject);
@@ -140,23 +150,31 @@ type
     procedure actSaveExecute(Sender: TObject);
     procedure actOpenExecute(Sender: TObject);
     procedure actNewExecute(Sender: TObject);
+    procedure actPasteUpdate(Sender: TObject);
+    procedure actDelUpdate(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
+    procedure tabMainActiveTabChanging(Sender: TObject; TabIndex,
+      NewTabIndex: Integer; var Allow: Boolean);
   private
     { Private declarations }
-    //procedure NotifyClipObjFree(Sender: TObject);
     procedure NotifyList(Sender: TLayerCollection; Action: TLayerListNotification; Layer: TCustomLayer; Index: Integer);
   protected
     FImageEditor: TImage32Editor;
-    FClipObj: TGRLayerControl;
-    procedure doSelectControl(Sender: TObject);
-    procedure SetClipObj(const Value: TGRLayerControl);
-  public
-    { Public declarations }
+    mmoSource: TMemo;
+    FClipObj: TGRLayer;
+    FIsSourceChanged: Boolean;
     FAppPath: string;
     FIniPath: string;
+    procedure DoCreateLayer(Sender: TObject);
+    procedure DoObjSourceChanged(Sender: TObject);
+    procedure SetClipObj(const Value: TGRLayer);
+  public
+    { Public declarations }
     procedure FillLayoutList(CurrentLayout: string = '');
     constructor Create(aComponent: TComponent);override;
     
-    property ClipObj: TGRLayerControl read FClipObj write SetClipObj;
+    property ClipObj: TGRLayer read FClipObj write SetClipObj;
   end;
 
 var
@@ -171,8 +189,8 @@ uses
 
 type
   TLayerCollectionAccess = class(TLayerCollection);
-{ Form }
 
+{ Form }
 procedure TfrmMain.FormShow(Sender: TObject);
 begin
   FAppPath := IncludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
@@ -325,7 +343,7 @@ var
   I: integer;
 begin
   I := tLanguages.ItemIndex;
-  if I > -1 then 
+  if I > -1 then
   begin
     tLanguages.Text := tLanguages.Items[I];
     // Change language and retranslate
@@ -350,7 +368,7 @@ begin
   FImageEditor.Align := alClient;
   TLayerCollectionAccess(FImageEditor.Layers).OnListNotify := NotifyList;
 
-  with GLayerControlClasses.LockList do
+  with GLayerClasses.LockList do
   try
   //tbComponentPallete.
     for i := 0 to count -1 do
@@ -358,14 +376,18 @@ begin
       vItem := TTBItem.Create(Self);
       vItem.ParentComponent := tbComponentPallete;
       //vItem.Action := aCustomize;
-      vItem.Caption := TGRLayerControlClass(Items[i]).ClassName;
+      vItem.Caption := TGRLayerClass(Items[i]).ClassName;
       vItem.Tag := Integer(Items[i]);
-      vItem.OnClick := doSelectControl;
+      vItem.OnClick := DoCreateLayer;
       tbComponentPallete.Items.Add(vitem);
     end;
   finally
-    GLayerControlClasses.UnlockList;
+    GLayerClasses.UnlockList;
   end;
+  mmoSource := TMemo.Create(Self);
+  mmoSource.Parent := tbsSource;
+  mmoSource.Align := alClient;
+  mmoSource.OnChange := DoObjSourceChanged;
 end;
 
 procedure TfrmMain.actSelectPointerExecute(Sender: TObject);
@@ -373,10 +395,9 @@ begin
   //select pt
 end;
 
-procedure TfrmMain.doSelectControl(Sender: TObject);
+procedure TfrmMain.DoCreateLayer(Sender: TObject);
 var
-  vLayerControl: TGRLayerControl;
-  //vEditorClass: TGRLayerEditorClass;
+  vLayerControl: TGRLayer;
   P: TPoint;
 begin
   if (Sender is TTBItem) then
@@ -386,24 +407,27 @@ begin
       begin
         with FImageEditor.GetViewportRect do
          P := FImageEditor.ControlToBitmap(Point((Right + Left) div 2, (Top + Bottom) div 2));
-        vLayerControl := TGRLayerControlClass(tag).Create(FImageEditor.Layers);
+        vLayerControl := TGRLayerClass(tag).Create(FImageEditor.Layers);
         vLayerControl.Left := P.X;
         vLayerControl.Top := P.Y;
-        ShowLayerControlEditor(vLayerControl);
-        FImageEditor.Selection := vLayerControl;
+        if TGRLayerEditor.Execute(vLayerControl) then
+        begin
+          if vLayerControl.Bitmap.Empty then
+          begin
+            vLayerControl.Width := 32;
+            vLayerControl.Height := 32;
+          end;
+          FImageEditor.Selection := vLayerControl;
+        end
+        else
+          vLayerControl.Free;
       end;
     end;
 end;
 
 procedure TfrmMain.actDelExecute(Sender: TObject);
-var
-  vLayerControl: TGRLayerControl;
 begin
-  vLayerControl := TGRLayerControl(FImageEditor.Selection);
-  if Assigned(vLayerControl) then
-  begin
-    vLayerControl.Free;
-  end;
+  FImageEditor.RemoveSelectedLayer;
 end;
 
 procedure TfrmMain.actPasteExecute(Sender: TObject);
@@ -413,7 +437,7 @@ end;
 
 procedure TfrmMain.actCopyExecute(Sender: TObject);
 begin
-  ClipObj := TGRLayerControl(FImageEditor.Selection);
+  ClipObj := TGRLayer(FImageEditor.Selection);
 end;
 
 procedure TfrmMain.actCutExecute(Sender: TObject);
@@ -427,7 +451,7 @@ begin
     FClipObj := nil;
 end;
 
-procedure TfrmMain.SetClipObj(const Value: TGRLayerControl);
+procedure TfrmMain.SetClipObj(const Value: TGRLayer);
 begin
   if FClipObj <> Value then
   begin
@@ -442,17 +466,88 @@ end;
 
 procedure TfrmMain.actSaveExecute(Sender: TObject);
 begin
-  //
+  with dlgSave do
+  begin
+    if Execute then
+      FImageEditor.SaveToFile(FileName);
+  end;
 end;
 
 procedure TfrmMain.actOpenExecute(Sender: TObject);
 begin
-  //
+  with dlgOpen do
+  begin
+    if Execute then
+      FImageEditor.LoadFromFile(FileName);
+  end;
 end;
 
 procedure TfrmMain.actNewExecute(Sender: TObject);
 begin
+  FImageEditor.Clear;
+end;
+
+procedure TfrmMain.actPasteUpdate(Sender: TObject);
+begin
   //
 end;
 
+procedure TfrmMain.actDelUpdate(Sender: TObject);
+begin
+ actDel.Enabled := Assigned(FImageEditor.Selection);
+end;
+
+procedure TfrmMain.Button1Click(Sender: TObject);
+begin
+  if Assigned(FImageEditor.Selection) then
+    //TGRLayer(FImageEditor.Selection).Top := 0;
+    
+    with TGRLayerAnimator_Sample.Create(TGRLayer(FImageEditor.Selection), 100) do
+    begin
+      FreeOnTerminate := True;
+      Start;
+    end; //}
+end;
+
+procedure TfrmMain.Button2Click(Sender: TObject);
+begin
+  if Assigned(FImageEditor.Selection) then
+    //TGRLayer(FImageEditor.Selection).Top := 0;
+
+    {with TGRLayerAnimator_Sample.Create(TGRLayer(FImageEditor.Selection), 100) do
+    begin
+      FreeOnTerminate := True;
+      Start;
+    end; //}
+end;
+
+procedure TfrmMain.tabMainActiveTabChanging(Sender: TObject; TabIndex,
+  NewTabIndex: Integer; var Allow: Boolean);
+begin
+  if NewTabIndex = tabMain.Items.IndexOf(tbiSource) then
+  begin
+    mmoSource.Lines.Text := FImageEditor.ToString;
+    FIsSourceChanged := False;
+  end
+  else if NewTabIndex = tabMain.Items.IndexOf(tbiDesign) then
+  begin
+    if FIsSourceChanged then
+    begin
+      try
+        FImageEditor.LoadFromString(mmoSource.Lines.Text);
+      except
+        On E: Exception do ShowMessage(E.Message);
+      end;
+      FIsSourceChanged := False;
+    end;
+  end
+end;
+
+procedure TfrmMain.DoObjSourceChanged(Sender: TObject);
+begin
+  FIsSourceChanged := True;
+end;
+
+initialization
+  //RegisterLayer(TGRLayer);
 end.

@@ -39,7 +39,7 @@ uses
   //Dialogs,
 {$ENDIF}
   Classes, SysUtils, Menus
-  GR32_Image, GR32_Layers, GR32
+  , GR32_Image, GR32_Layers, GR32
   , GR32_ExtLayers
   , GR_Layers
   ;
@@ -101,6 +101,7 @@ type
     procedure LoadFromStream(const aStream: TStream);override;
     procedure RemoveSelectedLayer();
     function CreateLayer(const aClass: TGRLayerClass): TGRLayer;
+    procedure Clear;
 
     property PopupMenu: TPopupMenu read FPopupMenu write FPopupMenu;
     property Selection: TTransformationLayer read FSelection write SetSelection;
@@ -223,8 +224,8 @@ end;
 
 procedure TImage32Ex.ReadData(aReader: TReader);
 var
-  vItem: TGRLayerControl;
-  vLayerControlClass: TGRLayerControlClass;
+  vItem: TGRLayer;
+  vLayerClass: TGRLayerClass;
   vS: string;
 begin
   TLayerCollectionAccess(Layers).BeginUpdate;
@@ -240,11 +241,11 @@ begin
       ReadListBegin;
       vS := ReadStr;
       vS := ReadString;
-      vLayerControlClass := GetPlayingLayerControlClass(vS);
+      vLayerClass := GetLayerClass(vS);
 
-      Assert(Assigned(vLayerControlClass),  vS + ' not Registered');
+      Assert(Assigned(vLayerClass),  vS + ' not Registered');
 
-      vItem := vLayerControlClass.Create(Layers);
+      vItem := vLayerClass.Create(Layers);
       while not EndOfList do ReadProperty(vItem);
       ReadListEnd;
     end;
@@ -433,7 +434,7 @@ begin
   Result := aClass.Create(Layers);
   Result.Left := P.X;
   Result.Top := P.Y;
-  if TGRLayerEditor.Execute(TResult) then
+  if TGRLayerEditor.Execute(Result) then
   begin
     if Result.Bitmap.Empty then
     begin
@@ -444,6 +445,13 @@ begin
   end
   else
     FreeAndNil(Result);
+end;
+
+procedure TImage32Editor.Clear;
+begin
+  Selection := nil;
+  FRubberBand := nil;
+  Layers.Clear;
 end;
 
 procedure TImage32Editor.KeyDown(var Key: Word; Shift: TShiftState);
