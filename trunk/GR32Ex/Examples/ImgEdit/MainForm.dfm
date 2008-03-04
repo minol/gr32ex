@@ -3,7 +3,7 @@ object frmMain: TfrmMain
   Top = 120
   Width = 774
   Height = 612
-  Caption = 'frmMain'
+  Caption = 'Image32 Editor'
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -17,7 +17,7 @@ object frmMain: TfrmMain
   OnShow = FormShow
   PixelsPerInch = 96
   TextHeight = 13
-  object SpTBXSplitter1: TSpTBXSplitter
+  object sptLeft: TSpTBXSplitter
     Left = 7
     Top = 73
     Height = 477
@@ -43,10 +43,14 @@ object frmMain: TfrmMain
     Font.Name = 'Courier New'
     Font.Style = []
     ParentFont = False
-    ActiveTabIndex = 0
+    ActiveTabIndex = 1
+    OnActiveTabChanging = tabMainActiveTabChanging
     HiddenItems = <>
-    object SpTBXTabItem1: TSpTBXTabItem
-      Caption = 'Design'
+    object tbiDesign: TSpTBXTabItem
+      Caption = '&Design'
+    end
+    object tbiSource: TSpTBXTabItem
+      Caption = '&Source'
       Checked = True
     end
     object tbsDesign: TSpTBXTabSheet
@@ -54,9 +58,18 @@ object frmMain: TfrmMain
       Top = 22
       Width = 617
       Height = 455
-      Caption = 'Design'
+      Caption = '&Design'
       ImageIndex = -1
-      TabItem = 'SpTBXTabItem1'
+      TabItem = 'tbiDesign'
+    end
+    object tbsSource: TSpTBXTabSheet
+      Left = 0
+      Top = 22
+      Width = 617
+      Height = 455
+      Caption = '&Source'
+      ImageIndex = -1
+      TabItem = 'tbiSource'
     end
   end
   object dockTop: TSpTBXDock
@@ -64,7 +77,6 @@ object frmMain: TfrmMain
     Top = 0
     Width = 766
     Height = 73
-    PopupMenu = SpTBXPopupMenu1
     object tbStandard: TSpTBXToolbar
       Left = 6
       Top = 22
@@ -286,7 +298,7 @@ object frmMain: TfrmMain
       DisplayMode = tbdmImageAboveCaption
     end
   end
-  object SpTBXMultiDock1: TSpTBXMultiDock
+  object dockLeft: TSpTBXMultiDock
     Left = 0
     Top = 73
     Width = 7
@@ -305,6 +317,25 @@ object frmMain: TfrmMain
       Caption = 'Options'
       DockPos = 0
       TabOrder = 0
+      Visible = False
+      object Button1: TButton
+        Left = 32
+        Top = 180
+        Width = 75
+        Height = 25
+        Caption = #22402#30452#36816#21160
+        TabOrder = 2
+        OnClick = Button1Click
+      end
+      object Button2: TButton
+        Left = 32
+        Top = 216
+        Width = 75
+        Height = 25
+        Caption = #27700#24179#36816#21160
+        TabOrder = 1
+        OnClick = Button2Click
+      end
     end
   end
   object dockBottom: TSpTBXDock
@@ -312,7 +343,7 @@ object frmMain: TfrmMain
     Top = 550
     Width = 766
     Height = 9
-    PopupMenu = SpTBXPopupMenu1
+    PopupMenu = pmCustomize
     Position = dpBottom
   end
   object SpTBXStatusBar1: TSpTBXStatusBar
@@ -1256,7 +1287,7 @@ object frmMain: TfrmMain
       FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000000000000000000000000000
       000000000000}
   end
-  object TntActionList1: TTntActionList
+  object ActionList: TTntActionList
     Images = ilMain
     Left = 224
     Top = 352
@@ -1306,6 +1337,7 @@ object frmMain: TfrmMain
       ImageIndex = 11
       ShortCut = 16470
       OnExecute = actPasteExecute
+      OnUpdate = actPasteUpdate
     end
     object aSelectAll: TTntAction
       Category = 'Edit'
@@ -1387,9 +1419,10 @@ object frmMain: TfrmMain
       Caption = 'Delete'
       ShortCut = 46
       OnExecute = actDelExecute
+      OnUpdate = actDelUpdate
     end
   end
-  object SpTBXPopupMenu1: TSpTBXPopupMenu
+  object pmCustomize: TSpTBXPopupMenu
     Left = 256
     Top = 352
     object pGroupItem1: TTBGroupItem
@@ -1400,10 +1433,6 @@ object frmMain: TfrmMain
     object pCustomize: TSpTBXItem
       Caption = 'Customize...'
       Action = aCustomize
-    end
-    object pEmbeddedCustomize: TSpTBXItem
-      Caption = 'Embedded Customize...'
-      Action = aEmbeddedCustomize
     end
   end
   object tbxCustomizer: TSpTBXCustomizer
@@ -1445,6 +1474,37 @@ object frmMain: TfrmMain
     object cExit: TSpTBXItem
       Caption = 'Exit'
       Action = actExit
+    end
+  end
+  object dlgOpen: TOpenDialog
+    DefaultExt = 'pbi'
+    Filter = 'PlayingBoard Interface Language|*.pbi|All Files(*.*)|*.*'
+    Left = 257
+    Top = 384
+  end
+  object dlgSave: TSaveDialog
+    DefaultExt = 'pbi'
+    Filter = 'PlayingBoard Interface Language|*.pbi|All Files(*.*)|*.*'
+    Options = [ofOverwritePrompt, ofHideReadOnly, ofEnableSizing]
+    Left = 224
+    Top = 383
+  end
+  object pmLayer: TSpTBXPopupMenu
+    AutoPopup = False
+    Left = 291
+    Top = 352
+    object TBGroupItem1: TTBGroupItem
+      LinkSubitems = mToolbars
+    end
+    object SpTBXSeparatorItem2: TSpTBXSeparatorItem
+    end
+    object SpTBXItem1: TSpTBXItem
+      Caption = 'Customize...'
+      Action = aCustomize
+    end
+    object SpTBXItem2: TSpTBXItem
+      Caption = 'Embedded Customize...'
+      Action = aEmbeddedCustomize
     end
   end
 end

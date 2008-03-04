@@ -35,6 +35,7 @@ uses
   SysUtils, Classes
   , Graphics
   , GR32
+  , GR32_Layers
   , GR32_Transforms
   , GR32_Filters
   //, GR_Graphics
@@ -69,11 +70,12 @@ type
   protected
     function  GetOwner: TPersistent; override;
   public
-    constructor Create(aOwner: TPersistent; ItemClass: TGRAnimationFrameClass);
+    constructor Create(aOwner: TPersistent);
     function Add: TGRAnimationFrame;
     property Items[Index: Integer]: TGRAnimationFrame read GetItem write SetItem; default;
   end;
 
+  TGRAnimationDirection = (adForward, adRewind);
   TGRAniLoopEvent = procedure(Sender: TObject; var Continued: Boolean) of object;
   TGRAnimationClass = class of TGRAnimation;
   //the abstract animation class
@@ -84,7 +86,9 @@ type
     FSpeed: TGRSpeed;
     FLooped: Boolean;
     FRunning: Boolean;
+    FEnabled: Boolean;
     FCurrentIndex: Integer;
+    FDirection: TGRAnimationDirection;
     FOnLoop: TGRAniLoopEvent;
     procedure SetFrames(const Value: TGRAnimationFrames);
     function GetOwner: TPersistent;override;
@@ -93,34 +97,24 @@ type
     function GetFrameDelay(const FrameIndex: Integer; const SafeMode: Boolean=True): Integer;
     function GetNextIndex(var aIndex: Integer; const CanLoop: Boolean): Boolean;
     function IndexIsValid(const aIndex: Integer): Boolean;
-    procedure DoLoop(var Continued: Boolean);
+    procedure DoLoop(var aContinued: Boolean);
   public
     function DisplayFirstFrame(): Boolean;
     function DisplayFrame(const FrameIndex: Integer): Boolean;
     procedure LoadFromFile(const Filename: string);
     procedure SaveToFile(const Filename: string);
-    procedure LoadFromStream(const aStream: TStream);abstract;virtual;
-    procedure SaveToStream(const aStream: TStream);abstract;virtual;
+    procedure LoadFromStream(const aStream: TStream);virtual;abstract;
+    procedure SaveToStream(const aStream: TStream);virtual;abstract;
     procedure Assign(Source: TPersistent);override;
-    constructor Create(aOwner: TPersistent);override;
+    constructor Create(aOwner: TPersistent);virtual;
     destructor Destroy; override;
-    property Frames: TGRAnimationFrames read FFrames write SetFrames; default;
+    property Frames: TGRAnimationFrames read FFrames write SetFrames;
     property Owner: TPersistent read FOwner;
     property Speed: TGRSpeed read FSpeed write SetSpeed;
     property Looped: Boolean read FLooped write FLooped;
     property OnLoop: TGRAniLoopEvent read FOnLoop write FOnLoop;
   end;
   
-
-procedure RegisterAnimation(const AExtension, ADescription: string; const aClass: TGRAnimationClass);
-function GAniFileFormats: TAniFileFormatsList;
-
-implementation
-
-const
-  G32DefaultDelay: ShortInt = 100; // Time in ms.
-  G32MinimumDelay: ShortInt = 10;  // Time in ms.
-
 type
   PAniFileFormat = ^TAniFileFormat;
   TAniFileFormat = record
@@ -141,6 +135,19 @@ type
     procedure BuildFilterStrings(AnimationClass: TGRAnimationClass;
       var Descriptions, Filters: string);
   end;
+
+
+procedure RegisterAnimation(const AExtension, ADescription: string; const aClass: TGRAnimationClass);
+function GAniFileFormats: TAniFileFormatsList;
+
+implementation
+
+uses
+  Consts;
+
+const
+  G32DefaultDelay: ShortInt = 100; // Time in ms.
+  G32MinimumDelay: ShortInt = 10;  // Time in ms.
 
 { TAniFileFormatsList }
 constructor TAniFileFormatsList.Create;
@@ -253,7 +260,7 @@ var
 function GAniFileFormats: TAniFileFormatsList;
 begin
   if FAniFileFormats = nil then FAniFileFormats := TAniFileFormatsList.Create;
-  Result := FileFormats;
+  Result := FAniFileFormats;
 end;
 
 
@@ -286,9 +293,9 @@ begin
   Result := TGRAnimationFrame(inherited Add);
 end;
 
-constructor TGRAnimationFrames.Create(aOwner: TPersistent; ItemClass: TGRAnimationFrame);
+constructor TGRAnimationFrames.Create(aOwner: TPersistent);
 begin
-  inherited Create(ItemClass);
+  inherited Create(TGRAnimationFrame);
   FOwner := aOwner;
 end;
 
@@ -308,10 +315,11 @@ begin
 end;
 
 { TGRAnimation }
-constructor TGRAnimation.Create(aOwner: TLayerCollection);
+constructor TGRAnimation.Create(aOwner: TPersistent);
 begin
-  inherited;
-  FFrames := TGRAnimation.Create(Self);
+  inherited Create();
+  FOwner := aOwner;
+  FFrames := TGRAnimationFrames.Create(Self);
   FSpeed := 100;
 end;
 
@@ -339,21 +347,21 @@ end;
 function TGRAnimation.DisplayFrame(const FrameIndex: Integer): Boolean;
 begin
   Result := FEnabled and IndexIsValid(FrameIndex);
-  if Result and (Frame.Count > 1) then
+  if Result and (Frames.Count > 1) then
     GetNextIndex(FCurrentIndex, FLooped);
 end;
 
-procedure TGRAnimation.DoLoop(var Continued: Boolean);
+procedure TGRAnimation.DoLoop(var aContinued: Boolean);
 begin
   if Assigned(FOnLoop) then
-    FOnLoop(Self, Continued);
+    FOnLoop(Self, aContinued);
 end;
 
 function TGRAnimation.GetFrameDelay(const FrameIndex: Integer; const SafeMode: Boolean): Integer;
 begin
   Result := 0;
   if IndexIsValid(FrameIndex) then
-  Result := FCollection.Items[FrameIndex].DelayTime;
+  Result := Frames.Items[FrameIndex].DelayTime;
   if (Result < G32MinimumDelay) and SafeMode then
   begin
     if (Result = 0) then
@@ -374,7 +382,7 @@ begin
   Result := False;
   if (Frames.Count > 0) then
   begin
-    if (FPlayDirection = pdForward) then
+    if (FDirection = adForward) then
     begin
       if (aIndex < Frames.Count -1) then
       begin

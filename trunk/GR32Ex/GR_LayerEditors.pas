@@ -50,55 +50,55 @@ type
     procedure btnOpenPicClick(Sender: TObject);
     procedure NumberKeyPressOnly(Sender: TObject; var Key: Char);
   protected
-    FLayerControl: TGRLayerControl;
+    FLayer: TGRLayer;
     FImage: TImage32;
-    procedure SetLayerControl(const Value: TGRLayerControl); virtual;
+    procedure SetLayer(const Value: TGRLayer); virtual;
     { Private declarations }
   public
     { Public declarations }
-    class function LayerControlClass: TGRLayerControlClass; virtual;
-    class function Execute(aLayerControl: TGRLayerControl): Boolean;
+    class function LayerClass: TGRLayerClass; virtual;
+    class function Execute(aLayer: TGRLayer): Boolean;
     constructor Create(aComponent: TComponent);override;
-    property LayerControl: TGRLayerControl read FLayerControl write SetLayerControl;
+    property Layer: TGRLayer read FLayer write SetLayer;
   end;
 
-procedure RegisterLayerControlEditor(const aEditor: TGRLayerEditorClass);
-function GetLayerControlEditorClass(const aLayer: TGRLayerControl): TGRLayerEditorClass;
-function ShowLayerControlEditor(const aLayer: TGRLayerControl): Boolean;
+procedure RegisterLayerEditor(const aEditor: TGRLayerEditorClass);
+function GetLayerEditorClass(const aLayer: TGRLayer): TGRLayerEditorClass;
+function ShowLayerEditor(const aLayer: TGRLayer): Boolean;
 
 implementation
 
 {$R *.dfm}
 
 var
-  FLayerControlEditorClasses: TList;
+  FLayerEditorClasses: TList;
 
-function GetLayerControlEditorClass(const aLayer: TGRLayerControl): TGRLayerEditorClass;
+function GetLayerEditorClass(const aLayer: TGRLayer): TGRLayerEditorClass;
 var
  i: integer;
 begin
-  with FLayerControlEditorClasses do
+  with FLayerEditorClasses do
     for i := Count -1 downto 0 do
     begin
       Result := TGRLayerEditorClass(Items[i]);
-      if aLayer.InheritsFrom(Result.LayerControlClass) then
+      if aLayer.InheritsFrom(Result.LayerClass) then
         exit;
     end;
   Result := nil;
 end;
 
-procedure RegisterLayerControlEditor(const aEditor: TGRLayerEditorClass);
+procedure RegisterLayerEditor(const aEditor: TGRLayerEditorClass);
 begin
-  with FLayerControlEditorClasses do
+  with FLayerEditorClasses do
     if IndexOf(aEditor) < 0 then
       Add(aEditor);
 end;
 
-function ShowLayerControlEditor(const aLayer: TGRLayerControl): Boolean;
+function ShowLayerEditor(const aLayer: TGRLayer): Boolean;
 var
   vEditorClass: TGRLayerEditorClass;
 begin
-  vEditorClass := GetLayerControlEditorClass(aLayer);
+  vEditorClass := GetLayerEditorClass(aLayer);
   Result := Assigned(vEditorClass);
   if Result then
   begin
@@ -110,30 +110,30 @@ end;
 
 { TGRLayerEditor }
 
-procedure TGRLayerEditor.SetLayerControl(const Value: TGRLayerControl);
+procedure TGRLayerEditor.SetLayer(const Value: TGRLayer);
 begin
-  FLayerControl := Value;
-  FImage.Bitmap.Assign(FLayerControl.Bitmap);
-  edtName.Text := FLayerControl.Name;
-  edtLeft.Text := IntToStr(FLayerControl.Left);
-  edtTop.Text := IntToStr(FLayerControl.Top);
+  FLayer := Value;
+  FImage.Bitmap.Assign(FLayer.Bitmap);
+  edtName.Text := FLayer.Name;
+  edtLeft.Text := IntToStr(FLayer.Left);
+  edtTop.Text := IntToStr(FLayer.Top);
 end;
 
 procedure TGRLayerEditor.btnOKClick(Sender: TObject);
 begin
  //save the properties to layer control.
-  FLayerControl.Bitmap.Assign(FImage.Bitmap);
-  FLayerControl.Name := edtName.Text;
-  FLayerControl.Left := StrToInt(edtLeft.Text);
-  FLayerControl.Top := StrToInt(edtTop.Text);
+  FLayer.Bitmap.Assign(FImage.Bitmap);
+  FLayer.Name := edtName.Text;
+  FLayer.Left := StrToInt(edtLeft.Text);
+  FLayer.Top := StrToInt(edtTop.Text);
 end;
 
 class function TGRLayerEditor.Execute(
-  aLayerControl: TGRLayerControl): Boolean;
+  aLayer: TGRLayer): Boolean;
 begin
   with Create(nil) do
   try
-    LayerControl := aLayerControl;
+    Layer := aLayer;
     Result := ShowModal = mrOk;
   finally
     Free;
@@ -149,9 +149,9 @@ begin
     end;
 end;
 
-class function TGRLayerEditor.LayerControlClass: TGRLayerControlClass;
+class function TGRLayerEditor.LayerClass: TGRLayerClass;
 begin
-  Result := TGRLayerControl;
+  Result := TGRLayer;
 end;
 
 procedure TGRLayerEditor.NumberKeyPressOnly(Sender: TObject; var Key: Char);
@@ -169,8 +169,8 @@ begin
 end;
 
 initialization
-  FLayerControlEditorClasses := TList.Create;
-  //RegisterLayerControlEditor(TGRLayerEditor);
+  FLayerEditorClasses := TList.Create;
+  //RegisterLayerEditor(TGRLayerEditor);
 finalization
-  FreeAndNil(FLayerControlEditorClasses);
+  FreeAndNil(FLayerEditorClasses);
 end.

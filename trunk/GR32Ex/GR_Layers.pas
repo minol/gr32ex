@@ -23,7 +23,7 @@
  * ***** END LICENSE BLOCK ***** *)
 unit GR_Layers;
 
-{$I GR32.inc}
+{$I Setting.inc}
 
 interface
 
@@ -41,8 +41,8 @@ uses
   ;
 
 type
-  TGRLayerControlClass = class of TGRLayerControl;
-  TGRLayerControl = class(TExtBitmapLayer)
+  TGRLayerClass = class of TGRLayer;
+  TGRLayer = class(TExtBitmapLayer)
   protected
     FWidth: Integer;
     FHeight: Integer;
@@ -84,27 +84,27 @@ type
     property OnMouseUp;
   end;
 
-  TGRAnimationLayer = class(TGRLayerControl)
+  TGRAnimationLayer = class(TGRLayer)
   protected
     FAnimation: TGRAnimation;
     procedure SetAnimation(const Value: TGRAnimation);
   public
-    constructor Create(ALayerCollection: TLayerCollection);override;
+    constructor Create(LayerCollection: TLayerCollection);override;
     destructor Destroy; override;
     property Animation: TGRAnimation read FAnimation write SetAnimation;
   end;
 
-  TGRAniFrameEvent = procedure(const Sender: TGRLayerControl; const MoveCount: Longword; var Done: Boolean) of object;
+  TGRAniFrameEvent = procedure(const Sender: TGRLayer; const MoveCount: Longword; var Done: Boolean) of object;
   TGRLayerAnimator = class(TThread)
   protected
     FIsPaused: Boolean;
     FLastTick: Longword;
-    FLayer: TGRLayerControl;
+    FLayer: TGRLayer;
     FOnFrame: TGRAniFrameEvent;
     function DrawFrame(const MoveCount: Longword): Boolean; virtual;
     procedure Execute; override;
   public
-    constructor Create(const aLayer: TGRLayerControl);
+    constructor Create(const aLayer: TGRLayer);
     procedure Start;
     property Paused: Boolean read FIsPaused write FIsPaused;
     property OnFrame: TGRAniFrameEvent read FOnFrame write FOnFrame;
@@ -117,7 +117,7 @@ type
     FMaxStep: Integer;
     function DrawFrame(const MoveCount: Longword): Boolean; override;
   public
-    constructor Create(const aLayer: TGRLayerControl; const aMaxStep: Integer);
+    constructor Create(const aLayer: TGRLayer; const aMaxStep: Integer);
   end;
 
   TGRLayerCollection = class(TLayerCollection)
@@ -185,9 +185,9 @@ type
   end;
 
 
-procedure RegisterLayerControl(const aLayerControlClass: TGRLayerControlClass);
-function GetLayerControlClass(const aClassName: string): TGRLayerControlClass;
-function GLayerControlClasses: TThreadList;
+procedure RegisterLayer(const aLayerControlClass: TGRLayerClass);
+function GetLayerClass(const aClassName: string): TGRLayerClass;
+function GLayerClasses: TThreadList;
 
 implementation
 
@@ -210,43 +210,43 @@ type
   TLayerAccess = class(TCustomLayer);
 
 var
-  FLayerControlClasses: TThreadList;
+  FLayerClasses: TThreadList;
 
-function GetLayerControlClass(const aClassName: string): TGRLayerControlClass;
+function GetLayerClass(const aClassName: string): TGRLayerClass;
 var
   I: integer;
 begin
-  with GLayerControlClasses.LockList do
+  with GLayerClasses.LockList do
   try
     for I := 0 to Count - 1 do
     begin
-      Result := TGRLayerControlClass(Items[I]);
+      Result := TGRLayerClass(Items[I]);
       if Result.ClassName = aClassName then exit;
     end;
     Result := nil;
   finally
-    FLayerControlClasses.UnlockList;
+    FLayerClasses.UnlockList;
   end;
 end;
 
-procedure RegisterLayerControl(const aLayerControlClass: TGRLayerControlClass);
+procedure RegisterLayer(const aLayerControlClass: TGRLayerClass);
 begin
-  with GLayerControlClasses.LockList do
+  with GLayerClasses.LockList do
   try
     if IndexOf(aLayerControlClass) < 0 then
       Add(aLayerControlClass);
   finally
-    FLayerControlClasses.UnlockList;
+    FLayerClasses.UnlockList;
   end;
 end;
 
-function GLayerControlClasses: TThreadList;
+function GLayerClasses: TThreadList;
 begin
-  if not Assigned(FLayerControlClasses) then
+  if not Assigned(FLayerClasses) then
   begin
-    FLayerControlClasses := TThreadList.Create;
+    FLayerClasses := TThreadList.Create;
   end;
-  Result := FLayerControlClasses;
+  Result := FLayerClasses;
 end;
 
 { TGRLayerContainer }
@@ -479,23 +479,23 @@ begin
   FInvalidRects.Clear;
 end;
 
-{ TGRLayerControl }
+{ TGRLayer }
 
-constructor TGRLayerControl.Create(
+constructor TGRLayer.Create(
   ALayerCollection: TLayerCollection);
 begin
   inherited;
   LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE; 
 end;
 
-procedure TGRLayerControl.BitmapChanged(Sender: TObject);
+procedure TGRLayer.BitmapChanged(Sender: TObject);
 begin
   inherited;
   if not Bitmap.Empty then
     Changed;
 end;
 
-function TGRLayerControl.DoHitTest(X, Y: Integer): Boolean;
+function TGRLayer.DoHitTest(X, Y: Integer): Boolean;
 var
   B: TPoint;
 begin
@@ -511,12 +511,12 @@ begin
   end;
 end;
 
-function TGRLayerControl.GetLeft: Integer;
+function TGRLayer.GetLeft: Integer;
 begin
   Result := Trunc(FPosition.X);
 end;
 
-function TGRLayerControl.GetNativeSize: TSize;
+function TGRLayer.GetNativeSize: TSize;
 begin
   if (FWidth <> 0) and (FHeight <> 0) then
   begin
@@ -527,12 +527,12 @@ begin
     Result := Inherited GetNativeSize();
 end;
 
-function TGRLayerControl.GetTop: Integer;
+function TGRLayer.GetTop: Integer;
 begin
   Result := Trunc(FPosition.Y);
 end;
 
-procedure TGRLayerControl.Paint(Buffer: TBitmap32);
+procedure TGRLayer.Paint(Buffer: TBitmap32);
 var
   vIsEmpty: Boolean;
 begin
@@ -549,7 +549,7 @@ begin
   if vIsEmpty and not Bitmap.Empty then Bitmap.Delete;
 end;
 
-procedure TGRLayerControl.SetHeight(const Value: Integer);
+procedure TGRLayer.SetHeight(const Value: Integer);
 begin
   if FHeight <> value then
   begin
@@ -561,7 +561,7 @@ begin
   end;
 end;
 
-procedure TGRLayerControl.SetLeft(const Value: Integer);
+procedure TGRLayer.SetLeft(const Value: Integer);
 begin
   if Trunc(FPosition.X) <> value then
   begin
@@ -573,7 +573,7 @@ begin
   end;
 end;
 
-procedure TGRLayerControl.SetTop(const Value: Integer);
+procedure TGRLayer.SetTop(const Value: Integer);
 begin
   if Trunc(FPosition.Y) <> value then
   begin
@@ -585,7 +585,7 @@ begin
   end;
 end;
 
-procedure TGRLayerControl.SetWidth(const Value: Integer);
+procedure TGRLayer.SetWidth(const Value: Integer);
 begin
   if FWidth <> value then
   begin
@@ -600,7 +600,7 @@ end;
 { TGRAnimationLayer }
 constructor TGRAnimationLayer.Create(LayerCollection: TLayerCollection);
 begin
-  inherited;
+  inherited Create(LayerCollection);
   FAnimation := nil;//TGRAnimation.Create(Self);
 end;
 
@@ -647,7 +647,7 @@ begin
   end;
 end;
 
-constructor TGRLayerAnimator.Create(const aLayer: TGRLayerControl);
+constructor TGRLayerAnimator.Create(const aLayer: TGRLayer);
 begin
   Assert(Assigned(aLayer), 'the layer must be Assigned');
   Inherited Create(True);
@@ -661,7 +661,7 @@ begin
 end;
 
 { TGRLayerAnimator_Sample }
-constructor TGRLayerAnimator_Sample.Create(const aLayer: TGRLayerControl; const aMaxStep: Integer);
+constructor TGRLayerAnimator_Sample.Create(const aLayer: TGRLayer; const aMaxStep: Integer);
 begin
   Inherited Create(aLayer);
   FMaxStep := aMaxStep;
@@ -687,5 +687,5 @@ end;
 
 initialization
 finalization
-  FreeAndNil(FLayerControlClasses);
+  FreeAndNil(FLayerClasses);
 end.

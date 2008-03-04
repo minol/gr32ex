@@ -22,6 +22,7 @@
     {$ENDIF}
 *)
 {$Define GR32_1_8_Above}
+{$Define Designtime_Supports}
 
 // use the PNGImage
 {$Define PNG_Supports}
