@@ -148,6 +148,7 @@ type
     function GetCaptured: Boolean;
     procedure SetCaptured(const Value: Boolean);
   protected
+    FName: string;
     FOnChange: TNotifyEvent;                     // For individual change events.
     FChangeNotificationList: TList;
 
@@ -155,34 +156,65 @@ type
     procedure RemoveChangeNotification(ALayer: TCustomLayerEx);
     procedure ChangeNotification(ALayer: TCustomLayerEx); virtual;
     procedure DoChange; virtual;
+
+    procedure SetName(const Value: string);
   public
     destructor Destroy; override;
+    {$IFDEF Designtime_Supports}
+    class function RubberbandOptions: TExtRubberBandOptions; virtual;
+    {$ENDIF}
+
+    property Name: string read FName write SetName;
     property Captured: Boolean read GetCaptured write SetCaptured;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
 
-  TTransformationLayer = class(TCustomLayerEx)
+  //How to express the position layer at the designtime?
+  TPositionLayer = class(TCustomLayerEx)
+  protected
+    FPosition: TFloatPoint;
+    {$IFDEF Designtime_Supports}
+    FGridLayer: TGridLayer;                      // Used to snap/align coordinates.
+    {$ENDIF}
+
+    procedure SetPosition(const Value: TFloatPoint);
+    {$IFDEF Designtime_Supports}
+    procedure SetGridLayer(const Value: TGridLayer);
+    class function RubberbandOptions: TExtRubberBandOptions; override;
+    {$ENDIF}
+
+  protected
+    function GetNativeSize: TSize; virtual;
+    procedure Notification(ALayer: TCustomLayer); override;
+  public
+    destructor Destroy; override;
+    procedure Assign(Source: TPersistent);override;
+    {$IFDEF Designtime_Supports}
+    procedure Paint(Buffer: TBitmap32); override;
+    {$ENDIF}
+
+    {$IFDEF Designtime_Supports}
+    property GridLayer: TGridLayer read FGridLayer write SetGridLayer;
+    {$ENDIF}
+    property Position: TFloatPoint read FPosition write SetPosition;
+  end;
+
+  TTransformationLayer = class(TPositionLayer)
   protected
     FAngle: Single;                              // Given in degrees.
     FAlphaHit: Boolean;
     FTransformation: TAffineTransformation;
     FSkew: TFloatPoint;
-    FPosition: TFloatPoint;
     FScaling: TFloatPoint;
     FScaled: Boolean;                            // Scaled with the viewport of a possible owner ImgView32.
     FPivotPoint: TFloatPoint;                    // Center of rotation and proportional scaling.
-    FGridLayer: TGridLayer;                      // Used to snap/align coordinates.
 
     procedure SetAngle(Value: Single);
-    procedure SetGridLayer(const Value: TGridLayer);
     procedure SetPivot(const Value: TFloatPoint);
-    procedure SetPosition(const Value: TFloatPoint);
     procedure SetScaled(const Value: Boolean);
     procedure SetScaling(const Value: TFloatPoint);
     procedure SetSkew(const Value: TFloatPoint);
   protected
-    function GetNativeSize: TSize; virtual;
-    procedure Notification(ALayer: TCustomLayer); override;
 
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
@@ -196,13 +228,10 @@ type
 
     property AlphaHit: Boolean read FAlphaHit write FAlphaHit;
     property Angle: Single read FAngle write SetAngle;
-    property GridLayer: TGridLayer read FGridLayer write SetGridLayer;
-    property Position: TFloatPoint read FPosition write SetPosition;
     property PivotPoint: TFloatPoint read FPivotPoint write SetPivot;
     property ScaledViewport: Boolean read FScaled write SetScaled; // Do not use Scaled as name as this is alredy taken by other VCL controls.
     property Scaling: TFloatPoint read FScaling write SetScaling;
     property Skew: TFloatPoint read FSkew write SetSkew;
-
   end;
 
   // The grid elements determine what will be painted of the grid layer.
@@ -451,6 +480,7 @@ begin
   end;
 end;
 
+{ TCustomLayerEx }
 destructor TCustomLayerEx.Destroy;
 begin
   if Assigned(FChangeNotificationList) then 
@@ -467,17 +497,8 @@ begin
   FChangeNotificationList.Add(ALayer);
 end;
 
-procedure TCustomLayerEx.RemoveChangeNotification(ALayer: TCustomLayerEx);
+procedure TCustomLayerEx.ChangeNotification(ALayer: TCustomLayerEx); 
 begin
-  if Assigned(FChangeNotificationList) then
-  begin
-    FChangeNotificationList.Remove(ALayer);
-    if FChangeNotificationList.Count = 0 then
-    begin
-      FChangeNotificationList.Free;
-      FChangeNotificationList := nil;
-    end;
-  end;
 end;
 
 procedure TCustomLayerEx.DoChange;
@@ -505,6 +526,19 @@ begin
   Result := FLayerOptions and LOB_NO_CAPTURE = 0;
 end;
 
+procedure TCustomLayerEx.RemoveChangeNotification(ALayer: TCustomLayerEx);
+begin
+  if Assigned(FChangeNotificationList) then
+  begin
+    FChangeNotificationList.Remove(ALayer);
+    if FChangeNotificationList.Count = 0 then
+    begin
+      FChangeNotificationList.Free;
+      FChangeNotificationList := nil;
+    end;
+  end;
+end;
+
 procedure TCustomLayerEx.SetCaptured(const Value: Boolean);
 begin
   if Value then
@@ -515,14 +549,105 @@ begin
   end;
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TCustomLayerEx.ChangeNotification(ALayer: TCustomLayerEx); 
+procedure TCustomLayerEx.SetName(const Value: string);
 begin
+  if Value <> FName then
+  begin
+    Changing;
+    FName := Value;
+    Changed;
+
+    DoChange;
+  end;
 end;
 
+{$IFDEF Designtime_Supports}
+class function TCustomLayerEx.RubberbandOptions: TExtRubberBandOptions;
+begin
+  Result := [rboShowFrame];
+end;
+{$ENDIF}
 
-//----------------- TTransformationLayer ---------------------------------------------------------------------------------
+{ TPositionLayer }
+destructor TPositionLayer.Destroy;
+begin
+  {$IFDEF Designtime_Supports}
+  if Assigned(FGridLayer) then
+    FGridLayer.RemoveNotification(Self);
+  {$ENDIF}
+  inherited;
+end;
+
+//----------------------------------------------------------------------------------------------------------------------
+procedure TPositionLayer.Assign(Source: TPersistent);
+begin
+  if Source is TPositionLayer then
+    with Source as TPositionLayer do
+    begin
+      Changing;
+      Self.GridLayer := GridLayer;
+      Self.FPosition := FPosition;
+
+      Changed; // Layer collection.
+      DoChange; // Layer only.
+    end;
+  inherited Assign(Source);
+end;
+
+// Returns the untransformed size of the content. Must be overriden by descentants.
+function TPositionLayer.GetNativeSize: TSize;
+begin
+  Result.cx := 1;
+  Result.cy := 1;
+end;
+
+procedure TPositionLayer.Notification(ALayer: TCustomLayer);
+begin
+  inherited;
+  
+  {$IFDEF Designtime_Supports}
+  if ALayer = FGridLayer then
+    FGridLayer := nil;
+  {$ENDIF}
+end;
+
+{$IFDEF Designtime_Supports}
+procedure TPositionLayer.Paint(Buffer: TBitmap32);
+begin
+
+end;
+
+procedure TPositionLayer.SetGridLayer(const Value: TGridLayer);
+begin
+  if Value <> FGridLayer then
+  begin
+    if Assigned(FGridLayer) then
+      FGridLayer.RemoveNotification(Self);
+    FGridLayer := Value;
+    if Assigned(FGridLayer) then
+      FGridLayer.AddNotification(Self);
+  end;
+end;
+
+class function TPositionLayer.RubberbandOptions: TExtRubberBandOptions;
+begin
+  Result := [rboAllowMove, rboShowFrame];
+end;
+{$ENDIF Designtime_Supports}
+
+procedure TPositionLayer.SetPosition(const Value: TFloatPoint);
+
+begin
+  Changing;
+  FPosition := Value;
+  Changed;
+
+  DoChange;
+end;
+
+//----------------------------------------------------------------------------------------------------------------------
+
+{ TTransformationLayer }
 
 constructor TTransformationLayer.Create(ALayerCollection: TLayerCollection);
 
@@ -536,10 +661,7 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 destructor TTransformationLayer.Destroy;
-
 begin
-  if Assigned(FGridLayer) then
-    FGridLayer.RemoveNotification(Self);
   FTransformation.Free;
   inherited;
 end;
@@ -552,7 +674,6 @@ begin
     begin
       Changing;
       Self.FAngle := FAngle;
-      Self.GridLayer := GridLayer;
       Self.FPivotPoint := FPivotPoint;
       Self.FScaled := FScaled;
       Self.FScaling := FScaling;
@@ -583,33 +704,6 @@ procedure TTransformationLayer.SetPivot(const Value: TFloatPoint);
 begin
   Changing;
   FPivotPoint := Value;
-  Changed;
-
-  DoChange;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TTransformationLayer.SetGridLayer(const Value: TGridLayer);
-
-begin
-  if Value <> FGridLayer then
-  begin
-    if Assigned(FGridLayer) then
-      FGridLayer.RemoveNotification(Self);
-    FGridLayer := Value;
-    if Assigned(FGridLayer) then
-      FGridLayer.AddNotification(Self);
-  end;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TTransformationLayer.SetPosition(const Value: TFloatPoint);
-
-begin
-  Changing;
-  FPosition := Value;
   Changed;
 
   DoChange;
@@ -656,28 +750,6 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-
-function TTransformationLayer.GetNativeSize: TSize;
-
-// Returns the untransformed size of the content. Must be overriden by descentants.
-
-begin
-  Result.cx := 1;
-  Result.cy := 1;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TTransformationLayer.Notification(ALayer: TCustomLayer);
-
-begin
-  inherited;
-  
-  if ALayer = FGridLayer then
-    FGridLayer := nil;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
 
 procedure TTransformationLayer.GetLayerTransformation(var Transformation: TAffineTransformation);
 
