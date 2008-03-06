@@ -93,6 +93,7 @@ type
     FRubberBand: TExtRubberBandLayer;
     FSelection: TTransformationLayer;
     FPopupMenu: TPopupMenu;
+    FOnSelectionChanged: TNotifyEvent;
 
     procedure SetSelection(Value: TTransformationLayer);
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer); reintroduce; overload;override;
@@ -105,6 +106,7 @@ type
 
     property PopupMenu: TPopupMenu read FPopupMenu write FPopupMenu;
     property Selection: TTransformationLayer read FSelection write SetSelection;
+    property OnSelectionChanged: TNotifyEvent read FOnSelectionChanged write FOnSelectionChanged;
   end;
 
 procedure Register;
@@ -530,6 +532,7 @@ begin
       //FRubberBand.Index := Value.Index + 1;
       FRubberBand.ChildLayer := Value;
     end;
+    if Assigned(FOnSelectionChanged) then FOnSelectionChanged(Self);
   end;
 end;
 
