@@ -29,6 +29,7 @@ uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   Buttons, ExtCtrls, Dialogs, ExtDlgs
   , GR32
   , GR32_Image
+  , GR32_ExtLayers
   , GR_Layers
   ;
 

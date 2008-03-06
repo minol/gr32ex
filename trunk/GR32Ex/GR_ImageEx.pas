@@ -90,22 +90,22 @@ type
 
   TImage32Editor = class(TImage32Ex)
   protected
-    FRubberBand: TExtRubberBandLayer;
-    FSelection: TTransformationLayer;
+    FRubberBand: TGRRubberBandLayer;
+    FSelection: TGRTransformationLayer;
     FPopupMenu: TPopupMenu;
     FOnSelectionChanged: TNotifyEvent;
 
-    procedure SetSelection(Value: TTransformationLayer);
+    procedure SetSelection(Value: TGRTransformationLayer);
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer); reintroduce; overload;override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
   public
     procedure LoadFromStream(const aStream: TStream);override;
     procedure RemoveSelectedLayer();
-    function CreateLayer(const aClass: TGRLayerClass): TGRLayer;
+    function CreateLayer(const aClass: TGRLayerClass): TGRCustomLayer;
     procedure Clear;
 
     property PopupMenu: TPopupMenu read FPopupMenu write FPopupMenu;
-    property Selection: TTransformationLayer read FSelection write SetSelection;
+    property Selection: TGRTransformationLayer read FSelection write SetSelection;
     property OnSelectionChanged: TNotifyEvent read FOnSelectionChanged write FOnSelectionChanged;
   end;
 
@@ -119,7 +119,7 @@ uses
 type
   TLayerHack = class(TCustomLayer);
   TLayerCollectionAccess = class(TLayerCollection);
-  TExtRubberBandLayerAccess = class(TExtRubberBandLayer);
+  TExtRubberBandLayerAccess = class(TGRRubberBandLayer);
   TReaderAccess = class(TReader);
   TWriterAccess = class(TWriter);
 
@@ -226,7 +226,7 @@ end;
 
 procedure TImage32Ex.ReadData(aReader: TReader);
 var
-  vItem: TGRLayer;
+  vItem: TGRCustomLayer;
   vLayerClass: TGRLayerClass;
   vS: string;
 begin
@@ -270,7 +270,7 @@ begin
     WriteValue(vaCollection);
     for I := 0 to Layers.Count - 1 do
     begin
-      if (Layers[I] is TExtRubberBandLayer) or (Layers[I] is TGridLayer) then
+      if (Layers[I] is TGRRubberBandLayer) or (Layers[I] is TGRGridLayer) then
         continue;
       WriteListBegin;
       WriteStr('Class');
@@ -427,26 +427,29 @@ end;
 
 { TImage32Editor }
 
-function TImage32Editor.CreateLayer(const aClass: TGRLayerClass): TGRLayer;
+function TImage32Editor.CreateLayer(const aClass: TGRLayerClass): TGRCustomLayer;
 var
   P: TPoint;
 begin
   with GetViewportRect do
     P := ControlToBitmap(Point((Right + Left) div 2, (Top + Bottom) div 2));
   Result := aClass.Create(Layers);
-  Result.Left := P.X;
-  Result.Top := P.Y;
-  if TGRLayerEditor.Execute(Result) then
+  if Result is TGRLayer then with TGRLayer(Result) do
   begin
-    if Result.Bitmap.Empty then
+    Left := P.X;
+    Top := P.Y;
+    if TGRLayerEditor.Execute(TGRLayer(Result)) then
     begin
-      Result.Width := 32;
-      Result.Height := 32;
+      if Bitmap.Empty then
+      begin
+        Width := 32;
+        Height := 32;
+      end;
+      Selection := TGRLayer(Result);
+    end
+    else
+      FreeAndNil(Result);
     end;
-    Selection := Result;
-  end
-  else
-    FreeAndNil(Result);
 end;
 
 procedure TImage32Editor.Clear;
@@ -472,9 +475,9 @@ end;
 
 procedure TImage32Editor.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer);
 begin
-  if (Layer is TTransformationLayer) then
+  if (Layer is TGRTransformationLayer) then
   begin
-    Selection := TTransformationLayer(Layer);
+    Selection := TGRTransformationLayer(Layer);
     if Assigned(FRubberBand) then
     begin
       Layers.MouseListener := nil;
@@ -493,7 +496,7 @@ end;
 
 procedure TImage32Editor.RemoveSelectedLayer;
 var
-  vSelected: TTransformationLayer;
+  vSelected: TGRTransformationLayer;
 begin
   vSelected := FSelection;
   if Assigned(vSelected) then
@@ -503,9 +506,9 @@ begin
   end;
 end;
 
-procedure TImage32Editor.SetSelection(Value: TTransformationLayer);
+procedure TImage32Editor.SetSelection(Value: TGRTransformationLayer);
 begin
-  if Value is TExtRubberBandLayer then exit;
+  if Value is TGRRubberBandLayer then exit;
   if Value <> FSelection then
   begin
     if FRubberBand <> nil then
@@ -524,7 +527,7 @@ begin
       //Value.BringToFront;
       if FRubberBand = nil then
       begin
-        FRubberBand := TExtRubberBandLayer.Create(Layers);
+        FRubberBand := TGRRubberBandLayer.Create(Layers);
         FRubberBand.Options := [rboAllowMove, rboShowFrame];
       end;
       //else 

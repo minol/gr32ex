@@ -41,8 +41,7 @@ uses
   ;
 
 type
-  TGRLayerClass = class of TGRLayer;
-  TGRLayer = class(TExtBitmapLayer)
+  TGRLayer = class(TGRBitmapLayer)
   protected
     FWidth: Integer;
     FHeight: Integer;
@@ -54,10 +53,6 @@ type
     procedure SetHeight(const Value: Integer);
     procedure SetWidth(const Value: Integer);
 
-    function GetNativeSize: TSize; override;
-    procedure Paint(Buffer: TBitmap32); override;
-    procedure BitmapChanged(Sender: TObject); override;
-    function DoHitTest(X, Y: Integer): Boolean;override;
 
   public
     constructor Create(ALayerCollection: TLayerCollection);override;
@@ -70,12 +65,12 @@ type
     property Name;
     property Bitmap;
     property Cursor;
-    property Cropped;
-    property DrawMode;
+    //property Cropped;
+    //property DrawMode;
     property Angle;
     property Skew;
     property PivotPoint;
-    property ScaledViewport;
+    property Scaled;
     property Scaling;
     property Visible;
     property MouseEvents;
@@ -120,74 +115,6 @@ type
     constructor Create(const aLayer: TGRLayer; const aMaxStep: Integer);
   end;
 
-  TGRLayerCollection = class(TLayerCollection)
-  end;
-
-  TGRLayerContainer = class(TCustomLayerEx)
-  protected
-    FLeft: Integer;
-    FTop: Integer;
-    FWidth: Integer;
-    FHeight: Integer;
-    FBuffer: TBitmap32;
-    FBufferOversize: Integer;
-    FBufferValid: Boolean;
-    FForceFullRepaint: Boolean;
-    FRepaintOptimizer: TCustomRepaintOptimizer;
-    FRepaintMode: TRepaintMode;
-
-    FLayers: TGRLayerCollection;
-
-
-    FInvalidRects: TRectList;
-    FScaleX: Single;
-    FScaleY: Single;
-    FScaleMode: TScaleMode;
-    FUpdateCount: Integer;
-
-    CachedBitmapRect: TRect;
-    CachedXForm: TCoordXForm;
-    CacheValid: Boolean;
-    OldSzX, OldSzY: Integer;
-
-    procedure SetRepaintMode(const Value: TRepaintMode); virtual;
-    function GetBitmapRect: TRect;
-
-    function  CustomRepaint: Boolean; virtual;
-    procedure DoPaintBuffer; virtual;
-    procedure UpdateCache; virtual;
-    property  UpdateCount: Integer read FUpdateCount;
-    procedure InvalidateCache;
-    procedure Invalidate;
-    function  InvalidRectsAvailable: Boolean; virtual;
-    procedure DoPrepareInvalidRects; virtual;
-    procedure ResetInvalidRects;
-    procedure Paint(aBuffer: TBitmap32); override;
-
-    procedure LayerCollectionChangeHandler(Sender: TObject);
-    procedure LayerCollectionGDIUpdateHandler(Sender: TObject);
-    procedure LayerCollectionGetViewportScaleHandler(Sender: TObject; var ScaleX, ScaleY: Single);
-    procedure LayerCollectionGetViewportShiftHandler(Sender: TObject; var ShiftX, ShiftY: Single);
-
-    property  BufferValid: Boolean read FBufferValid write FBufferValid;
-    property  InvalidRects: TRectList read FInvalidRects;
-  public
-    constructor Create(aLayerCollection: TLayerCollection);override;
-    destructor Destroy;override;
-    function  GetViewportRect: TRect; virtual;
-
-    property Left: Integer read FLeft write FLeft;
-    property Top: Integer read FTop write FTop;
-    property Width: Integer read FWidth write FWidth;
-    property Height: Integer read FHeight write FHeight;
-    property Buffer: TBitmap32 read FBuffer;
-    property RepaintMode: TRepaintMode read FRepaintMode write SetRepaintMode default rmFull;
-  end;
-
-
-procedure RegisterLayer(const aLayerControlClass: TGRLayerClass);
-function GetLayerClass(const aClassName: string): TGRLayerClass;
-function GLayerClasses: TThreadList;
 
 implementation
 
@@ -209,276 +136,6 @@ type
   TBitmap32Access = class(TBitmap32);
   TLayerAccess = class(TCustomLayer);
 
-var
-  FLayerClasses: TThreadList;
-
-function GetLayerClass(const aClassName: string): TGRLayerClass;
-var
-  I: integer;
-begin
-  with GLayerClasses.LockList do
-  try
-    for I := 0 to Count - 1 do
-    begin
-      Result := TGRLayerClass(Items[I]);
-      if Result.ClassName = aClassName then exit;
-    end;
-    Result := nil;
-  finally
-    FLayerClasses.UnlockList;
-  end;
-end;
-
-procedure RegisterLayer(const aLayerControlClass: TGRLayerClass);
-begin
-  with GLayerClasses.LockList do
-  try
-    if IndexOf(aLayerControlClass) < 0 then
-      Add(aLayerControlClass);
-  finally
-    FLayerClasses.UnlockList;
-  end;
-end;
-
-function GLayerClasses: TThreadList;
-begin
-  if not Assigned(FLayerClasses) then
-  begin
-    FLayerClasses := TThreadList.Create;
-  end;
-  Result := FLayerClasses;
-end;
-
-{ TGRLayerContainer }
-
-constructor TGRLayerContainer.Create(aLayerCollection: TLayerCollection);
-begin
-  inherited;
-  FBuffer := TBitmap32.Create;
-  FBufferOversize := 40;
-  FForceFullRepaint := True;
-  FInvalidRects := TRectList.Create;
-  FRepaintOptimizer := DefaultRepaintOptimizerClass.Create(Buffer, InvalidRects);
-  Height := 192;
-  Width := 192;
-
-
-  FLayers := TGRLayerCollection.Create(Self);
-  with FLayers do
-  begin
-{$IFDEF DEPRECATEDMODE}
-    CoordXForm := @CachedXForm;
-{$ENDIF}
-    OnChange := LayerCollectionChangeHandler;
-    OnGDIUpdate := LayerCollectionGDIUpdateHandler;
-    OnGetViewportScale := LayerCollectionGetViewportScaleHandler;
-    OnGetViewportShift := LayerCollectionGetViewportShiftHandler;
-  end;
-
-  FRepaintOptimizer.RegisterLayerCollection(FLayers);
-  RepaintMode := rmFull;
-end;
-
-destructor TGRLayerContainer.Destroy;
-begin
-  FRepaintOptimizer.Free;
-  FInvalidRects.Free;
-  FBuffer.Free;
-  inherited;
-end;
-
-procedure TGRLayerContainer.LayerCollectionChangeHandler(Sender: TObject);
-begin
-  Changed;
-end;
-
-procedure TGRLayerContainer.LayerCollectionGDIUpdateHandler(Sender: TObject);
-begin
-  Changed;
-end;
-
-procedure TGRLayerContainer.LayerCollectionGetViewportScaleHandler(Sender: TObject; var ScaleX, ScaleY: Single);
-begin
-  UpdateCache;
-  ScaleX := CachedXForm.ScaleX / FixedOne;
-  ScaleY := CachedXForm.ScaleY / FixedOne;
-end;
-
-procedure TGRLayerContainer.LayerCollectionGetViewportShiftHandler(Sender: TObject; var ShiftX, ShiftY: Single);
-begin
-  UpdateCache;
-  ShiftX := CachedXForm.ShiftX;
-  ShiftY := CachedXForm.ShiftY;
-end;
-
-procedure TGRLayerContainer.UpdateCache;
-begin
-  if CacheValid then Exit;
-  CachedBitmapRect := GetBitmapRect;
-  CachedXForm := UnitXForm;
-  CacheValid := True;
-end;
-
-function TGRLayerContainer.InvalidRectsAvailable: Boolean;
-begin
-  // avoid calling inherited, we have a totally different behaviour here...
-  DoPrepareInvalidRects;
-  Result := FInvalidRects.Count > 0;
-end;
-
-procedure TGRLayerContainer.InvalidateCache;
-begin
-  if FRepaintOptimizer.Enabled then FRepaintOptimizer.Reset;
-  CacheValid := False;
-end;
-
-procedure TGRLayerContainer.Invalidate;
-begin
-  BufferValid := False;
-  CacheValid := False;
-end;
-
-procedure TGRLayerContainer.DoPrepareInvalidRects;
-begin
-  if FRepaintOptimizer.Enabled and not FForceFullRepaint then
-    FRepaintOptimizer.PerformOptimization;
-end;
-
-function TGRLayerContainer.GetBitmapRect: TRect;
-begin
-    with Result do
-    begin
-      Left := 0;
-      Right := 0;
-      Top := 0;
-      Bottom := 0;
-    end
-end;
-
-procedure TGRLayerContainer.Paint(aBuffer: TBitmap32);
-var
-  I: Integer;
-  vRect: TRect;
-begin
-  if FRepaintOptimizer.Enabled then
-  begin
-{$IFDEF CLX}
-    if CustomRepaint then DoPrepareInvalidRects;
-{$ENDIF}
-    FRepaintOptimizer.BeginPaint;
-  end;
-
-  if not FBufferValid then
-  begin
-{$IFDEF CLX}
-    TBitmap32Access(FBuffer).ImageNeeded;
-{$ENDIF}
-    DoPaintBuffer;
-{$IFDEF CLX}
-    TBitmap32Access(FBuffer).CheckPixmap;
-{$ENDIF}
-  end;
-
-  FBuffer.Lock;
-  try
-    if FInvalidRects.Count > 0 then
-      for i := 0 to FInvalidRects.Count - 1 do
-      begin
-        vRect := FInvalidRects[i]^;
-        with vRect do
-          BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
-      end
-    else begin
-      vRect := GetViewportRect;
-      with vRect do
-        BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
-    end;
-  finally
-    FBuffer.Unlock;
-  end;
-
-  
-  if FRepaintOptimizer.Enabled then
-    FRepaintOptimizer.EndPaint;
-  ResetInvalidRects;
-  FForceFullRepaint := False;
-end;
-
-function TGRLayerContainer.CustomRepaint: Boolean;
-begin
-  Result := FRepaintOptimizer.Enabled and not FForceFullRepaint and
-    FRepaintOptimizer.UpdatesAvailable;
-end;
-
-procedure TGRLayerContainer.DoPaintBuffer;
-var
-  I, J: Integer;
-begin
-  if FRepaintOptimizer.Enabled then
-    FRepaintOptimizer.BeginPaintBuffer;
-
-  UpdateCache;
-
-
-  Buffer.BeginUpdate;
-  if FInvalidRects.Count = 0 then
-  begin
-    Buffer.ClipRect := GetViewportRect;
-
-    for I := 0 to FLayers.Count - 1 do
-      if (FLayers.Items[I].LayerOptions and LOB_VISIBLE) <> 0 then
-        TLayerAccess(FLayers.Items[I]).DoPaint(Buffer);
-  end
-  else
-  begin
-    for J := 0 to FInvalidRects.Count - 1 do
-    begin
-      Buffer.ClipRect := FInvalidRects[J]^;
-      for I := 0 to FLayers.Count - 1 do
-        if (FLayers.Items[I].LayerOptions and LOB_VISIBLE) <> 0 then
-          TLayerAccess(FLayers.Items[I]).DoPaint(Buffer);
-    end;
-
-    Buffer.ClipRect := GetViewportRect;
-  end;
-  Buffer.EndUpdate;
-
-  if FRepaintOptimizer.Enabled then
-    FRepaintOptimizer.EndPaintBuffer;
-
-  // avoid calling inherited, we have a totally different behaviour here...
-  FBufferValid := True;
-end;
-
-function TGRLayerContainer.GetViewportRect: TRect;
-begin
-  // returns position of the buffered area within the control bounds
-  with Result do
-  begin
-    // by default, the whole control is buffered
-    Left := 0;
-    Top := 0;
-    Right := Width;
-    Bottom := Height;
-  end;
-end;
-
-procedure TGRLayerContainer.SetRepaintMode(const Value: TRepaintMode);
-begin
-  if Assigned(FRepaintOptimizer) then
-  begin
-    FRepaintOptimizer.Enabled := Value = rmOptimizer;
-
-    FRepaintMode := Value;
-    Invalidate;
-  end;
-end;
-
-procedure TGRLayerContainer.ResetInvalidRects;
-begin
-  FInvalidRects.Clear;
-end;
-
 { TGRLayer }
 
 constructor TGRLayer.Create(
@@ -488,43 +145,9 @@ begin
   LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE; 
 end;
 
-procedure TGRLayer.BitmapChanged(Sender: TObject);
-begin
-  inherited;
-  if not Bitmap.Empty then
-    Changed;
-end;
-
-function TGRLayer.DoHitTest(X, Y: Integer): Boolean;
-var
-  B: TPoint;
-begin
-  B := FTransformation.ReverseTransform(Point(X, Y));
-
-  if Bitmap.Empty then
-    Result := PtInRect(Rect(0, 0, FWidth, FHeight), B)
-  else
-  begin
-    Result := PtInRect(Rect(0, 0, Bitmap.Width, Bitmap.Height), B);
-    if Result and AlphaHit and (Bitmap.PixelS[B.X, B.Y] and $FF000000 = 0) then
-      Result := False;
-  end;
-end;
-
 function TGRLayer.GetLeft: Integer;
 begin
   Result := Trunc(FPosition.X);
-end;
-
-function TGRLayer.GetNativeSize: TSize;
-begin
-  if (FWidth <> 0) and (FHeight <> 0) then
-  begin
-    Result.cx := FWidth;
-    Result.cy := FHeight;
-  end
-  else
-    Result := Inherited GetNativeSize();
 end;
 
 function TGRLayer.GetTop: Integer;
@@ -532,29 +155,12 @@ begin
   Result := Trunc(FPosition.Y);
 end;
 
-procedure TGRLayer.Paint(Buffer: TBitmap32);
-var
-  vIsEmpty: Boolean;
-begin
-  vIsEmpty := Bitmap.Empty;
-  if vIsEmpty then
-  begin
-    Bitmap.SetSize(Width, Height);
-    if (LayerCollection.Owner is TImage32Editor) then
-      Bitmap.Clear(SetAlpha(clWhite32, $3F))
-    else
-      Bitmap.Clear(0);
-  end;
-  inherited;
-  if vIsEmpty and not Bitmap.Empty then Bitmap.Delete;
-end;
-
 procedure TGRLayer.SetHeight(const Value: Integer);
 begin
-  if FHeight <> value then
+  if FSize.cy <> value then
   begin
     Changing;
-    FHeight := Value;
+    FSize.cy := Value;
     Changed;
 
     DoChange;
@@ -587,10 +193,10 @@ end;
 
 procedure TGRLayer.SetWidth(const Value: Integer);
 begin
-  if FWidth <> value then
+  if FSize.cx <> value then
   begin
     Changing;
-    FWidth := Value;
+    FSize.cx := Value;
     Changed;
 
     DoChange;
@@ -687,5 +293,4 @@ end;
 
 initialization
 finalization
-  FreeAndNil(FLayerClasses);
 end.
