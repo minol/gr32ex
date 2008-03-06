@@ -408,7 +408,7 @@ end;
 
 procedure TfrmMain.DoCreateLayer(Sender: TObject);
 var
-  vLayerControl: TGRLayer;
+  vLayer: TGRPositionLayer;
   P: TPoint;
 begin
   if (Sender is TTBItem) then
@@ -418,20 +418,20 @@ begin
       begin
         with FImageEditor.GetViewportRect do
          P := FImageEditor.ControlToBitmap(Point((Right + Left) div 2, (Top + Bottom) div 2));
-        vLayerControl := TGRLayerClass(tag).Create(FImageEditor.Layers);
-        vLayerControl.Left := P.X;
-        vLayerControl.Top := P.Y;
-        if TGRLayerEditor.Execute(vLayerControl) then
+        vLayer := TGRLayerClass(tag).Create(FImageEditor.Layers);
+        with vLayer.Position do
         begin
-          if vLayerControl.Bitmap.Empty then
-          begin
-            vLayerControl.Width := 32;
-            vLayerControl.Height := 32;
-          end;
-          FImageEditor.Selection := vLayerControl;
+          X := P.X;
+          Y := P.Y;
+        end;
+        FImageEditor.Selection := vLayer;
+        {if TGRLayerEditor.Execute(vLayer) then
+        begin
+          FImageEditor.Selection := vLayer;
         end
         else
-          vLayerControl.Free;
+          vLayer.Free;
+          //}
       end;
     end;
 end;

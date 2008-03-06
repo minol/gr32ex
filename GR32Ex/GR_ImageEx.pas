@@ -91,21 +91,21 @@ type
   TImage32Editor = class(TImage32Ex)
   protected
     FRubberBand: TGRRubberBandLayer;
-    FSelection: TGRTransformationLayer;
+    FSelection: TGRPositionLayer;
     FPopupMenu: TPopupMenu;
     FOnSelectionChanged: TNotifyEvent;
 
-    procedure SetSelection(Value: TGRTransformationLayer);
+    procedure SetSelection(Value: TGRPositionLayer);
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer); reintroduce; overload;override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
   public
     procedure LoadFromStream(const aStream: TStream);override;
     procedure RemoveSelectedLayer();
-    function CreateLayer(const aClass: TGRLayerClass): TGRCustomLayer;
+    function CreateLayer(const aClass: TGRLayerClass): TGRPositionLayer;
     procedure Clear;
 
     property PopupMenu: TPopupMenu read FPopupMenu write FPopupMenu;
-    property Selection: TGRTransformationLayer read FSelection write SetSelection;
+    property Selection: TGRPositionLayer read FSelection write SetSelection;
     property OnSelectionChanged: TNotifyEvent read FOnSelectionChanged write FOnSelectionChanged;
   end;
 
@@ -427,7 +427,7 @@ end;
 
 { TImage32Editor }
 
-function TImage32Editor.CreateLayer(const aClass: TGRLayerClass): TGRCustomLayer;
+function TImage32Editor.CreateLayer(const aClass: TGRLayerClass): TGRPositionLayer;
 var
   P: TPoint;
 begin
@@ -440,11 +440,6 @@ begin
     Top := P.Y;
     if TGRLayerEditor.Execute(TGRLayer(Result)) then
     begin
-      if Bitmap.Empty then
-      begin
-        Width := 32;
-        Height := 32;
-      end;
       Selection := TGRLayer(Result);
     end
     else
@@ -496,7 +491,7 @@ end;
 
 procedure TImage32Editor.RemoveSelectedLayer;
 var
-  vSelected: TGRTransformationLayer;
+  vSelected: TGRPositionLayer;
 begin
   vSelected := FSelection;
   if Assigned(vSelected) then
@@ -506,7 +501,7 @@ begin
   end;
 end;
 
-procedure TImage32Editor.SetSelection(Value: TGRTransformationLayer);
+procedure TImage32Editor.SetSelection(Value: TGRPositionLayer);
 begin
   if Value is TGRRubberBandLayer then exit;
   if Value <> FSelection then
