@@ -41,23 +41,27 @@ type
   //when the LayerSelector changed then the editor should change the selection too.
   TGRLayerInspector = class(TForm)
   protected
+    FOldLayerListNotify: TLayerListNotifyEvent;
     FLayerSelector: TComboBox;
     FInspector: TJvInspector;
     FInspectorBorlandPainter: TJvInspectorBorlandPainter;
     FInspectorDotNETPainter: TJvInspectorDotNETPainter;
     FEditor: TImage32Editor;
 
-    procedure InspectorAfterItemCreate(Sender: TObject; const Item: TJvCustomInspectorItem);
+    procedure InspectorAfterItemCreate(Sender: TObject; Item: TJvCustomInspectorItem);
     procedure DoSelectionChanged(Sender: TObject);
     procedure DoLayerSelectorChanged(Sender: TObject);
+    procedure DoLayerListNotify(Sender: TLayerCollection; Action: TLayerListNotification;
+      Layer: TCustomLayer; Index: Integer);
     procedure RefreshLayerSelector;
-    procedure AddObjectToInspector(const Parent: TJvCustomInspectorItem; const Ctrl: TControl);
+    procedure AddObjectToInspector(const Parent: TJvCustomInspectorItem; const aObj: TObject);
 
     procedure SetEditor(const Value: TImage32Editor);
   public
     class function Execute(const aEditor: TImage32Editor): TGRLayerInspector;
     constructor Create(aComponent: TComponent);override;
-    property CurrentLayer: TCustomLayer read GetCurrentLayer;
+    destructor Destroy;override;
+    //property CurrentLayer: TCustomLayer read GetCurrentLayer;
     property Editor: TImage32Editor read FEditor write SetEditor;
   end;
 
@@ -73,43 +77,33 @@ uses
 
 {$R *.dfm}
 
+type
+  TLayerCollectionAccess = class(TLayerCollection);
+
 var
   FLayerInspector: TGRLayerInspector;
 
 function GLayerInspector: TGRLayerInspector;
 begin
   if not Assigned(FLayerInspector) then
-    TGRLayerInspector.Create(nil);
+    FLayerInspector := TGRLayerInspector.Create(nil);
   Result := FLayerInspector;
 end;
 
 { TGRLayerInspector }
 
-procedure TGRLayerInspector.SetEditor(const Value: TImage32Editor);
+class function TGRLayerInspector.Execute(const aEditor: TImage32Editor): TGRLayerInspector;
 begin
-  if FEditor <> Value then
+  Result := GLayerInspector();
+  with Result do
   begin
-    //if Assigned(FEditor) then
-    FEditor := Value;
-    if Assigned(FEditor) then
-    begin
-      FEditor.OnSelectionChanged := DoSelectionChanged;
-    end;
-    RefreshLayerSelector;
+    Editor := aEditor;
+    Show;
   end;
-end;
-
-class procedure TGRLayerInspector.Execute(const aEditor: TImage32Editor);
-begin
-  if not Assigned(FLayerInspector) then
-    FLayerInspector := Create(nil);
-  FLayerInspector.Editor := aEditor;
-  FLayerInspector.Show;
 end;
 
 constructor TGRLayerInspector.Create(aComponent: TComponent);
 begin
-  Assert(FLayerInspector = nil);
   inherited;
   FLayerInspector := Self;
 
@@ -129,10 +123,16 @@ begin
   FInspector.AfterItemCreate  := InspectorAfterItemCreate;
 end;
 
+destructor TGRLayerInspector.Destroy;
+begin
+  if FLayerInspector = Self then
+    FLayerInspector := nil;
+  inherited;
+end;
+
 procedure TGRLayerInspector.AddObjectToInspector(const Parent: TJvCustomInspectorItem; const aObj: TObject);
 var
   InspCat: TJvInspectorCustomCategoryItem;
-  M: TNotifyEvent;
 begin
   InspCat := TJvInspectorCustomCategoryItem.Create(Parent, nil);
   if aObj is TControl then
@@ -147,6 +147,29 @@ begin
   TJvInspectorPropData.New(InspCat, aObj);
 end;
 
+procedure TGRLayerInspector.DoLayerListNotify(Sender: TLayerCollection; Action: TLayerListNotification;
+      Layer: TCustomLayer; Index: Integer);
+var
+  i: integer;
+begin
+  case Action of
+    lnLayerDeleted:
+      begin
+        if FInspector.InspectObject = Layer then FInspector.Clear;
+        i := FLayerSelector.Items.IndexOfObject(Layer);
+        if i >= 0 then FLayerSelector.Items.Delete(i);
+      end;
+    lnLayerAdded, lnLayerInserted:
+      FLayerSelector.Items.AddObject(Layer.ClassName, Layer);
+    lnCleared:
+      FInspector.Clear
+  end;
+
+  RefreshLayerSelector;
+  if Assigned(FOldLayerListNotify) then
+    FOldLayerListNotify(Sender, Action, Layer, Index);
+end;
+
 procedure TGRLayerInspector.DoLayerSelectorChanged(Sender: TObject);
 //var
   //vInspCat: TJvInspectorCustomCategoryItem;
@@ -154,7 +177,7 @@ begin
   FInspector.SaveValues;
   FInspector.Clear;
   if (FLayerSelector.ItemIndex >= 0) and (FEditor.Selection <> FLayerSelector.Items.Objects[FLayerSelector.ItemIndex]) then
-    FEditor.Selection := FLayerSelector.Items.Objects[FLayerSelector.ItemIndex];
+    FEditor.Selection := TTransformationLayer(FLayerSelector.Items.Objects[FLayerSelector.ItemIndex]);
   
   if Assigned(FEditor.Selection) then 
   begin
@@ -171,7 +194,7 @@ begin
   DoLayerSelectorChanged(FLayerSelector);
 end;
 
-procedure TGRLayerInspector.InspectorAfterItemCreate(Sender: TObject; const Item: TJvCustomInspectorItem);
+procedure TGRLayerInspector.InspectorAfterItemCreate(Sender: TObject; Item: TJvCustomInspectorItem);
 begin
   if Item is TJvInspectorBooleanItem then
     TJvInspectorBooleanItem(Item).ShowAsCheckbox := True;
@@ -190,6 +213,27 @@ begin
     end;
     FLayerSelector.ItemIndex := FLayerSelector.Items.IndexOfObject(FEditor.Selection);
     DoLayerSelectorChanged(FLayerSelector);
+  end;
+end;
+
+procedure TGRLayerInspector.SetEditor(const Value: TImage32Editor);
+begin
+  if FEditor <> Value then
+  begin
+    if Assigned(FEditor) then
+    begin
+      FEditor.OnSelectionChanged := nil;
+      TLayerCollectionAccess(FEditor.Layers).OnListNotify := FOldLayerListNotify;
+      FOldLayerListNotify := nil;
+    end;
+    FEditor := Value;
+    if Assigned(FEditor) then
+    begin
+      FEditor.OnSelectionChanged := DoSelectionChanged;
+      FOldLayerListNotify := TLayerCollectionAccess(FEditor.Layers).OnListNotify;
+      TLayerCollectionAccess(FEditor.Layers).OnListNotify := DoLayerListNotify;
+    end;
+    RefreshLayerSelector;
   end;
 end;
 
