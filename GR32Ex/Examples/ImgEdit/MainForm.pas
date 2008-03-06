@@ -17,6 +17,7 @@ uses
   GR32_Layers,
   GR32_Image,
   GR32_PNG,
+  GR32_ExtLayers,
   GR_Layers, 
   GR_ImageEx,
   { gettext }

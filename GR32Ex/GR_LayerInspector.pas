@@ -137,8 +137,8 @@ begin
   InspCat := TJvInspectorCustomCategoryItem.Create(Parent, nil);
   if aObj is TControl then
     InspCat.DisplayName := TControl(aObj).Name + ': '
-  else if aObj is TCustomLayerEx then
-    InspCat.DisplayName := TCustomLayerEx(aObj).Name + ': '
+  else if aObj is TGRCustomLayer then
+    InspCat.DisplayName := TGRCustomLayer(aObj).Name + ': '
   else
     InspCat.DisplayName := '';
 
@@ -177,7 +177,7 @@ begin
   FInspector.SaveValues;
   FInspector.Clear;
   if (FLayerSelector.ItemIndex >= 0) and (FEditor.Selection <> FLayerSelector.Items.Objects[FLayerSelector.ItemIndex]) then
-    FEditor.Selection := TTransformationLayer(FLayerSelector.Items.Objects[FLayerSelector.ItemIndex]);
+    FEditor.Selection := TGRTransformationLayer(FLayerSelector.Items.Objects[FLayerSelector.ItemIndex]);
   
   if Assigned(FEditor.Selection) then 
   begin

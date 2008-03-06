@@ -1,12 +1,13 @@
 {
 history by riceball
-  + TCustomLayerEx
+  + TGRCustomLayer
     + ChangeNotifiction
     + AddChangeNotifiction
     + RemoveChangeNotifiction
-  * TExtRubberBandLayer
-    + change the TExtRubberBandLayer when the childLayer changed
+  * TGRRubberBandLayer
+    + change the TGRRubberBandLayer when the childLayer changed
     * [bug] can not drap it(click then drag) directly before fixed
+  + TGRLayerContainer
 
 Based on the newsgroup post (March 18, 2002,  news://news.g32.org/g32org.public.graphics32)
  <public@lischke-online.de ; <news:a755io$6t1$1@webserver9.elitedev.com>...
@@ -42,19 +43,19 @@ The other unit (GR32_ExtLayers.pas) contains a reimplementation of the
 layers used currently in Graphics32. The implementation starts from
 TCustomLayer and defines the following new:
 
-- TTransformationLayer (the base class from which all others are derived)
-- TGridLayer (derived from TTransformationLayer)
-- TExtRubberBandLayer (derived from TTransformationLayer)
-- TPropertyLayer (derived from TTransformationLayer)
-- TTextLayer (derived from TPropertyLayer)
-- TExtBitmapLayer (derived from TPropertyLayer)
+- TGRTransformationLayer (the base class from which all others are derived)
+- TGRGridLayer (derived from TGRTransformationLayer)
+- TGRRubberBandLayer (derived from TGRTransformationLayer)
+- TGRPropertyLayer (derived from TGRTransformationLayer)
+- TGRTextLayer (derived from TGRPropertyLayer)
+- TGRBitmapLayer (derived from TGRPropertyLayer)
 
 Additionally there is a slightly enhanced TAffineTransformation derivate
 (TExtAffineTransformation).
 
 Here a short description of all the layers:
 
-TTransformationLayer
+TGRTransformationLayer
 This layer is the fundament of the other enhanced layers and provides the
 functionality to translate, rotate, sheer (skew) and scale any layer. It
 supports a pivot point, which is the center for rotations and proportional
@@ -62,13 +63,13 @@ transformations. Because of the rotation and sheer feature this and derived
 layers are slower in handling than the current layers, but my primary goal
 was to provide as many of the features of Photoshop as I could implement.
 
-TGridLayer
+TGRGridLayer
 This layer provides you with a customizable grid and support for guides.
 It allows to snap coordinates to either guides, grid lines or the image
 borders (just like in Photoshop). All features are switchable. This grid
 cannot be rotated however and is always axis aligned.
 
-TExtRubberBandLayer
+TGRRubberBandLayer
 This layer is a much enhanced reimplementation of the current rubberband
 and supports almost anything what Photoshop allows. This includes to
 visually rotate and scale images (negative scale values will mirror them).
@@ -82,16 +83,16 @@ with the same effect as in, you guess it, Photoshop (e.g. sizing is done to
 all four directions, with the pivot as center etc.).
 NOTE: the rubber band uses many of the cursors in the GR32_Types.pas unit!
 
-TPropertyLayer
+TGRPropertyLayer
 This layer is a generic ancestor for the following layers and only stores
 some properties, which might be used, e.g. when loading PSD files.
 
-TTextLayer
+TGRTextLayer
 This layer is not really implemented, but used as a placeholder. Once
 somebody decides to write a real text layer, this one can serve as the
 starting point.
 
-TExtBitmapLayer
+TGRBitmapLayer
 This is the last layer in the bundle and provides means to paint a
 TBitmap32 with all the transformations applied. Additionally, it has a
 PaintTo method, which allows to draw the content to other locations than the
@@ -122,8 +123,16 @@ uses
  {$IFDEF Debug}
  DbugIntf,
  {$ENDIF}
-  Windows, SysUtils, Classes, Types, Controls, Forms, Graphics,       
-  GR32_Types, GR32, GR32_Layers, GR32_Transforms;
+  Windows, SysUtils, Classes, Types, Controls, Forms, Graphics
+  , GR32
+  , GR32_Resamplers
+  , GR32_Containers
+  , GR32_Layers
+  , GR32_RepaintOpt
+  , GR32_Image
+  , GR32_Types
+  , GR32_Transforms
+  ;
 
 type
   TExtRubberBandOptions = set of (
@@ -141,9 +150,10 @@ const
     rboShowFrame, rboShowHandles];
 
 type
-  TGridLayer = class;
+  TGRGridLayer = class;
 
-  TCustomLayerEx = class(TCustomLayer)
+  TGRLayerClass = class of TGRCustomLayer;
+  TGRCustomLayer = class(TCustomLayer)
   private
     function GetCaptured: Boolean;
     procedure SetCaptured(const Value: Boolean);
@@ -152,69 +162,83 @@ type
     FOnChange: TNotifyEvent;                     // For individual change events.
     FChangeNotificationList: TList;
 
-    procedure AddChangeNotification(ALayer: TCustomLayerEx);
-    procedure RemoveChangeNotification(ALayer: TCustomLayerEx);
-    procedure ChangeNotification(ALayer: TCustomLayerEx); virtual;
+    procedure AddChangeNotification(ALayer: TGRCustomLayer);
+    procedure RemoveChangeNotification(ALayer: TGRCustomLayer);
+    procedure ChangeNotification(ALayer: TGRCustomLayer); virtual;
     procedure DoChange; virtual;
 
     procedure SetName(const Value: string);
   public
+    constructor Create(aLayerCollection: TLayerCollection); override;
     destructor Destroy; override;
     {$IFDEF Designtime_Supports}
     class function RubberbandOptions: TExtRubberBandOptions; virtual;
     {$ENDIF}
 
-    property Name: string read FName write SetName;
+  public
     property Captured: Boolean read GetCaptured write SetCaptured;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
+  public
+    property Name: string read FName write SetName;
   end;
 
   //How to express the position layer at the designtime?
-  TPositionLayer = class(TCustomLayerEx)
+  TGRPositionLayer = class(TGRCustomLayer)
   protected
     FPosition: TFloatPoint;
+    FScaled: Boolean;
     {$IFDEF Designtime_Supports}
-    FGridLayer: TGridLayer;                      // Used to snap/align coordinates.
+    FGridLayer: TGRGridLayer;                      // Used to snap/align coordinates.
     {$ENDIF}
 
     procedure SetPosition(const Value: TFloatPoint);
+    procedure SetScaled(const Value: Boolean);
     {$IFDEF Designtime_Supports}
-    procedure SetGridLayer(const Value: TGridLayer);
+    procedure SeTGRGridLayer(const Value: TGRGridLayer);
     class function RubberbandOptions: TExtRubberBandOptions; override;
     {$ENDIF}
 
   protected
     function GetNativeSize: TSize; virtual;
     procedure Notification(ALayer: TCustomLayer); override;
+    function GetAdjustedPosition(const P: TFloatPoint): TFloatPoint;
   public
     destructor Destroy; override;
     procedure Assign(Source: TPersistent);override;
     {$IFDEF Designtime_Supports}
     procedure Paint(Buffer: TBitmap32); override;
+    function DoHitTest(aX, aY: Integer): Boolean; override;
     {$ENDIF}
 
     {$IFDEF Designtime_Supports}
-    property GridLayer: TGridLayer read FGridLayer write SetGridLayer;
+    property GridLayer: TGRGridLayer read FGridLayer write SeTGRGridLayer;
     {$ENDIF}
     property Position: TFloatPoint read FPosition write SetPosition;
+    property Scaled: Boolean read FScaled write SetScaled; //Scaled with the viewport of a possible owner ImgView32.
   end;
 
-  TTransformationLayer = class(TPositionLayer)
+  TGRTransformationLayer = class(TGRPositionLayer)
   protected
     FAngle: Single;                              // Given in degrees.
     FAlphaHit: Boolean;
     FTransformation: TAffineTransformation;
     FSkew: TFloatPoint;
     FScaling: TFloatPoint;
-    FScaled: Boolean;                            // Scaled with the viewport of a possible owner ImgView32.
     FPivotPoint: TFloatPoint;                    // Center of rotation and proportional scaling.
+    FSize: TSize;
 
     procedure SetAngle(Value: Single);
     procedure SetPivot(const Value: TFloatPoint);
-    procedure SetScaled(const Value: Boolean);
     procedure SetScaling(const Value: TFloatPoint);
     procedure SetSkew(const Value: TFloatPoint);
+    procedure SetSize(const Value: TSize);
   protected
+    {$IFDEF Designtime_Supports}
+    class function RubberbandOptions: TExtRubberBandOptions; override;
+    procedure Paint(Buffer: TBitmap32); override;
+    function DoHitTest(aX, aY: Integer): Boolean; override;
+    {$ENDIF}
+    function GetNativeSize: TSize;override;
 
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
@@ -229,9 +253,9 @@ type
     property AlphaHit: Boolean read FAlphaHit write FAlphaHit;
     property Angle: Single read FAngle write SetAngle;
     property PivotPoint: TFloatPoint read FPivotPoint write SetPivot;
-    property ScaledViewport: Boolean read FScaled write SetScaled; // Do not use Scaled as name as this is alredy taken by other VCL controls.
     property Scaling: TFloatPoint read FScaling write SetScaling;
     property Skew: TFloatPoint read FSkew write SetSkew;
+    property Size: TSize read FSize write SetSize;
   end;
 
   // The grid elements determine what will be painted of the grid layer.
@@ -248,7 +272,7 @@ type
     soSnapGrid
   );
 
-  TGridLayer = class(TTransformationLayer)
+  TGRGridLayer = class(TGRTransformationLayer)
   private
     FGridSize: Integer;
     FElements: TGridElements;
@@ -289,7 +313,7 @@ type
     property SnapThreshold: Integer read FSnapThreshold write SetSnapThreshold default 8;
   end;
 
-  TCursorDirection = (
+  TGRCursorDirection = (
     cdNotUsed,
     cdNorth,
     cdNorthEast,
@@ -301,12 +325,12 @@ type
     cdNorthWest
   );
 
-  TContour = array[0..3] of TFixedPoint;
+  TGRContour = array[0..3] of TFixedPoint;
 
-  TExtRubberBandLayer = class(TTransformationLayer)
-  private
-    FChildLayer: TTransformationLayer;
-    FSize: TSize;                      // Real (untransformed) size of the child layer (if there is one).
+  TGRRubberBandLayer = class(TGRTransformationLayer)
+  protected
+    FChildLayer: TGRTransformationLayer;
+    //FSize: TSize;                      // Real (untransformed) size of the child layer (if there is one).
                                        // Otherwise the current (unscaled) size of the rubber band.
     FOptions: TExtRubberBandOptions;
     FHandleSize: Integer;
@@ -326,19 +350,20 @@ type
     FOldAngle: Single;
     FDragPos: TPoint;
 
-    procedure SetChildLayer(const Value: TTransformationLayer);
+    procedure SetChildLayer(const Value: TGRTransformationLayer);
     procedure SetHandleFill(const Value: TColor);
     procedure SetHandleFrame(const Value: TColor);
     procedure SetHandleSize(Value: Integer);
     procedure SetOptions(const Value: TExtRubberBandOptions);
     procedure SetOuterColor(const Value: TColor32);
-    procedure SetSize(const Value: TSize);
+    //procedure SetSize(const Value: TSize);
+    function GetOptions: TExtRubberBandOptions;
   protected
     function DoHitTest(X, Y: Integer): Boolean; override;
-    procedure FillOuter(Buffer: TBitmap32; OuterRect: TRect; Contour: TContour);
-    function GetCursorDirection(X, Y: Integer; AxisTolerance: Integer; State: TRubberbandDragState): TCursorDirection;
+    procedure FillOuter(Buffer: TBitmap32; OuterRect: TRect; Contour: TGRContour);
+    function GeTGRCursorDirection(X, Y: Integer; AxisTolerance: Integer; State: TRubberbandDragState): TGRCursorDirection;
     function GetHitCode(X, Y: Integer; Shift: TShiftState): TRubberbandDragState;
-    function GetNativeSize: TSize; override;
+    //function GetNativeSize: TSize; override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
@@ -347,28 +372,28 @@ type
     function SnapPosition: Boolean;
     procedure UpdateChildLayer;
 
-    procedure ChangeNotification(ALayer: TCustomLayerEx); override;
+    procedure ChangeNotification(ALayer: TGRCustomLayer); override;
   public
     constructor Create(LayerCollection: TLayerCollection); override;
     destructor Destroy; override;
 
     procedure Cancel;
 
-    property ChildLayer: TTransformationLayer read FChildLayer write SetChildLayer;
+    property ChildLayer: TGRTransformationLayer read FChildLayer write SetChildLayer;
     property DragState: TRubberbandDragState read FDragState;
     property HandleSize: Integer read FHandleSize write SetHandleSize default 3;
     property HandleFill: TColor read FHandleFill write SetHandleFill default clWhite;
     property HandleFrame: TColor read FHandleFrame write SetHandleFrame default clBlack;
     property IsDragging: Boolean read FIsDragging;
-    property Options: TExtRubberBandOptions read FOptions write SetOptions default DefaultRubberbandOptions;
+    property Options: TExtRubberBandOptions read GetOptions write SetOptions default DefaultRubberbandOptions;
     property OuterColor: TColor32 read FOuterColor write SetOuterColor;
-    property Size: TSize read FSize write SetSize;
+    //property Size: TSize read FSize write SetSize;
     property Threshold: Integer read FThreshold write FThreshold default 8;
   end;
 
-  // TExtBitmapLayer provides some special properties as used for the image editor, like the ability for affine
+  // TGRBitmapLayer provides some special properties as used for the image editor, like the ability for affine
   // transformation, name, lock state and other things.
-  TLayerDrawMode = (
+  TGRLayerDrawMode = (
     ldmBlend,           // Can also be opaque if opacity is 100%.
     ldmAdd,
     ldmSubtract,
@@ -377,22 +402,19 @@ type
     ldmMin
   );
 
-  TPropertyLayer = class(TTransformationLayer)
+  TGRPropertyLayer = class(TGRTransformationLayer)
   protected
-    FName: WideString;
     FLocked: Boolean;
-    FDrawMode: TLayerDrawMode;
-    procedure SetName(const Value: WideString);
-    procedure SetDrawMode(const Value: TLayerDrawMode);
+    FDrawMode: TGRLayerDrawMode;
+    procedure SetDrawMode(const Value: TGRLayerDrawMode);
   public
     procedure Assign(Source: TPersistent);override;
 
-    property DrawMode: TLayerDrawMode read FDrawMode write SetDrawMode;
+    property DrawMode: TGRLayerDrawMode read FDrawMode write SetDrawMode;
     property Locked: Boolean read FLocked write FLocked;
-    property Name: WideString read FName write SetName;
   end;
 
-  TTextLayer = class(TPropertyLayer)
+  TGRTextLayer = class(TGRPropertyLayer)
   protected
     FText: WideString;
     FTextColor: TColor32;
@@ -406,7 +428,7 @@ type
     property TextColor: TColor32 read FTextColor write SetTextColor default clBlack32;
   end;
 
-  TExtBitmapLayer = class(TPropertyLayer)
+  TGRBitmapLayer = class(TGRPropertyLayer)
   protected
     FBitmap: TBitmap32;
     FCropped: Boolean;
@@ -429,43 +451,184 @@ type
     property Cropped: Boolean read FCropped write SetCropped;
   end;
 
+  TGRLayerCollection = class(TLayerCollection)
+  end;
+
+  TGRLayerContainer = class(TGRCustomLayer)
+  protected
+    FLeft: Integer;
+    FTop: Integer;
+    FWidth: Integer;
+    FHeight: Integer;
+    FBuffer: TBitmap32;
+    FBufferOversize: Integer;
+    FBufferValid: Boolean;
+    FForceFullRepaint: Boolean;
+    FRepaintOptimizer: TCustomRepaintOptimizer;
+    FRepaintMode: TRepaintMode;
+
+    FLayers: TGRLayerCollection;
+
+
+    FInvalidRects: TRectList;
+    FScaleX: Single;
+    FScaleY: Single;
+    FScaleMode: TScaleMode;
+    FUpdateCount: Integer;
+
+    CachedBitmapRect: TRect;
+    CachedXForm: TCoordXForm;
+    CacheValid: Boolean;
+    OldSzX, OldSzY: Integer;
+
+    procedure SetRepaintMode(const Value: TRepaintMode); virtual;
+    function GetBitmapRect: TRect;
+
+    function  CustomRepaint: Boolean; virtual;
+    procedure DoPaintBuffer; virtual;
+    procedure UpdateCache; virtual;
+    property  UpdateCount: Integer read FUpdateCount;
+    procedure InvalidateCache;
+    procedure Invalidate;
+    function  InvalidRectsAvailable: Boolean; virtual;
+    procedure DoPrepareInvalidRects; virtual;
+    procedure ResetInvalidRects;
+    procedure Paint(aBuffer: TBitmap32); override;
+
+    procedure LayerCollectionChangeHandler(Sender: TObject);
+    procedure LayerCollectionGDIUpdateHandler(Sender: TObject);
+    procedure LayerCollectionGetViewportScaleHandler(Sender: TObject; var ScaleX, ScaleY: Single);
+    procedure LayerCollectionGetViewportShiftHandler(Sender: TObject; var ShiftX, ShiftY: Single);
+
+    property  BufferValid: Boolean read FBufferValid write FBufferValid;
+    property  InvalidRects: TRectList read FInvalidRects;
+  public
+    constructor Create(aLayerCollection: TLayerCollection);override;
+    destructor Destroy;override;
+    function  GetViewportRect: TRect; virtual;
+
+    property Left: Integer read FLeft write FLeft;
+    property Top: Integer read FTop write FTop;
+    property Width: Integer read FWidth write FWidth;
+    property Height: Integer read FHeight write FHeight;
+    property Buffer: TBitmap32 read FBuffer;
+    property RepaintMode: TRepaintMode read FRepaintMode write SetRepaintMode default rmFull;
+  end;
+
+procedure RegisterLayer(const aLayerControlClass: TGRLayerClass);
+function GetLayerClass(const aClassName: string): TGRLayerClass;
+function GLayerClasses: TThreadList;
+
 //----------------------------------------------------------------------------------------------------------------------
 function ComponentToStr(const Component: TComponent): string;
 procedure SaveStrToFile(const aFileName, s: string);
+procedure ComponentToTextFile(const Component: TComponent; const aFileName: string);
 
 implementation
 
 uses
-  Math, GR32_Polygons, GR32_Image;
+  Math, GR32_Polygons, GR32_MicroTiles;
 
 type
   TAffineTransformationAccess = class(TAffineTransformation);
+  TLayerAccess = class(TCustomLayer);
+
+const
+  cAniIntervalCount = 33; //ms
+  DefaultRepaintOptimizerClass: TCustomRepaintOptimizerClass = TMicroTilesRepaintOptimizer;
+  UnitXForm: TCoordXForm = (
+    ScaleX: $10000;
+    ScaleY: $10000;
+    ShiftX: 0;
+    ShiftY: 0;
+    RevScaleX: 65536;
+    RevScaleY: 65536);
+
+var
+  FLayerClasses: TThreadList;
+
+function GetLayerClass(const aClassName: string): TGRLayerClass;
+var
+  I: integer;
+begin
+  with GLayerClasses.LockList do
+  try
+    for I := 0 to Count - 1 do
+    begin
+      Result := TGRLayerClass(Items[I]);
+      if Result.ClassName = aClassName then exit;
+    end;
+    Result := nil;
+  finally
+    FLayerClasses.UnlockList;
+  end;
+end;
+
+procedure RegisterLayer(const aLayerControlClass: TGRLayerClass);
+begin
+  with GLayerClasses.LockList do
+  try
+    if IndexOf(aLayerControlClass) < 0 then
+      Add(aLayerControlClass);
+  finally
+    FLayerClasses.UnlockList;
+  end;
+end;
+
+function GLayerClasses: TThreadList;
+begin
+  if not Assigned(FLayerClasses) then
+  begin
+    FLayerClasses := TThreadList.Create;
+  end;
+  Result := FLayerClasses;
+end;
+
+procedure ComponentToTextFile(const Component: TComponent; const aFileName: string);
+var
+  vBinStream:TMemoryStream;
+  vFileStream: TFileStream;
+  s: string;
+begin
+  vBinStream := TMemoryStream.Create;
+  try
+    vFileStream := TFileStream.Create(aFileName, fmCreate or fmShareDenyWrite);
+    try
+      vBinStream.WriteComponent(Component);
+      vBinStream.Seek(0, soFromBeginning);
+      ObjectBinaryToText(vBinStream, vFileStream);
+    finally
+      vFileStream.Free;
+    end;
+  finally
+    vBinStream.Free
+  end;
+end;
 
 function ComponentToStr(const Component: TComponent): string;
 var
-  BinStream:TMemoryStream;
-  StrStream: TStringStream;
+  vBinStream:TMemoryStream;
+  vStrStream: TStringStream;
   s: string;
 begin
-  BinStream := TMemoryStream.Create;
+  vBinStream := TMemoryStream.Create;
   try
-    StrStream := TStringStream.Create(s);
+    vStrStream := TStringStream.Create(s);
     try
-      BinStream.WriteComponent(Component);
-      BinStream.Seek(0, soFromBeginning);
+      vBinStream.WriteComponent(Component);
+      vBinStream.Seek(0, soFromBeginning);
       //try
-      ObjectBinaryToText(BinStream, StrStream);
+      ObjectBinaryToText(vBinStream, vStrStream);
       //except
       //  on E:Exception do
       //end;
-      StrStream.Seek(0, soFromBeginning);
-      Result:= StrStream.DataString;
+      vStrStream.Seek(0, soFromBeginning);
+      Result:= vStrStream.DataString;
     finally
-      StrStream.Free;
-
+      vStrStream.Free;
     end;
   finally
-    BinStream.Free
+    vBinStream.Free
   end;
 end;
 
@@ -480,8 +643,14 @@ begin
   end;
 end;
 
-{ TCustomLayerEx }
-destructor TCustomLayerEx.Destroy;
+{ TGRCustomLayer }
+constructor TGRCustomLayer.Create(aLayerCollection: TLayerCollection);
+begin
+  inherited;
+  LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE; 
+end;
+
+destructor TGRCustomLayer.Destroy;
 begin
   if Assigned(FChangeNotificationList) then 
   begin
@@ -491,17 +660,17 @@ begin
   inherited;
 end;
 
-procedure TCustomLayerEx.AddChangeNotification(ALayer: TCustomLayerEx);
+procedure TGRCustomLayer.AddChangeNotification(ALayer: TGRCustomLayer);
 begin
   if not Assigned(FChangeNotificationList) then FChangeNotificationList := TList.Create;
   FChangeNotificationList.Add(ALayer);
 end;
 
-procedure TCustomLayerEx.ChangeNotification(ALayer: TCustomLayerEx); 
+procedure TGRCustomLayer.ChangeNotification(ALayer: TGRCustomLayer); 
 begin
 end;
 
-procedure TCustomLayerEx.DoChange;
+procedure TGRCustomLayer.DoChange;
 var
   i: integer;
 begin
@@ -511,7 +680,7 @@ begin
     begin
       if Assigned(FChangeNotificationList[i]) then
       try
-        TTransformationLayer(FChangeNotificationList[i]).ChangeNotification(Self);
+        TGRTransformationLayer(FChangeNotificationList[i]).ChangeNotification(Self);
       except
         FChangeNotificationList.Delete(i);
       end;
@@ -521,12 +690,12 @@ begin
     FOnChange(Self);
 end;
 
-function TCustomLayerEx.GetCaptured: Boolean;
+function TGRCustomLayer.GetCaptured: Boolean;
 begin
   Result := FLayerOptions and LOB_NO_CAPTURE = 0;
 end;
 
-procedure TCustomLayerEx.RemoveChangeNotification(ALayer: TCustomLayerEx);
+procedure TGRCustomLayer.RemoveChangeNotification(ALayer: TGRCustomLayer);
 begin
   if Assigned(FChangeNotificationList) then
   begin
@@ -539,7 +708,7 @@ begin
   end;
 end;
 
-procedure TCustomLayerEx.SetCaptured(const Value: Boolean);
+procedure TGRCustomLayer.SetCaptured(const Value: Boolean);
 begin
   if Value then
     LayerOptions := LayerOptions or LOB_NO_CAPTURE
@@ -549,7 +718,7 @@ begin
   end;
 end;
 
-procedure TCustomLayerEx.SetName(const Value: string);
+procedure TGRCustomLayer.SetName(const Value: string);
 begin
   if Value <> FName then
   begin
@@ -562,14 +731,14 @@ begin
 end;
 
 {$IFDEF Designtime_Supports}
-class function TCustomLayerEx.RubberbandOptions: TExtRubberBandOptions;
+class function TGRCustomLayer.RubberbandOptions: TExtRubberBandOptions;
 begin
   Result := [rboShowFrame];
 end;
 {$ENDIF}
 
-{ TPositionLayer }
-destructor TPositionLayer.Destroy;
+{ TGRPositionLayer }
+destructor TGRPositionLayer.Destroy;
 begin
   {$IFDEF Designtime_Supports}
   if Assigned(FGridLayer) then
@@ -579,14 +748,15 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
-procedure TPositionLayer.Assign(Source: TPersistent);
+procedure TGRPositionLayer.Assign(Source: TPersistent);
 begin
-  if Source is TPositionLayer then
-    with Source as TPositionLayer do
+  if Source is TGRPositionLayer then
+    with Source as TGRPositionLayer do
     begin
       Changing;
       Self.GridLayer := GridLayer;
       Self.FPosition := FPosition;
+      Self.FScaled := FScaled;
 
       Changed; // Layer collection.
       DoChange; // Layer only.
@@ -594,14 +764,33 @@ begin
   inherited Assign(Source);
 end;
 
+function TGRPositionLayer.GetAdjustedPosition(const P: TFloatPoint): TFloatPoint;
+var
+  ScaleX, ScaleY, ShiftX, ShiftY: Single;
+begin
+  if Scaled and Assigned(FLayerCollection) then
+  begin
+    FLayerCollection.GetViewportShift(ShiftX, ShiftY);
+    FLayerCollection.GetViewportScale(ScaleX, ScaleY);
+
+    with Result do
+    begin
+      X := P.X * ScaleX + ShiftX;
+      Y := P.Y * ScaleY + ShiftY;
+    end;
+  end
+  else
+    Result := P;
+end;
+
 // Returns the untransformed size of the content. Must be overriden by descentants.
-function TPositionLayer.GetNativeSize: TSize;
+function TGRPositionLayer.GetNativeSize: TSize;
 begin
   Result.cx := 1;
   Result.cy := 1;
 end;
 
-procedure TPositionLayer.Notification(ALayer: TCustomLayer);
+procedure TGRPositionLayer.Notification(ALayer: TCustomLayer);
 begin
   inherited;
   
@@ -612,12 +801,40 @@ begin
 end;
 
 {$IFDEF Designtime_Supports}
-procedure TPositionLayer.Paint(Buffer: TBitmap32);
+const
+  cPositionLayerWdith = 16;
+  cPositionLayerHeight = 16;
+  
+function TGRPositionLayer.DoHitTest(aX, aY: Integer): Boolean;
 begin
-
+  with GetAdjustedPosition(FPosition) do
+    Result := (aX >= X - cPositionLayerWdith) and (aX < X + cPositionLayerWdith) and (aY >= Y - cPositionLayerHeight) and (aY < Y + cPositionLayerHeight);
 end;
 
-procedure TPositionLayer.SetGridLayer(const Value: TGridLayer);
+procedure TGRPositionLayer.Paint(Buffer: TBitmap32);
+var
+  SrcRect, DstRect, ClipRect, TempRect: TRect;
+  ImageRect: TRect;
+begin
+  with GetAdjustedPosition(FPosition) do
+  begin
+    DstRect.Left := Trunc(X - cPositionLayerWdith);
+    DstRect.Top := Trunc(Y - cPositionLayerHeight);
+    DstRect.Right := Trunc(X + cPositionLayerWdith);
+    DstRect.Bottom := Trunc(Y + cPositionLayerHeight);
+  end;
+  ClipRect := Buffer.ClipRect;
+  IntersectRect(TempRect, ClipRect, DstRect);
+  if IsRectEmpty(TempRect) then Exit;
+  Buffer.RaiseRectTS(DstRect, 80);
+  with DstRect do
+  begin
+    Buffer.LineAS(Left, Top, Right, Bottom, clBlack32);
+    Buffer.LineAS(Right, Top, Left, Bottom, clBlack32);
+  end;
+end;
+
+procedure TGRPositionLayer.SeTGRGridLayer(const Value: TGRGridLayer);
 begin
   if Value <> FGridLayer then
   begin
@@ -629,13 +846,13 @@ begin
   end;
 end;
 
-class function TPositionLayer.RubberbandOptions: TExtRubberBandOptions;
+class function TGRPositionLayer.RubberbandOptions: TExtRubberBandOptions;
 begin
   Result := [rboAllowMove, rboShowFrame];
 end;
 {$ENDIF Designtime_Supports}
 
-procedure TPositionLayer.SetPosition(const Value: TFloatPoint);
+procedure TGRPositionLayer.SetPosition(const Value: TFloatPoint);
 
 begin
   Changing;
@@ -645,39 +862,63 @@ begin
   DoChange;
 end;
 
+procedure TGRPositionLayer.SetScaled(const Value: Boolean);
+begin
+  if Value <> FScaled then
+  begin
+    Changing;
+    FScaled := Value;
+    Changed;
+  end;
+end;
+
 //----------------------------------------------------------------------------------------------------------------------
 
-{ TTransformationLayer }
+{ TGRTransformationLayer }
+class function TGRTransformationLayer.RubberbandOptions: TExtRubberBandOptions;
+begin
+  Result := [rboAllowCornerResize,
+    rboAllowEdgeResize,
+    rboAllowMove,
+    rboAllowRotation,
+    rboShowFrame,
+    rboShowHandles
+  ];
+end;
 
-constructor TTransformationLayer.Create(ALayerCollection: TLayerCollection);
+constructor TGRTransformationLayer.Create(ALayerCollection: TLayerCollection);
 
 begin
   inherited;
 
   FTransformation := TAffineTransformationAccess.Create;
+
+  FSize.cx := 32;
+  FSize.cy := 32;
+
   ResetTransformation;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-destructor TTransformationLayer.Destroy;
+destructor TGRTransformationLayer.Destroy;
 begin
   FTransformation.Free;
   inherited;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
-procedure TTransformationLayer.Assign(Source: TPersistent);
+procedure TGRTransformationLayer.Assign(Source: TPersistent);
 begin
-  if Source is TTransformationLayer then
-    with Source as TTransformationLayer do
+  if Source is TGRTransformationLayer then
+    with Source as TGRTransformationLayer do
     begin
       Changing;
       Self.FAngle := FAngle;
       Self.FPivotPoint := FPivotPoint;
-      Self.FScaled := FScaled;
       Self.FScaling := FScaling;
       Self.FSkew := FSkew;
+      Self.FSize := FSize;
 
       Changed; // Layer collection.
       DoChange; // Layer only.
@@ -686,8 +927,7 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
-
-procedure TTransformationLayer.SetAngle(Value: Single);
+procedure TGRTransformationLayer.SetAngle(Value: Single);
 
 begin
   Changing;
@@ -698,8 +938,7 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
-
-procedure TTransformationLayer.SetPivot(const Value: TFloatPoint);
+procedure TGRTransformationLayer.SetPivot(const Value: TFloatPoint);
 
 begin
   Changing;
@@ -710,23 +949,7 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
-
-procedure TTransformationLayer.SetScaled(const Value: Boolean);
-
-begin
-  if FScaled <> Value then
-  begin
-    Changing;
-    FScaled := Value;
-    Changed;
-
-    DoChange;
-  end;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TTransformationLayer.SetScaling(const Value: TFloatPoint);
+procedure TGRTransformationLayer.SetScaling(const Value: TFloatPoint);
 
 begin
   Changing;
@@ -738,8 +961,16 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TTransformationLayer.SetSkew(const Value: TFloatPoint);
+procedure TGRTransformationLayer.SetSize(const Value: TSize);
+begin
+  Changing;
+  FSize := Value;
+  Changed;
 
+  DoChange;
+end;
+
+procedure TGRTransformationLayer.SetSkew(const Value: TFloatPoint);
 begin
   Changing;
   FSkew := Value;
@@ -749,9 +980,7 @@ begin
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
-
-
-procedure TTransformationLayer.GetLayerTransformation(var Transformation: TAffineTransformation);
+procedure TGRTransformationLayer.GetLayerTransformation(var Transformation: TAffineTransformation);
 
 // Creates Transformation if it does not exist yet and applies the current layer transformations.
 // This does not include viewport scaling.
@@ -770,21 +999,50 @@ begin
   Transformation.Translate(FPosition.X + FPivotPoint.X, FPosition.Y + FPivotPoint.Y);
 end;
 
+{$IFDEF Designtime_Supports}
+procedure TGRTransformationLayer.Paint(Buffer: TBitmap32); 
+var
+  SrcRect, DstRect, ClipRect, TempRect: TRect;
+  ImageRect: TRect;
+begin
+  DstRect := MakeRect(GetTransformedTargetRect);
+  ClipRect := Buffer.ClipRect;
+  IntersectRect(TempRect, ClipRect, DstRect);
+  if IsRectEmpty(TempRect) then Exit;
+  Buffer.RaiseRectTS(DstRect, -80);
+  {
+  with DstRect do
+  begin
+    Buffer.LineAS(Left, Top, Right, Bottom, clBlack32);
+    Buffer.LineAS(Right, Top, Left, Bottom, clBlack32);
+  end; //}
+end;
+
+function TGRTransformationLayer.DoHitTest(aX, aY: Integer): Boolean;
+begin
+  with GetTransformedTargetRect do
+    Result := (aX >= Left) and (aX < Right) and (aY >= Top) and (aY < Bottom);
+end;
+{$ENDIF Designtime_Supports}
+
+//----------------------------------------------------------------------------------------------------------------------
+function TGRTransformationLayer.GetNativeSize: TSize;
+begin
+  Result := FSize;
+end;
+
 //----------------------------------------------------------------------------------------------------------------------
 
-function TTransformationLayer.GetTransformedTargetRect: TFloatRect;
-
+function TGRTransformationLayer.GetTransformedTargetRect: TFloatRect;
 // Helper method to transform position, size and scale factor into a rectangle which
 // determines the location in a container like TImgView32.
 // The rotation is not taken into account here because it is meant for special handling.
-
 var
-  Size: TSize;
-
+  vSize: TSize;
 begin
   UpdateTransformation;
 
-  Size := GetNativeSize;
+  vSize := GetNativeSize;
   with FPosition do
     Result := FloatRect(X, Y, FScaling.X * (X + Size.cx), FScaling.Y * (Y + Size.cy));
 
@@ -798,7 +1056,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TTransformationLayer.ResetTransformation;
+procedure TGRTransformationLayer.ResetTransformation;
 
 begin
   Changing;
@@ -814,7 +1072,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TTransformationLayer.UpdateTransformation;
+procedure TGRTransformationLayer.UpdateTransformation;
 var
   ShiftX, ShiftY, ScaleX, ScaleY: Single;
 begin
@@ -837,10 +1095,9 @@ begin
 
 end;
 
-//----------------- TGridLayer -----------------------------------------------------------------------------------------
+//----------------- TGRGridLayer -----------------------------------------------------------------------------------------
 
-constructor TGridLayer.Create(ALayerCollection: TLayerCollection);
-
+constructor TGRGridLayer.Create(ALayerCollection: TLayerCollection);
 begin
   inherited;
 
@@ -859,7 +1116,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-destructor TGridLayer.Destroy;
+destructor TGRGridLayer.Destroy;
 
 begin
   FHorizontalGuides.Free;
@@ -870,7 +1127,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGridLayer.SetColor(const Index: Integer; const Value: TColor32);
+procedure TGRGridLayer.SetColor(const Index: Integer; const Value: TColor32);
 
 begin
   Changing;
@@ -889,7 +1146,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGridLayer.SetElements(const Value: TGridElements);
+procedure TGRGridLayer.SetElements(const Value: TGridElements);
 
 begin
   if FElements <> Value then
@@ -904,7 +1161,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGridLayer.SetGridSize(const Value: Integer);
+procedure TGRGridLayer.SetGridSize(const Value: Integer);
 
 begin
   if FGridSize <> Value then
@@ -919,7 +1176,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGridLayer.SetSnapThreshold(const Value: Integer);
+procedure TGRGridLayer.SetSnapThreshold(const Value: Integer);
 
 begin
   FSnapThreshold := Value;
@@ -929,8 +1186,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-function TGridLayer.DoHitTest(X, Y: Integer): Boolean;
-
+function TGRGridLayer.DoHitTest(X, Y: Integer): Boolean;
 begin
   // The grid layer is currently fully transparent for the mouse.
   // TODO: Ability to manipulate guides.
@@ -943,11 +1199,9 @@ type
   // To access protected properties and methods.
   TLayerCollectionCast = class(TLayerCollection);
 
-function TGridLayer.GetNativeSize: TSize;
-
+function TGRGridLayer.GetNativeSize: TSize;
 var
   Layers: TLayerCollectionCast;
-
 begin
   Layers := TLayerCollectionCast(LayerCollection);
   if Layers.GetOwner is TCustomImage32 then
@@ -965,8 +1219,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGridLayer.Paint(Buffer: TBitmap32);
-
+procedure TGRGridLayer.Paint(Buffer: TBitmap32);
 var
   R: TFloatRect;
   IntR: TRect;
@@ -1132,7 +1385,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGridLayer.AddHorizontalGuide(Y: Integer);
+procedure TGRGridLayer.AddHorizontalGuide(Y: Integer);
 
 begin
   Changing;
@@ -1142,7 +1395,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGridLayer.AddVerticalGuide(X: Integer);
+procedure TGRGridLayer.AddVerticalGuide(X: Integer);
 
 begin
   Changing;
@@ -1152,7 +1405,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGridLayer.ClearGuides;
+procedure TGRGridLayer.ClearGuides;
 
 begin
   Changing;
@@ -1163,7 +1416,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-function TGridLayer.Snap(var P: TFloatPoint): Boolean;
+function TGRGridLayer.Snap(var P: TFloatPoint): Boolean;
 
 // This method takes the given coordinates and looks for a border, guide or grid line which is within
 // snap threshold distance. It returnes True if something was found and modifies the coordinates which
@@ -1269,7 +1522,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGridLayer.RemoveHorizontalGuide(Y: Integer);
+procedure TGRGridLayer.RemoveHorizontalGuide(Y: Integer);
 
 begin
   Changing;
@@ -1279,7 +1532,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGridLayer.RemoveVerticalGuide(X: Integer);
+procedure TGRGridLayer.RemoveVerticalGuide(X: Integer);
 
 begin
   Changing;
@@ -1287,9 +1540,9 @@ begin
   Changed;
 end;
 
-//----------------- TExtRubberBandLayer --------------------------------------------------------------------------------
+//----------------- TGRRubberBandLayer --------------------------------------------------------------------------------
 
-constructor TExtRubberBandLayer.Create(LayerCollection: TLayerCollection);
+constructor TGRRubberBandLayer.Create(LayerCollection: TLayerCollection);
 
 begin
   inherited;
@@ -1306,7 +1559,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-destructor TExtRubberBandLayer.Destroy;
+destructor TGRRubberBandLayer.Destroy;
 
 begin
   if Assigned(FChildLayer) then
@@ -1317,9 +1570,16 @@ begin
   inherited;
 end;
 
+function TGRRubberBandLayer.GetOptions: TExtRubberBandOptions;
+begin
+  Result := FOptions;
+  if Assigned(FChildLayer) then
+    Result := Result * FChildLayer.RubberbandOptions;
+end;
+
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.SetChildLayer(const Value: TTransformationLayer);
+procedure TGRRubberBandLayer.SetChildLayer(const Value: TGRTransformationLayer);
 
 begin
   if Assigned(FChildLayer) then
@@ -1336,7 +1596,7 @@ begin
     FAngle := Value.Angle;
     FPosition := Value.Position;
     FPivotPoint := Value.PivotPoint;
-    FScaled := Value.ScaledViewport;
+    FScaled := Value.FScaled;
     FScaling := Value.Scaling;
     FSkew := Value.Skew;
 
@@ -1367,7 +1627,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.SetHandleFill(const Value: TColor);
+procedure TGRRubberBandLayer.SetHandleFill(const Value: TColor);
 
 begin
   if FHandleFill <> Value then
@@ -1379,7 +1639,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.SetHandleFrame(const Value: TColor);
+procedure TGRRubberBandLayer.SetHandleFrame(const Value: TColor);
 
 begin
   if FHandleFrame <> Value then
@@ -1391,7 +1651,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.SetHandleSize(Value: Integer);
+procedure TGRRubberBandLayer.SetHandleSize(Value: Integer);
 
 begin
   if Value < 1 then
@@ -1405,7 +1665,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.SetOptions(const Value: TExtRubberBandOptions);
+procedure TGRRubberBandLayer.SetOptions(const Value: TExtRubberBandOptions);
 
 begin
   if FOptions <> Value then
@@ -1420,7 +1680,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.SetOuterColor(const Value: TColor32);
+procedure TGRRubberBandLayer.SetOuterColor(const Value: TColor32);
 
 begin
   if FOuterColor <> Value then
@@ -1435,19 +1695,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.SetSize(const Value: TSize);
-
-begin
-  Changing;
-  FSize := Value;
-  Changed;
-
-  DoChange;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-function TExtRubberBandLayer.DoHitTest(X, Y: Integer): Boolean;
+function TGRRubberBandLayer.DoHitTest(X, Y: Integer): Boolean;
 
 // Generally, a rubberband layer is always accepting a mouse event. However if rotation is not allowed
 // then we reject the outside of the current bounds as hit.
@@ -1460,7 +1708,7 @@ begin
   SendDebug('DoHitTest='+IntToStr(Integer(Result))+' X='+IntToStr(X)+' Y='+IntToStr(Y));
  {$ENDIF}
 
-  if Result and not (rboAllowRotation in FOptions) then
+  if Result and not (rboAllowRotation in Options) then
   begin
     if not TAffineTransformationAccess(FTransformation).TransformValid then
       TAffineTransformationAccess(FTransformation).PrepareTransform;
@@ -1482,7 +1730,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.FillOuter(Buffer: TBitmap32; OuterRect: TRect; Contour: TContour);
+procedure TGRRubberBandLayer.FillOuter(Buffer: TBitmap32; OuterRect: TRect; Contour: TGRContour);
 
 var
   Polygon: TArrayOfArrayOfFixedPoint;
@@ -1510,8 +1758,8 @@ end;
            
 //----------------------------------------------------------------------------------------------------------------------
 
-function TExtRubberBandLayer.GetCursorDirection(X, Y: Integer; AxisTolerance: Integer;
-  State: TRubberbandDragState): TCursorDirection;
+function TGRRubberBandLayer.GeTGRCursorDirection(X, Y: Integer; AxisTolerance: Integer;
+  State: TRubberbandDragState): TGRCursorDirection;
 
 // Returns, depending on X and Y as well as the current transformation, the direction either relative to
 // the image bounds or the rotation pivot (if not within the bounds).
@@ -1521,12 +1769,12 @@ function TExtRubberBandLayer.GetCursorDirection(X, Y: Integer; AxisTolerance: In
 // aligned.
 
 const
-  Directions: array[0..18] of TCursorDirection = (
+  Directions: array[0..18] of TGRCursorDirection = (
     cdNorth, cdNorthEast, cdEast, cdSouthEast, cdSouth, cdSouthWest, cdWest, cdNorthWest, cdNorth, cdNorthEast, cdEast,
     cdSouthEast, cdSouth, cdSouthWest, cdWest, cdNorthWest, cdNorth, cdNorthEast, cdEast
   );
 
-  SheerDirections: array[0..3] of TCursorDirection = (
+  SheerDirections: array[0..3] of TGRCursorDirection = (
     cdNorth, cdEast, cdSouth, cdWest
   );
 
@@ -1647,7 +1895,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-function TExtRubberBandLayer.GetHitCode(X, Y: Integer; Shift: TShiftState): TRubberbandDragState;
+function TGRRubberBandLayer.GetHitCode(X, Y: Integer; Shift: TShiftState): TRubberbandDragState;
 
 // Determines the possible drag state, which the layer could enter.
 
@@ -1686,7 +1934,7 @@ begin
     dY := 0;
 
   // Special case: rotation Pivot is hit.
-  if (dX = 0) and (dY = 0) and (rboAllowPivotMove in FOptions) then
+  if (dX = 0) and (dY = 0) and (rboAllowPivotMove in Options) then
     Result := rdsMovePivot
   else
   begin
@@ -1701,7 +1949,7 @@ begin
       NearTop := Abs(Local.Y) <= LocalThresholdY;
       NearBottom := Abs(FSize.cy - Local.Y) <= LocalThresholdY;
 
-      if rboAllowCornerResize in FOptions then
+      if rboAllowCornerResize in Options then
       begin
         // Check borders.
         if NearTop then
@@ -1722,7 +1970,7 @@ begin
                 Result := rdsResizeSW;
           end;
       end;
-      if (Result = rdsMoveLayer) and (rboAllowEdgeResize in FOptions) then
+      if (Result = rdsMoveLayer) and (rboAllowEdgeResize in Options) then
       begin
         // Check for border if no corner hit.
         if NearTop then
@@ -1756,7 +2004,7 @@ begin
     else
     begin
       // Mouse is not within the bounds. So if rotating is allowed we can return the rotation state.
-      if rboAllowRotation in FOptions then
+      if rboAllowRotation in Options then
         Result := rdsRotate;
     end;
   end;
@@ -1764,15 +2012,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-function TExtRubberBandLayer.GetNativeSize: TSize;
-
-begin
-  Result := FSize;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TExtRubberBandLayer.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TGRRubberBandLayer.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 
 begin
   //update the DragState first.
@@ -1802,10 +2042,10 @@ end;
 const
   Epsilon = 1E-4; // Minimal changes are not taken into account. This is the threshold.
 
-procedure TExtRubberBandLayer.MouseMove(Shift: TShiftState; X, Y: Integer);
+procedure TGRRubberBandLayer.MouseMove(Shift: TShiftState; X, Y: Integer);
 
 const
-  MoveCursor: array [TCursorDirection] of TCursor = (
+  MoveCursor: array [TGRCursorDirection] of TCursor = (
     crDefault,
     crGrMovePointNS,    // cdNorth
     crGrMovePointNESW,  // cdNorthEast
@@ -1817,7 +2057,7 @@ const
     crGrMovePointNWSE   // cdNorthWest
   );
 
-  RotateCursor: array [TCursorDirection] of TCursor = (
+  RotateCursor: array [TGRCursorDirection] of TCursor = (
     crDefault,
     crGrRotateN,        // cdNorth
     crGrRotateNE,       // cdNorthEast
@@ -1829,7 +2069,7 @@ const
     crGrRotateNW        // cdNorthWest
   );
 
-  SheerCursor: array [TCursorDirection] of TCursor = (
+  SheerCursor: array [TGRCursorDirection] of TCursor = (
     crDefault,
     crGrArrowMoveWE,    // cdNorth
     crDefault,          // cdNorthEast
@@ -1872,15 +2112,15 @@ begin
       rdsNone:
         Cursor := crDefault;
       rdsRotate:
-        Cursor := RotateCursor[GetCursorDirection(X, Y, 15, FDragState)];
+        Cursor := RotateCursor[GeTGRCursorDirection(X, Y, 15, FDragState)];
       rdsMoveLayer:
         Cursor := crGrArrow;
       rdsMovePivot:
         Cursor := crGrMoveCenter;
       rdsSheerN..rdsSheerW:
-        Cursor := SheerCursor[GetCursorDirection(X, Y, 15, FDragState)];
+        Cursor := SheerCursor[GeTGRCursorDirection(X, Y, 15, FDragState)];
     else
-      Cursor := MoveCursor[GetCursorDirection(X, Y, 15, FDragState)];
+      Cursor := MoveCursor[GeTGRCursorDirection(X, Y, 15, FDragState)];
     end;
   end
   else
@@ -2005,7 +2245,7 @@ begin
       rdsRotate:
         begin
           // Update cursor properly.
-          Cursor := RotateCursor[GetCursorDirection(X, Y, 15, FDragState)];
+          Cursor := RotateCursor[GeTGRCursorDirection(X, Y, 15, FDragState)];
 
           // Calculate the angle opened by the old position, the new position and the pivot point.
           with FTransformation do
@@ -2093,7 +2333,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+procedure TGRRubberBandLayer.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 
 begin
   FIsDragging := False;
@@ -2103,7 +2343,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.ChangeNotification(ALayer: TCustomLayerEx);
+procedure TGRRubberBandLayer.ChangeNotification(ALayer: TGRCustomLayer);
 var
   SomethingChanged: Boolean;
 
@@ -2147,7 +2387,7 @@ begin
   end;
 end;
 
-procedure TExtRubberBandLayer.Notification(ALayer: TCustomLayer);
+procedure TGRRubberBandLayer.Notification(ALayer: TCustomLayer);
 begin
   inherited;
 
@@ -2170,10 +2410,10 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.Paint(Buffer: TBitmap32);
+procedure TGRRubberBandLayer.Paint(Buffer: TBitmap32);
 
 var
-  Contour: TContour;
+  Contour: TGRContour;
 
   //--------------- local functions -------------------------------------------
 
@@ -2286,7 +2526,7 @@ begin
   if AlphaComponent(FOuterColor) > 0 then
     FillOuter(Buffer, Rect(0, 0, Buffer.Width, Buffer.Height), Contour);
 
-  if rboShowFrame in FOptions then
+  if rboShowFrame in Options then
   begin
     Buffer.SetStipple([clWhite32, clWhite32, clBlack32, clBlack32]);
     Buffer.StippleCounter := 0;
@@ -2294,7 +2534,7 @@ begin
     DrawContour;
   end;
 
-  if rboShowHandles in FOptions then
+  if rboShowHandles in Options then
   begin
     DrawHandle(0, 0);
     DrawHandle(FSize.cx, 0);
@@ -2302,7 +2542,7 @@ begin
     DrawHandle(0, FSize.cy);
   end;
 
-  if rboShowHandles in FOptions then
+  if rboShowHandles in Options then
   begin
     Cx := FSize.cx / 2;
     Cy := FSize.cy / 2;
@@ -2312,13 +2552,13 @@ begin
     DrawHandle(Cx, FSize.cy);
     DrawHandle(0, Cy);
   end;
-  if rboAllowPivotMove in FOptions then
+  if rboAllowPivotMove in Options then
     DrawPivot(FPivotPoint.X, FPivotPoint.Y);
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-function TExtRubberBandLayer.SnapPosition: Boolean;
+function TGRRubberBandLayer.SnapPosition: Boolean;
 
 // This method is called if there is a grid layer assigned to the rubber band layer and transformations took place
 // which require alignment to the grid.
@@ -2329,7 +2569,6 @@ var
   Transformation: TAffineTransformation;
 
   //--------------- local function --------------------------------------------
-
   function TrySnap(const Point: TFloatPoint): Boolean;
 
   var
@@ -2394,7 +2633,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.UpdateChildLayer;
+procedure TGRRubberBandLayer.UpdateChildLayer;
 var
   SomethingChanged: Boolean;
 
@@ -2440,7 +2679,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtRubberBandLayer.Cancel;
+procedure TGRRubberBandLayer.Cancel;
 
 begin
   if FIsDragging then
@@ -2460,11 +2699,11 @@ begin
   end;
 end;
 
-//----------------- TPropertyLayer -------------------------------------------------------------------------------------
-procedure TPropertyLayer.Assign(Source: TPersistent);
+//----------------- TGRPropertyLayer -------------------------------------------------------------------------------------
+procedure TGRPropertyLayer.Assign(Source: TPersistent);
 begin
-  if Source is TPropertyLayer then
-    with Source as TPropertyLayer do
+  if Source is TGRPropertyLayer then
+    with Source as TGRPropertyLayer do
     begin
       Changing;
       Self.FName := FName;
@@ -2475,7 +2714,7 @@ begin
   inherited Assign(Source);
 end;
 
-procedure TPropertyLayer.SetDrawMode(const Value: TLayerDrawMode);
+procedure TGRPropertyLayer.SetDrawMode(const Value: TGRLayerDrawMode);
 
 begin
   if FDrawMode <> Value then
@@ -2486,22 +2725,9 @@ begin
   end;
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
+//----------------- TGRTextLayer -----------------------------------------------------------------------------------------
 
-procedure TPropertyLayer.SetName(const Value: WideString);
-
-begin
-  if FName <> Value then
-  begin
-    Changing;
-    FName := Value;
-    Changed;
-  end;
-end;
-
-//----------------- TTextLayer -----------------------------------------------------------------------------------------
-
-constructor TTextLayer.Create(ALayerCollection: TLayerCollection);
+constructor TGRTextLayer.Create(ALayerCollection: TLayerCollection);
 
 begin
   inherited;
@@ -2509,10 +2735,10 @@ begin
   FTextColor := clBlack32;
 end;
 
-procedure TTextLayer.Assign(Source: TPersistent);
+procedure TGRTextLayer.Assign(Source: TPersistent);
 begin
-  if Source is TTextLayer then
-    with Source as TTextLayer do
+  if Source is TGRTextLayer then
+    with Source as TGRTextLayer do
     begin
       Changing;
       Self.FText := FText;
@@ -2524,7 +2750,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TTextLayer.SetText(const Value: WideString);
+procedure TGRTextLayer.SetText(const Value: WideString);
 
 begin
   if FText <> Value then
@@ -2537,7 +2763,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TTextLayer.SetTextColor(const Value: TColor32);
+procedure TGRTextLayer.SetTextColor(const Value: TColor32);
 
 begin
   if FTextColor <> Value then
@@ -2548,9 +2774,9 @@ begin
   end;
 end;
 
-//----------------- TExtBitmapLayer ------------------------------------------------------------------------------------
+//----------------- TGRBitmapLayer ------------------------------------------------------------------------------------
 
-constructor TExtBitmapLayer.Create(ALayerCollection: TLayerCollection);
+constructor TGRBitmapLayer.Create(ALayerCollection: TLayerCollection);
 
 begin
   inherited;
@@ -2562,7 +2788,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-destructor TExtBitmapLayer.Destroy;
+destructor TGRBitmapLayer.Destroy;
 
 begin
   FBitmap.Free;
@@ -2570,10 +2796,10 @@ begin
   inherited;
 end;
 
-procedure TExtBitmapLayer.Assign(Source: TPersistent);
+procedure TGRBitmapLayer.Assign(Source: TPersistent);
 begin
-  if Source is TExtBitmapLayer then
-    with Source as TExtBitmapLayer do
+  if Source is TGRBitmapLayer then
+    with Source as TGRBitmapLayer do
     begin
       Changing;
       Self.FBitmap.Assign(FBitmap);
@@ -2584,7 +2810,7 @@ begin
 end;
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtBitmapLayer.BitmapChanged(Sender: TObject);
+procedure TGRBitmapLayer.BitmapChanged(Sender: TObject);
 
 begin
   Changing;
@@ -2594,7 +2820,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtBitmapLayer.SetBitmap(Value: TBitmap32);
+procedure TGRBitmapLayer.SetBitmap(Value: TBitmap32);
 
 begin
   Changing;
@@ -2604,7 +2830,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtBitmapLayer.SetCropped(Value: Boolean);
+procedure TGRBitmapLayer.SetCropped(Value: Boolean);
 
 begin
   if Value <> FCropped then
@@ -2617,7 +2843,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-function TExtBitmapLayer.DoHitTest(X, Y: Integer): Boolean;
+function TGRBitmapLayer.DoHitTest(X, Y: Integer): Boolean;
 
 var
   B: TPoint;
@@ -2631,20 +2857,31 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-function TExtBitmapLayer.GetNativeSize: TSize;
-
+function TGRBitmapLayer.GetNativeSize: TSize;
 begin
+  {$IFDEF Designtime_Supports}
+  if FBitmap.Empty then
+  begin
+    Result := inherited GetNativeSize;
+    exit;
+  end;
+  {$ENDIF}
   Result.cx := FBitmap.Width;
   Result.cy := FBitmap.Height;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtBitmapLayer.Paint(Buffer: TBitmap32);
-
+procedure TGRBitmapLayer.Paint(Buffer: TBitmap32);
 begin 
+  {$IFDEF Designtime_Supports}
+  if FBitmap.Empty then
+  begin
+    inherited Paint(Buffer);
+    exit;
+  end;
+  {$ENDIF}
   UpdateTransformation;
-
   // TODO: cropping
   if not TAffineTransformationAccess(FTransformation).TransformValid then
     TAffineTransformationAccess(FTransformation).PrepareTransform;
@@ -2653,13 +2890,10 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TExtBitmapLayer.PaintTo(Buffer: TBitmap32; const R: TRect);
-
+procedure TGRBitmapLayer.PaintTo(Buffer: TBitmap32; const R: TRect);
 // Paints the bitmap to the given buffer using the position and size/location given in R.
-
 var
   Transformation: TAffineTransformation;
-
 begin
   Transformation := nil;
   try
@@ -2676,4 +2910,237 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
+{ TGRLayerContainer }
+
+constructor TGRLayerContainer.Create(aLayerCollection: TLayerCollection);
+begin
+  inherited;
+  FBuffer := TBitmap32.Create;
+  FBufferOversize := 40;
+  FForceFullRepaint := True;
+  FInvalidRects := TRectList.Create;
+  FRepaintOptimizer := DefaultRepaintOptimizerClass.Create(Buffer, InvalidRects);
+  Height := 192;
+  Width := 192;
+
+
+  FLayers := TGRLayerCollection.Create(Self);
+  with FLayers do
+  begin
+{$IFDEF DEPRECATEDMODE}
+    CoordXForm := @CachedXForm;
+{$ENDIF}
+    OnChange := LayerCollectionChangeHandler;
+    OnGDIUpdate := LayerCollectionGDIUpdateHandler;
+    OnGetViewportScale := LayerCollectionGetViewportScaleHandler;
+    OnGetViewportShift := LayerCollectionGetViewportShiftHandler;
+  end;
+
+  FRepaintOptimizer.RegisterLayerCollection(FLayers);
+  RepaintMode := rmFull;
+end;
+
+destructor TGRLayerContainer.Destroy;
+begin
+  FRepaintOptimizer.Free;
+  FInvalidRects.Free;
+  FBuffer.Free;
+  inherited;
+end;
+
+procedure TGRLayerContainer.LayerCollectionChangeHandler(Sender: TObject);
+begin
+  Changed;
+end;
+
+procedure TGRLayerContainer.LayerCollectionGDIUpdateHandler(Sender: TObject);
+begin
+  Changed;
+end;
+
+procedure TGRLayerContainer.LayerCollectionGetViewportScaleHandler(Sender: TObject; var ScaleX, ScaleY: Single);
+begin
+  UpdateCache;
+  ScaleX := CachedXForm.ScaleX / FixedOne;
+  ScaleY := CachedXForm.ScaleY / FixedOne;
+end;
+
+procedure TGRLayerContainer.LayerCollectionGetViewportShiftHandler(Sender: TObject; var ShiftX, ShiftY: Single);
+begin
+  UpdateCache;
+  ShiftX := CachedXForm.ShiftX;
+  ShiftY := CachedXForm.ShiftY;
+end;
+
+procedure TGRLayerContainer.UpdateCache;
+begin
+  if CacheValid then Exit;
+  CachedBitmapRect := GetBitmapRect;
+  CachedXForm := UnitXForm;
+  CacheValid := True;
+end;
+
+function TGRLayerContainer.InvalidRectsAvailable: Boolean;
+begin
+  // avoid calling inherited, we have a totally different behaviour here...
+  DoPrepareInvalidRects;
+  Result := FInvalidRects.Count > 0;
+end;
+
+procedure TGRLayerContainer.InvalidateCache;
+begin
+  if FRepaintOptimizer.Enabled then FRepaintOptimizer.Reset;
+  CacheValid := False;
+end;
+
+procedure TGRLayerContainer.Invalidate;
+begin
+  BufferValid := False;
+  CacheValid := False;
+end;
+
+procedure TGRLayerContainer.DoPrepareInvalidRects;
+begin
+  if FRepaintOptimizer.Enabled and not FForceFullRepaint then
+    FRepaintOptimizer.PerformOptimization;
+end;
+
+function TGRLayerContainer.GetBitmapRect: TRect;
+begin
+    with Result do
+    begin
+      Left := 0;
+      Right := 0;
+      Top := 0;
+      Bottom := 0;
+    end
+end;
+
+procedure TGRLayerContainer.Paint(aBuffer: TBitmap32);
+var
+  I: Integer;
+  vRect: TRect;
+begin
+  if FRepaintOptimizer.Enabled then
+  begin
+{$IFDEF CLX}
+    if CustomRepaint then DoPrepareInvalidRects;
+{$ENDIF}
+    FRepaintOptimizer.BeginPaint;
+  end;
+
+  if not FBufferValid then
+  begin
+{$IFDEF CLX}
+    TBitmap32Access(FBuffer).ImageNeeded;
+{$ENDIF}
+    DoPaintBuffer;
+{$IFDEF CLX}
+    TBitmap32Access(FBuffer).CheckPixmap;
+{$ENDIF}
+  end;
+
+  FBuffer.Lock;
+  try
+    if FInvalidRects.Count > 0 then
+      for i := 0 to FInvalidRects.Count - 1 do
+      begin
+        vRect := FInvalidRects[i]^;
+        with vRect do
+          BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
+      end
+    else begin
+      vRect := GetViewportRect;
+      with vRect do
+        BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
+    end;
+  finally
+    FBuffer.Unlock;
+  end;
+
+  
+  if FRepaintOptimizer.Enabled then
+    FRepaintOptimizer.EndPaint;
+  ResetInvalidRects;
+  FForceFullRepaint := False;
+end;
+
+function TGRLayerContainer.CustomRepaint: Boolean;
+begin
+  Result := FRepaintOptimizer.Enabled and not FForceFullRepaint and
+    FRepaintOptimizer.UpdatesAvailable;
+end;
+
+procedure TGRLayerContainer.DoPaintBuffer;
+var
+  I, J: Integer;
+begin
+  if FRepaintOptimizer.Enabled then
+    FRepaintOptimizer.BeginPaintBuffer;
+
+  UpdateCache;
+
+
+  Buffer.BeginUpdate;
+  if FInvalidRects.Count = 0 then
+  begin
+    Buffer.ClipRect := GetViewportRect;
+
+    for I := 0 to FLayers.Count - 1 do
+      if (FLayers.Items[I].LayerOptions and LOB_VISIBLE) <> 0 then
+        TLayerAccess(FLayers.Items[I]).DoPaint(Buffer);
+  end
+  else
+  begin
+    for J := 0 to FInvalidRects.Count - 1 do
+    begin
+      Buffer.ClipRect := FInvalidRects[J]^;
+      for I := 0 to FLayers.Count - 1 do
+        if (FLayers.Items[I].LayerOptions and LOB_VISIBLE) <> 0 then
+          TLayerAccess(FLayers.Items[I]).DoPaint(Buffer);
+    end;
+
+    Buffer.ClipRect := GetViewportRect;
+  end;
+  Buffer.EndUpdate;
+
+  if FRepaintOptimizer.Enabled then
+    FRepaintOptimizer.EndPaintBuffer;
+
+  // avoid calling inherited, we have a totally different behaviour here...
+  FBufferValid := True;
+end;
+
+function TGRLayerContainer.GetViewportRect: TRect;
+begin
+  // returns position of the buffered area within the control bounds
+  with Result do
+  begin
+    // by default, the whole control is buffered
+    Left := 0;
+    Top := 0;
+    Right := Width;
+    Bottom := Height;
+  end;
+end;
+
+procedure TGRLayerContainer.SetRepaintMode(const Value: TRepaintMode);
+begin
+  if Assigned(FRepaintOptimizer) then
+  begin
+    FRepaintOptimizer.Enabled := Value = rmOptimizer;
+
+    FRepaintMode := Value;
+    Invalidate;
+  end;
+end;
+
+procedure TGRLayerContainer.ResetInvalidRects;
+begin
+  FInvalidRects.Clear;
+end;
+
+initialization
+finalization
+  FreeAndNil(FLayerClasses);
 end.
