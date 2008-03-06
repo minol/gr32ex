@@ -135,7 +135,7 @@ uses
   ;
 
 type
-  TExtRubberBandOptions = set of (
+  TGRRubberBandOptions = set of (
     rboAllowPivotMove,
     rboAllowCornerResize,
     rboAllowEdgeResize,
@@ -152,7 +152,7 @@ const
 type
   TGRGridLayer = class;
 
-  TGRLayerClass = class of TGRCustomLayer;
+  TGRLayerClass = class of TGRPositionLayer;
   TGRCustomLayer = class(TCustomLayer)
   private
     function GetCaptured: Boolean;
@@ -172,7 +172,7 @@ type
     constructor Create(aLayerCollection: TLayerCollection); override;
     destructor Destroy; override;
     {$IFDEF Designtime_Supports}
-    class function RubberbandOptions: TExtRubberBandOptions; virtual;
+    class function RubberbandOptions: TGRRubberBandOptions; virtual;
     {$ENDIF}
 
   public
@@ -195,7 +195,7 @@ type
     procedure SetScaled(const Value: Boolean);
     {$IFDEF Designtime_Supports}
     procedure SeTGRGridLayer(const Value: TGRGridLayer);
-    class function RubberbandOptions: TExtRubberBandOptions; override;
+    class function RubberbandOptions: TGRRubberBandOptions; override;
     {$ENDIF}
 
   protected
@@ -234,7 +234,7 @@ type
     procedure SetSize(const Value: TSize);
   protected
     {$IFDEF Designtime_Supports}
-    class function RubberbandOptions: TExtRubberBandOptions; override;
+    class function RubberbandOptions: TGRRubberBandOptions; override;
     procedure Paint(Buffer: TBitmap32); override;
     function DoHitTest(aX, aY: Integer): Boolean; override;
     {$ENDIF}
@@ -329,10 +329,10 @@ type
 
   TGRRubberBandLayer = class(TGRTransformationLayer)
   protected
-    FChildLayer: TGRTransformationLayer;
+    FChildLayer: TGRPositionLayer;
     //FSize: TSize;                      // Real (untransformed) size of the child layer (if there is one).
                                        // Otherwise the current (unscaled) size of the rubber band.
-    FOptions: TExtRubberBandOptions;
+    FOptions: TGRRubberBandOptions;
     FHandleSize: Integer;
     FHandleFrame: TColor;
     FHandleFill: TColor;
@@ -350,18 +350,18 @@ type
     FOldAngle: Single;
     FDragPos: TPoint;
 
-    procedure SetChildLayer(const Value: TGRTransformationLayer);
+    procedure SetChildLayer(const Value: TGRPositionLayer);
     procedure SetHandleFill(const Value: TColor);
     procedure SetHandleFrame(const Value: TColor);
     procedure SetHandleSize(Value: Integer);
-    procedure SetOptions(const Value: TExtRubberBandOptions);
+    procedure SetOptions(const Value: TGRRubberBandOptions);
     procedure SetOuterColor(const Value: TColor32);
     //procedure SetSize(const Value: TSize);
-    function GetOptions: TExtRubberBandOptions;
+    function GetOptions: TGRRubberBandOptions;
   protected
     function DoHitTest(X, Y: Integer): Boolean; override;
     procedure FillOuter(Buffer: TBitmap32; OuterRect: TRect; Contour: TGRContour);
-    function GeTGRCursorDirection(X, Y: Integer; AxisTolerance: Integer; State: TRubberbandDragState): TGRCursorDirection;
+    function GetCursorDirection(X, Y: Integer; AxisTolerance: Integer; State: TRubberbandDragState): TGRCursorDirection;
     function GetHitCode(X, Y: Integer; Shift: TShiftState): TRubberbandDragState;
     //function GetNativeSize: TSize; override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
@@ -379,13 +379,13 @@ type
 
     procedure Cancel;
 
-    property ChildLayer: TGRTransformationLayer read FChildLayer write SetChildLayer;
+    property ChildLayer: TGRPositionLayer read FChildLayer write SetChildLayer;
     property DragState: TRubberbandDragState read FDragState;
     property HandleSize: Integer read FHandleSize write SetHandleSize default 3;
     property HandleFill: TColor read FHandleFill write SetHandleFill default clWhite;
     property HandleFrame: TColor read FHandleFrame write SetHandleFrame default clBlack;
     property IsDragging: Boolean read FIsDragging;
-    property Options: TExtRubberBandOptions read GetOptions write SetOptions default DefaultRubberbandOptions;
+    property Options: TGRRubberBandOptions read GetOptions write SetOptions default DefaultRubberbandOptions;
     property OuterColor: TColor32 read FOuterColor write SetOuterColor;
     //property Size: TSize read FSize write SetSize;
     property Threshold: Integer read FThreshold write FThreshold default 8;
@@ -731,7 +731,7 @@ begin
 end;
 
 {$IFDEF Designtime_Supports}
-class function TGRCustomLayer.RubberbandOptions: TExtRubberBandOptions;
+class function TGRCustomLayer.RubberbandOptions: TGRRubberBandOptions;
 begin
   Result := [rboShowFrame];
 end;
@@ -846,7 +846,7 @@ begin
   end;
 end;
 
-class function TGRPositionLayer.RubberbandOptions: TExtRubberBandOptions;
+class function TGRPositionLayer.RubberbandOptions: TGRRubberBandOptions;
 begin
   Result := [rboAllowMove, rboShowFrame];
 end;
@@ -875,7 +875,7 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 { TGRTransformationLayer }
-class function TGRTransformationLayer.RubberbandOptions: TExtRubberBandOptions;
+class function TGRTransformationLayer.RubberbandOptions: TGRRubberBandOptions;
 begin
   Result := [rboAllowCornerResize,
     rboAllowEdgeResize,
@@ -1570,7 +1570,7 @@ begin
   inherited;
 end;
 
-function TGRRubberBandLayer.GetOptions: TExtRubberBandOptions;
+function TGRRubberBandLayer.GetOptions: TGRRubberBandOptions;
 begin
   Result := FOptions;
   if Assigned(FChildLayer) then
@@ -1579,7 +1579,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGRRubberBandLayer.SetChildLayer(const Value: TGRTransformationLayer);
+procedure TGRRubberBandLayer.SetChildLayer(const Value: TGRPositionLayer);
 
 begin
   if Assigned(FChildLayer) then
@@ -1593,12 +1593,16 @@ begin
   begin
     //Changing;
     FSize := Value.GetNativeSize;
-    FAngle := Value.Angle;
-    FPosition := Value.Position;
-    FPivotPoint := Value.PivotPoint;
     FScaled := Value.FScaled;
-    FScaling := Value.Scaling;
-    FSkew := Value.Skew;
+    FPosition := Value.Position;
+    if Value is TGRTransformationLayer then
+    with TGRTransformationLayer(Value) do
+    begin
+      Self.FAngle := Angle;
+      Self.FPivotPoint := PivotPoint;
+      Self.FScaling := Scaling;
+      Self.FSkew := Skew;
+    end;
 
     FChildLayer.AddNotification(Self);
     FChildLayer.AddChangeNotification(Self);
@@ -1665,7 +1669,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGRRubberBandLayer.SetOptions(const Value: TExtRubberBandOptions);
+procedure TGRRubberBandLayer.SetOptions(const Value: TGRRubberBandOptions);
 
 begin
   if FOptions <> Value then
@@ -1758,7 +1762,7 @@ end;
            
 //----------------------------------------------------------------------------------------------------------------------
 
-function TGRRubberBandLayer.GeTGRCursorDirection(X, Y: Integer; AxisTolerance: Integer;
+function TGRRubberBandLayer.GetCursorDirection(X, Y: Integer; AxisTolerance: Integer;
   State: TRubberbandDragState): TGRCursorDirection;
 
 // Returns, depending on X and Y as well as the current transformation, the direction either relative to
@@ -2112,15 +2116,15 @@ begin
       rdsNone:
         Cursor := crDefault;
       rdsRotate:
-        Cursor := RotateCursor[GeTGRCursorDirection(X, Y, 15, FDragState)];
+        Cursor := RotateCursor[GetCursorDirection(X, Y, 15, FDragState)];
       rdsMoveLayer:
         Cursor := crGrArrow;
       rdsMovePivot:
         Cursor := crGrMoveCenter;
       rdsSheerN..rdsSheerW:
-        Cursor := SheerCursor[GeTGRCursorDirection(X, Y, 15, FDragState)];
+        Cursor := SheerCursor[GetCursorDirection(X, Y, 15, FDragState)];
     else
-      Cursor := MoveCursor[GeTGRCursorDirection(X, Y, 15, FDragState)];
+      Cursor := MoveCursor[GetCursorDirection(X, Y, 15, FDragState)];
     end;
   end
   else
@@ -2245,7 +2249,7 @@ begin
       rdsRotate:
         begin
           // Update cursor properly.
-          Cursor := RotateCursor[GeTGRCursorDirection(X, Y, 15, FDragState)];
+          Cursor := RotateCursor[GetCursorDirection(X, Y, 15, FDragState)];
 
           // Calculate the angle opened by the old position, the new position and the pivot point.
           with FTransformation do
@@ -2366,16 +2370,21 @@ begin
 
     SomethingChanged := False;
 
-    if FChildLayer.Angle <> Angle then
-    begin
-      Angle := FChildLayer.Angle;
-      SomethingChanged := True;
-    end;
-
-    if Different(FChildLayer.Skew, Skew) then Skew := FChildLayer.Skew;
     if Different(FChildLayer.Position, Position) then Position := FChildLayer.Position;
-    if Different(FChildLayer.Scaling, Scaling) then Scaling := FChildLayer.Scaling;
-    if Different(FChildLayer.PivotPoint, PivotPoint) then PivotPoint := FChildLayer.PivotPoint;
+
+    if FChildLayer is TGRTransformationLayer then
+    with TGRTransformationLayer(FChildLayer) do
+    begin
+      if Angle <> Self.Angle then
+      begin
+        Angle := Self.Angle;
+        SomethingChanged := True;
+      end;
+  
+      if Different(Skew, Self.Skew) then Self.Skew := Skew;
+      if Different(Scaling, Self.Scaling) then Self.Scaling := Scaling;
+      if Different(PivotPoint, Self.PivotPoint) then Self.PivotPoint := PivotPoint;
+    end;
 
     EndUpdate;
 
@@ -2656,16 +2665,21 @@ begin
 
     SomethingChanged := False;
 
-    if FChildLayer.Angle <> Angle then
-    begin
-      FChildLayer.Angle := Angle;
-      SomethingChanged := True;
-    end;
-
-    if Different(FChildLayer.Skew, Skew) then FChildLayer.Skew := Skew;
     if Different(FChildLayer.Position, Position) then FChildLayer.Position := Position;
-    if Different(FChildLayer.Scaling, Scaling) then FChildLayer.Scaling := Scaling;
-    if Different(FChildLayer.PivotPoint, PivotPoint) then FChildLayer.PivotPoint := PivotPoint;
+
+    if FChildLayer is TGRTransformationLayer then
+    with TGRTransformationLayer(FChildLayer) do
+    begin
+      if Angle <> Self.Angle then
+      begin
+        Angle := Self.Angle;
+        SomethingChanged := True;
+      end;
+  
+      if Different(Skew, Self.Skew) then Skew := Self.Skew;
+      if Different(Scaling, Self.Scaling) then Scaling := Self.Scaling;
+      if Different(PivotPoint, Self.PivotPoint) then PivotPoint := Self.PivotPoint;
+    end;
 
     FChildLayer.EndUpdate;
 
