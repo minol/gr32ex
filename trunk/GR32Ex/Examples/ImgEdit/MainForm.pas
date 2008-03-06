@@ -183,7 +183,7 @@ var
 implementation
 
 uses
-  TntSystem, TntForms, GR_LayerEditors;
+  TntSystem, TntForms, GR_LayerEditors, GR_LayerInspector;
 
 {$R *.dfm}
 
@@ -367,6 +367,16 @@ begin
   FImageEditor.Parent := tbsDesign;
   FImageEditor.Align := alClient;
   TLayerCollectionAccess(FImageEditor.Layers).OnListNotify := NotifyList;
+  with GLayerInspector do
+  begin
+    Parent := pnlOptions;
+    BorderStyle := bsNone;
+    Left:=0;
+    Top:=0;
+    Align := alClient;
+    Editor := FImageEditor;
+    Visible := True;
+  end;
 
   with GLayerClasses.LockList do
   try
