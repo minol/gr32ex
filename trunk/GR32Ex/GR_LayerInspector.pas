@@ -65,6 +65,16 @@ type
     property Editor: TImage32Editor read FEditor write SetEditor;
   end;
 
+  TJvInspectorFloatPointItem = class(TJvInspectorCustomCompoundItem)
+  private
+    FX: TJvInspectorFloatItem;
+    FY: TJvInspectorFloatItem;
+  protected
+  public
+    constructor Create(const AParent: TJvCustomInspectorItem;
+      const AData: TJvCustomInspectorData); override;
+  end;
+
 function GLayerInspector: TGRLayerInspector;
 
 implementation
@@ -237,8 +247,25 @@ begin
   end;
 end;
 
+{ TJvInspectorFloatPointItem }
+constructor TJvInspectorFloatPointItem.Create(const AParent: TJvCustomInspectorItem;
+  const AData: TJvCustomInspectorData);
+begin
+  inherited Create(AParent, AData);
+  SingleNameUseFirstCol := True;
+  FX := TJvInspectorFloatItem.Create(Self, AData);
+  FY := TJvInspectorFloatItem.Create(Self, AData);
+  AddColumnPrim(FX);
+  AddColumnPrim(FY);
+end;
+
 initialization
   FLayerInspector := nil;
+
+  with TJvCustomInspectorData.ItemRegister do
+  begin
+    Add(TJvInspectorTypeKindRegItem.Create(TJvInspectorFloatPointItem, TypeInfo(TFloatPoint)));
+  end;
 
   TJvInspectorAlignItem.RegisterAsDefaultItem;
   TJvInspectorAnchorsItem.RegisterAsDefaultItem;

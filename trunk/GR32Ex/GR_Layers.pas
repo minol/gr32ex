@@ -19,6 +19,8 @@
  * All Rights Reserved.
  *
  * Contributor(s):
+ *   Based on the newsgroup post (March 18, 2002,  news://news.g32.org/g32org.public.graphics32)
+ *   <public@lischke-online.de ; <news:a755io$6t1$1@webserver9.elitedev.com>...
  *
  * ***** END LICENSE BLOCK ***** *)
 unit GR_Layers;
@@ -36,11 +38,110 @@ uses
   , GR32_Layers
   , GR32_RepaintOpt
   , GR32_Image
-  , GR32_ExtLayers
+  //, GR32_ExtLayers
   , GR_Animation
   ;
 
 type
+  TGRRubberBandOptions = set of (
+    rboAllowPivotMove,
+    rboAllowCornerResize,
+    rboAllowEdgeResize,
+    rboAllowMove,
+    rboAllowRotation,
+    rboShowFrame,
+    rboShowHandles
+  );
+
+const
+  cDefaultRubberbandOptions = [rboAllowCornerResize, rboAllowEdgeResize, rboAllowMove,
+    rboShowFrame, rboShowHandles];
+
+type
+  TGRGridLayer = class;
+  TGRLayerClass = class of TGRCustomLayer;
+
+  TGRCustomLayer = class(TPositionedLayer)
+  protected
+    {$IFDEF Designtime_Supports}
+    FGridLayer: TGRGridLayer;                      // Used to snap/align coordinates.
+    {$ENDIF}
+    FName: string;
+    FOnChange: TNotifyEvent;                     // For individual change events.
+    FChangeNotificationList: TList;
+
+    procedure AddChangeNotification(ALayer: TGRCustomLayer);
+    procedure RemoveChangeNotification(ALayer: TGRCustomLayer);
+    function GetCaptured: Boolean;
+    procedure SetCaptured(const Value: Boolean);
+    procedure SetName(const Value: string);
+
+    procedure ChangeNotification(ALayer: TGRCustomLayer); virtual;
+    procedure DoChange; virtual;
+    procedure Notification(ALayer: TCustomLayer); override;
+
+
+    {$IFDEF Designtime_Supports}
+    procedure SetGridLayer(const Value: TGRGridLayer);
+    class function RubberbandOptions: TGRRubberBandOptions; override;
+    procedure Paint(Buffer: TBitmap32); override;
+    {$ENDIF}
+
+  public
+    {$IFDEF Designtime_Supports}
+    class function RubberbandOptions: TGRRubberBandOptions; virtual;
+    {$ENDIF}
+    constructor Create(aLayerCollection: TLayerCollection); override;
+    destructor Destroy; override;
+    procedure Assign(Source: TPersistent);override;
+
+  public
+    {$IFDEF Designtime_Supports}
+    property GridLayer: TGRGridLayer read FGridLayer write SetGridLayer;
+    {$ENDIF}
+    property Captured: Boolean read GetCaptured write SetCaptured;
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
+  public
+    property Name: string read FName write SetName;
+  end; //}
+
+  TGRTransformationLayer = class(TGRCustomLayer)
+  protected
+    FAngle: Single;                              // Given in degrees.
+    FTransformation: TAffineTransformation;
+    FSkew: TFloatPoint;
+    FScaling: TFloatPoint;
+    FPivotPoint: TFloatPoint;                    // Center of rotation and proportional scaling.
+
+    procedure SetAngle(Value: Single);
+    procedure SetPivot(const Value: TFloatPoint);
+    procedure SetScaling(const Value: TFloatPoint);
+    procedure SetSkew(const Value: TFloatPoint);
+  protected
+    {$IFDEF Designtime_Supports}
+    class function RubberbandOptions: TGRRubberBandOptions; override;
+    procedure Paint(Buffer: TBitmap32); override;
+    function DoHitTest(aX, aY: Integer): Boolean; override;
+    {$ENDIF}
+    function GetAdjustedRect(const R: TFloatRect): TFloatRect; override;
+  public
+    constructor Create(ALayerCollection: TLayerCollection); override;
+    destructor Destroy; override;
+    procedure Assign(Source: TPersistent);override;
+
+    // Creates Transformation if it does not exist yet and applies the current layer transformations.
+    // This does not include viewport scaling.
+    // The caller is responsible for freeing Transformation!
+    procedure GetLayerTransformation(var aTransformation: TAffineTransformation);
+    procedure ResetTransformation;
+    procedure UpdateTransformation; virtual;
+
+    property Angle: Single read FAngle write SetAngle;
+    property PivotPoint: TFloatPoint read FPivotPoint write SetPivot;
+    property Scaling: TFloatPoint read FScaling write SetScaling;
+    property Skew: TFloatPoint read FSkew write SetSkew;
+  end;
+
   TGRLayer = class(TGRBitmapLayer)
   protected
     FWidth: Integer;
@@ -116,6 +217,14 @@ type
   end;
 
 
+procedure RegisterLayer(const aLayerClass: TGRLayerClass);
+function GetLayerClass(const aClassName: string): TGRLayerClass;
+function GLayerClasses: TThreadList;
+//----------------------------------------------------------------------------------------------------------------------
+function ComponentToStr(const Component: TComponent): string;
+procedure SaveStrToFile(const aFileName, s: string);
+procedure ComponentToTextFile(const Component: TComponent; const aFileName: string);
+
 implementation
 
 uses
@@ -135,14 +244,408 @@ const
 type
   TBitmap32Access = class(TBitmap32);
   TLayerAccess = class(TCustomLayer);
+  TAffineTransformationAccess = class(TAffineTransformation);
 
-{ TGRLayer }
+var
+  FLayerClasses: TThreadList;
 
-constructor TGRLayer.Create(
-  ALayerCollection: TLayerCollection);
+function GetLayerClass(const aClassName: string): TGRLayerClass;
+var
+  I: integer;
+begin
+  with GLayerClasses.LockList do
+  try
+    for I := 0 to Count - 1 do
+    begin
+      Result := TGRLayerClass(Items[I]);
+      if Result.ClassName = aClassName then exit;
+    end;
+    Result := nil;
+  finally
+    FLayerClasses.UnlockList;
+  end;
+end;
+
+procedure RegisterLayer(const aLayerClass: TGRLayerClass);
+begin
+  with GLayerClasses.LockList do
+  try
+    if IndexOf(aLayerClass) < 0 then
+      Add(aLayerClass);
+  finally
+    FLayerClasses.UnlockList;
+  end;
+end;
+
+function GLayerClasses: TThreadList;
+begin
+  if not Assigned(FLayerClasses) then
+  begin
+    FLayerClasses := TThreadList.Create;
+  end;
+  Result := FLayerClasses;
+end;
+
+procedure ComponentToTextFile(const Component: TComponent; const aFileName: string);
+var
+  vBinStream:TMemoryStream;
+  vFileStream: TFileStream;
+  s: string;
+begin
+  vBinStream := TMemoryStream.Create;
+  try
+    vFileStream := TFileStream.Create(aFileName, fmCreate or fmShareDenyWrite);
+    try
+      vBinStream.WriteComponent(Component);
+      vBinStream.Seek(0, soFromBeginning);
+      ObjectBinaryToText(vBinStream, vFileStream);
+    finally
+      vFileStream.Free;
+    end;
+  finally
+    vBinStream.Free
+  end;
+end;
+
+function ComponentToStr(const Component: TComponent): string;
+var
+  vBinStream:TMemoryStream;
+  vStrStream: TStringStream;
+  s: string;
+begin
+  vBinStream := TMemoryStream.Create;
+  try
+    vStrStream := TStringStream.Create(s);
+    try
+      vBinStream.WriteComponent(Component);
+      vBinStream.Seek(0, soFromBeginning);
+      //try
+      ObjectBinaryToText(vBinStream, vStrStream);
+      //except
+      //  on E:Exception do
+      //end;
+      vStrStream.Seek(0, soFromBeginning);
+      Result:= vStrStream.DataString;
+    finally
+      vStrStream.Free;
+    end;
+  finally
+    vBinStream.Free
+  end;
+end;
+
+procedure SaveStrToFile(const aFileName, s: string);
+begin
+  with TStringList.Create do
+  try
+    Text := s;
+    SaveToFile(aFileName);
+  finally
+    Free;
+  end;
+end;
+
+{ TGRCustomLayer }
+constructor TGRCustomLayer.Create(aLayerCollection: TLayerCollection);
 begin
   inherited;
   LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE; 
+end;
+
+destructor TGRCustomLayer.Destroy;
+begin
+  if Assigned(FChangeNotificationList) then 
+  begin
+    FChangeNotificationList.Free;
+    FChangeNotificationList := nil;
+  end;
+
+  {$IFDEF Designtime_Supports}
+  if Assigned(FGridLayer) then
+    FGridLayer.RemoveNotification(Self);
+  {$ENDIF}
+  inherited;
+end;
+
+procedure TGRCustomLayer.Assign(Source: TPersistent);
+begin
+  if Source is TGRCustomLayer then
+    with Source as TGRCustomLayer do
+    begin
+      Changing;
+  {$IFDEF Designtime_Supports}
+      Self.GridLayer := GridLayer;
+  {$ENDIF}
+      Self.FCursor := FCursor;
+      Self.FLocation := FLocation;
+      Self.FScaled := FScaled;
+
+      Changed; // Layer collection.
+      DoChange; // Layer only.
+    end;
+  inherited Assign(Source);
+end;
+
+procedure TGRCustomLayer.AddChangeNotification(ALayer: TGRCustomLayer);
+begin
+  if not Assigned(FChangeNotificationList) then FChangeNotificationList := TList.Create;
+  FChangeNotificationList.Add(ALayer);
+end;
+
+procedure TGRCustomLayer.ChangeNotification(ALayer: TGRCustomLayer); 
+begin
+end;
+
+procedure TGRCustomLayer.DoChange;
+var
+  i: integer;
+begin
+  if Assigned(FChangeNotificationList) then
+  begin
+    for i := FChangeNotificationList.Count - 1 downto 0 do
+    begin
+      if Assigned(FChangeNotificationList[i]) then
+      try
+        TGRTransformationLayer(FChangeNotificationList[i]).ChangeNotification(Self);
+      except
+        FChangeNotificationList.Delete(i);
+      end;
+    end;
+  end;
+  if Assigned(FOnChange) then
+    FOnChange(Self);
+end;
+
+function TGRCustomLayer.GetCaptured: Boolean;
+begin
+  Result := FLayerOptions and LOB_NO_CAPTURE = 0;
+end;
+
+procedure TGRCustomLayer.Notification(ALayer: TCustomLayer);
+begin
+  inherited;
+  
+  {$IFDEF Designtime_Supports}
+  if ALayer = FGridLayer then
+    FGridLayer := nil;
+  {$ENDIF}
+end;
+
+procedure TGRCustomLayer.RemoveChangeNotification(ALayer: TGRCustomLayer);
+begin
+  if Assigned(FChangeNotificationList) then
+  begin
+    FChangeNotificationList.Remove(ALayer);
+    if FChangeNotificationList.Count = 0 then
+    begin
+      FChangeNotificationList.Free;
+      FChangeNotificationList := nil;
+    end;
+  end;
+end;
+
+procedure TGRCustomLayer.SetCaptured(const Value: Boolean);
+begin
+  if Value then
+    LayerOptions := LayerOptions or LOB_NO_CAPTURE
+  else
+  begin
+    LayerOptions := LayerOptions and not LOB_NO_CAPTURE
+  end;
+end;
+
+procedure TGRCustomLayer.SetName(const Value: string);
+begin
+  if Value <> FName then
+  begin
+    Changing;
+    FName := Value;
+    Changed;
+
+    DoChange;
+  end;
+end;
+
+{$IFDEF Designtime_Supports}
+class function TGRCustomLayer.RubberbandOptions: TGRRubberBandOptions;
+begin
+  Result := [rboShowFrame];
+  //Result := [rboAllowMove, rboShowFrame, rboAllowCornerResize, rboAllowEdgeResize];
+end;
+
+procedure TGRCustomLayer.Paint(Buffer: TBitmap32);
+var
+  SrcRect, DstRect, ClipRect, TempRect: TRect;
+  ImageRect: TRect;
+begin
+  DstRect := MakeRect(GetAdjustedLocation);
+  ClipRect := Buffer.ClipRect;
+  IntersectRect(TempRect, ClipRect, DstRect);
+  if IsRectEmpty(TempRect) then Exit;
+  Buffer.RaiseRectTS(DstRect, 80);
+  with DstRect do
+  begin
+    Buffer.LineAS(Left, Top, Right, Bottom, clBlack32);
+    Buffer.LineAS(Right, Top, Left, Bottom, clBlack32);
+  end;
+end;
+
+procedure TGRCustomLayer.SetGridLayer(const Value: TGRGridLayer);
+begin
+  if Value <> FGridLayer then
+  begin
+    if Assigned(FGridLayer) then
+      FGridLayer.RemoveNotification(Self);
+    FGridLayer := Value;
+    if Assigned(FGridLayer) then
+      FGridLayer.AddNotification(Self);
+  end;
+end;
+{$ENDIF Designtime_Supports}
+
+
+{ TGRTransformationLayer }
+class function TGRTransformationLayer.RubberbandOptions: TGRRubberBandOptions;
+begin
+  Result := [rboAllowCornerResize,
+    rboAllowEdgeResize,
+    rboAllowMove,
+    rboShowFrame,
+    rboShowHandles
+  ];
+end;
+
+constructor TGRTransformationLayer.Create(ALayerCollection: TLayerCollection);
+begin
+  inherited;
+  FTransformation := TAffineTransformationAccess.Create;
+
+  FLocation.Right  := 32;
+  FLocation.Bottom := 32;
+
+  ResetTransformation;
+end;
+
+destructor TGRTransformationLayer.Destroy;
+begin
+  FTransformation.Free;
+  inherited;
+end;
+
+procedure TGRTransformationLayer.Assign(Source: TPersistent);
+begin
+  if Source is TGRTransformationLayer then
+    with Source as TGRTransformationLayer do
+    begin
+      Changing;
+      Self.FAngle := FAngle;
+      Self.FPivotPoint := FPivotPoint;
+      Self.FScaling := FScaling;
+      Self.FSkew := FSkew;
+
+      Changed; // Layer collection.
+      DoChange; // Layer only.
+    end;
+  inherited Assign(Source);
+end;
+
+function TGRTransformationLayer.GetAdjustedRect(const R: TFloatRect): TFloatRect;
+begin
+  UpdateTransformation;
+  Result := FloatRect(FTransformation.GetTransformedBounds);
+end;
+
+procedure TGRTransformationLayer.GetLayerTransformation(var aTransformation: TAffineTransformation);
+begin
+  if aTransformation = nil then
+    aTransformation := TAffineTransformationAccess.Create
+  else
+    aTransformation.Clear;
+
+  aTransformation.Translate(-FPivotPoint.X, -FPivotPoint.Y);
+  aTransformation.Scale(FScaling.X, FScaling.Y);
+  aTransformation.Skew(FSkew.X, FSkew.Y);
+  aTransFormation.Rotate(0, 0, FAngle);
+  aTransformation.Translate(FLocation.Left + FPivotPoint.X, FLocation.Top + FPivotPoint.Y);
+end;
+
+procedure TGRTransformationLayer.ResetTransformation;
+begin
+  Changing;
+  FTransformation.Clear;
+  //FSkew := FloatPoint(0, 0);
+  //FLocation := FloatRect(0, 0, 0, 0);
+  //FScaling := FloatPoint(1, 1);
+  //FAngle := 0;
+  Changed;
+
+  DoChange;
+end;
+
+procedure TGRTransformationLayer.UpdateTransformation;
+var
+  ShiftX, ShiftY, ScaleX, ScaleY: Single;
+begin
+  FTransformation.Clear;
+
+  FTransformation.Translate(-FPivotPoint.X, -FPivotPoint.Y);
+  FTransformation.Scale(FScaling.X, FScaling.Y);
+  FTransformation.Skew(FSkew.X, FSkew.Y);
+  FTransFormation.Rotate(0, 0, FAngle);
+  FTransformation.Translate(FLocation.Left + FPivotPoint.X, FLocation.Top + FPivotPoint.Y);
+
+  // Scale to viewport if activated.
+  if FScaled and Assigned(LayerCollection) then
+  begin
+    LayerCollection.GetViewportScale(ScaleX, ScaleY);
+    FTransformation.Scale(ScaleX, ScaleY);
+    LayerCollection.GetViewportShift(ShiftX, ShiftY);
+    FTransformation.Translate(ShiftX, ShiftY);
+  end;
+  //FTransformation.SrcRect := FLocation;
+end;
+
+procedure TGRTransformationLayer.SetAngle(Value: Single);
+begin
+  Changing;
+  FAngle := Value;
+  Changed; // Layer collection.
+
+  DoChange; // Layer only.
+end;
+
+procedure TGRTransformationLayer.SetPivot(const Value: TFloatPoint);
+begin
+  Changing;
+  FPivotPoint := Value;
+  Changed;
+
+  DoChange;
+end;
+
+procedure TGRTransformationLayer.SetScaling(const Value: TFloatPoint);
+begin
+  Changing;
+  FScaling := Value;
+  Changed;
+
+  DoChange;
+end;
+
+procedure TGRTransformationLayer.SetSkew(const Value: TFloatPoint);
+begin
+  Changing;
+  FSkew := Value;
+  Changed;
+
+  DoChange;
+end;
+
+{ TGRLayer }
+constructor TGRLayer.Create(aLayerCollection: TLayerCollection);
+begin
+  inherited;
+  //LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE; 
 end;
 
 function TGRLayer.GetLeft: Integer;

@@ -523,7 +523,7 @@ begin
       if FRubberBand = nil then
       begin
         FRubberBand := TGRRubberBandLayer.Create(Layers);
-        FRubberBand.Options := [rboAllowMove, rboShowFrame];
+        //FRubberBand.Options := [rboAllowMove, rboShowFrame];
       end;
       //else 
         FRubberBand.BringToFront;
