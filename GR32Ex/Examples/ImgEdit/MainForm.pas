@@ -560,5 +560,5 @@ begin
 end;
 
 initialization
-  //RegisterLayer(TGRLayer);
+  RegisterLayer(TGRLayer);
 end.

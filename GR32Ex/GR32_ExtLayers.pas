@@ -255,7 +255,7 @@ type
     property PivotPoint: TFloatPoint read FPivotPoint write SetPivot;
     property Scaling: TFloatPoint read FScaling write SetScaling;
     property Skew: TFloatPoint read FSkew write SetSkew;
-    property Size: TSize read FSize write SetSize;
+    property Size: TSize read GetNativeSize write SetSize;
   end;
 
   // The grid elements determine what will be painted of the grid layer.
@@ -515,7 +515,7 @@ type
     property RepaintMode: TRepaintMode read FRepaintMode write SetRepaintMode default rmFull;
   end;
 
-procedure RegisterLayer(const aLayerControlClass: TGRLayerClass);
+procedure RegisterLayer(const aLayerClass: TGRLayerClass);
 function GetLayerClass(const aClassName: string): TGRLayerClass;
 function GLayerClasses: TThreadList;
 
@@ -564,12 +564,12 @@ begin
   end;
 end;
 
-procedure RegisterLayer(const aLayerControlClass: TGRLayerClass);
+procedure RegisterLayer(const aLayerClass: TGRLayerClass);
 begin
   with GLayerClasses.LockList do
   try
-    if IndexOf(aLayerControlClass) < 0 then
-      Add(aLayerControlClass);
+    if IndexOf(aLayerClass) < 0 then
+      Add(aLayerClass);
   finally
     FLayerClasses.UnlockList;
   end;
@@ -1004,24 +1004,79 @@ procedure TGRTransformationLayer.Paint(Buffer: TBitmap32);
 var
   SrcRect, DstRect, ClipRect, TempRect: TRect;
   ImageRect: TRect;
+
+var
+  Contour: TGRContour;
+
+  //--------------- local functions -------------------------------------------
+  procedure CalculateContour(X, Y, W, H: Single);
+  // Constructs four vertex points from the given coordinates and sizes and
+  // transforms them into a contour structure, which corresponds to the
+  // current transformations.
+  var
+    R: TFloatRect;
+
+  begin
+    R.TopLeft := FloatPoint(X, Y);
+    R.BottomRight := FloatPoint(X + W, Y + H);
+
+    with FTransformation do
+    begin
+      // Upper left
+      Contour[0].X := Fixed(Matrix[0, 0] * R.Left + Matrix[1, 0] * R.Top + Matrix[2, 0]);
+      Contour[0].Y := Fixed(Matrix[0, 1] * R.Left + Matrix[1, 1] * R.Top + Matrix[2, 1]);
+
+      // Upper right
+      Contour[1].X := Fixed(Matrix[0, 0] * R.Right + Matrix[1, 0] * R.Top + Matrix[2, 0]);
+      Contour[1].Y := Fixed(Matrix[0, 1] * R.Right + Matrix[1, 1] * R.Top + Matrix[2, 1]);
+
+      // Lower right
+      Contour[2].X := Fixed(Matrix[0, 0] * R.Right + Matrix[1, 0] * R.Bottom + Matrix[2, 0]);
+      Contour[2].Y := Fixed(Matrix[0, 1] * R.Right + Matrix[1, 1] * R.Bottom + Matrix[2, 1]);
+
+      // Lower left
+      Contour[3].X := Fixed(Matrix[0, 0] * R.Left + Matrix[1, 0] * R.Bottom + Matrix[2, 0]);
+      Contour[3].Y := Fixed(Matrix[0, 1] * R.Left + Matrix[1, 1] * R.Bottom + Matrix[2, 1]);
+    end;
+  end;
+
+  procedure DrawContour;
+
+  begin
+    with Buffer do
+    begin
+      MoveToX(Contour[0].X, Contour[0].Y);
+      LineToXSP(Contour[1].X, Contour[1].Y);
+      LineToXSP(Contour[2].X, Contour[2].Y);
+      LineToXSP(Contour[3].X, Contour[3].Y);
+      LineToXSP(Contour[0].X, Contour[0].Y);
+    end;
+  end;
+
 begin
-  DstRect := MakeRect(GetTransformedTargetRect);
+  UpdateTransformation;
+  with GetNativeSize do CalculateContour(0, 0, cx, cy);
+  DrawContour;
+{  DstRect := MakeRect(GetTransformedTargetRect);
   ClipRect := Buffer.ClipRect;
   IntersectRect(TempRect, ClipRect, DstRect);
   if IsRectEmpty(TempRect) then Exit;
   Buffer.RaiseRectTS(DstRect, -80);
-  {
-  with DstRect do
-  begin
-    Buffer.LineAS(Left, Top, Right, Bottom, clBlack32);
-    Buffer.LineAS(Right, Top, Left, Bottom, clBlack32);
-  end; //}
+}
 end;
 
 function TGRTransformationLayer.DoHitTest(aX, aY: Integer): Boolean;
+var
+  Local: TPoint;
 begin
-  with GetTransformedTargetRect do
-    Result := (aX >= Left) and (aX < Right) and (aY >= Top) and (aY < Bottom);
+    if not TAffineTransformationAccess(FTransformation).TransformValid then
+      TAffineTransformationAccess(FTransformation).PrepareTransform;
+    with FTransformation do
+      Local := ReverseTransform(Point(aX, aY));
+
+
+    with GetNativeSize do
+      Result := PtInRect(Rect(0, 0, cx, cy), Local);
 end;
 {$ENDIF Designtime_Supports}
 
@@ -1044,7 +1099,7 @@ begin
 
   vSize := GetNativeSize;
   with FPosition do
-    Result := FloatRect(X, Y, FScaling.X * (X + Size.cx), FScaling.Y * (Y + Size.cy));
+    Result := FloatRect(X, Y, FScaling.X * (X + vSize.cx), FScaling.Y * (Y + vSize.cy));
 
   if Assigned(LayerCollection) then
     with Result, LayerCollection do
@@ -1425,7 +1480,7 @@ function TGRGridLayer.Snap(var P: TFloatPoint): Boolean;
 
 var
   I: Integer;
-  Size: TSize;
+  vSize: TSize;
   XFound,
   YFound: Boolean;
   LocalX,
@@ -1438,16 +1493,16 @@ begin
   // Check the image borders first.
   if soSnapBorders in FSnapOptions then
   begin
-    Size := GetNativeSize;
+    vSize := GetNativeSize;
     if Abs(P.X) <= FSnapThreshold then
     begin
       P.X := 0;
       XFound := True;
     end
     else
-      if Abs(P.X - Size.cx) <= FSnapThreshold then
+      if Abs(P.X - vSize.cx) <= FSnapThreshold then
       begin
-        P.X := Size.cx;
+        P.X := vSize.cx;
         XFound := True;
       end;
 
@@ -1457,9 +1512,9 @@ begin
       YFound := True;
     end
     else
-      if Abs(P.Y - Size.cy) <= FSnapThreshold then
+      if Abs(P.Y - vSize.cy) <= FSnapThreshold then
       begin
-        P.Y := Size.cy;
+        P.Y := vSize.cy;
         YFound := True;
       end;
   end;
@@ -1523,7 +1578,6 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 procedure TGRGridLayer.RemoveHorizontalGuide(Y: Integer);
-
 begin
   Changing;
   FHorizontalGuides.Remove(Pointer(Y));
@@ -1533,7 +1587,6 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 procedure TGRGridLayer.RemoveVerticalGuide(X: Integer);
-
 begin
   Changing;
   FVerticalGuides.Remove(Pointer(X));
@@ -1560,7 +1613,6 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 destructor TGRRubberBandLayer.Destroy;
-
 begin
   if Assigned(FChildLayer) then
   begin
@@ -1580,7 +1632,6 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 procedure TGRRubberBandLayer.SetChildLayer(const Value: TGRPositionLayer);
-
 begin
   if Assigned(FChildLayer) then
   begin
@@ -1707,12 +1758,12 @@ function TGRRubberBandLayer.DoHitTest(X, Y: Integer): Boolean;
 var
   Local: TPoint;
 begin
-  Result := Visible and inherited DoHitTest(X, Y);
+  //Result := Visible and inherited DoHitTest(X, Y);
  {$IFDEF Debug}
   SendDebug('DoHitTest='+IntToStr(Integer(Result))+' X='+IntToStr(X)+' Y='+IntToStr(Y));
  {$ENDIF}
 
-  if Result and not (rboAllowRotation in Options) then
+  //if Result and not (rboAllowRotation in Options) then
   begin
     if not TAffineTransformationAccess(FTransformation).TransformValid then
       TAffineTransformationAccess(FTransformation).PrepareTransform;
@@ -1759,7 +1810,7 @@ begin
   Polygon[1][4] := Contour[3];
   PolyPolygonTS(Buffer, Polygon, FOuterColor, pfWinding);
 end;
-           
+
 //----------------------------------------------------------------------------------------------------------------------
 
 function TGRRubberBandLayer.GetCursorDirection(X, Y: Integer; AxisTolerance: Integer;
@@ -2351,7 +2402,7 @@ procedure TGRRubberBandLayer.ChangeNotification(ALayer: TGRCustomLayer);
 var
   SomethingChanged: Boolean;
 
-  function Different(const F1, F2: TFloatPoint): Boolean;
+  function Different(const F1, F2: TFloatPoint): Boolean;overload;
   begin
     Result := False;
     
@@ -2362,6 +2413,16 @@ var
     end;
   end;
   
+  function Different(const F1, F2: TSize): Boolean;overload;
+  begin
+    Result := False;
+    
+    If (F1.cx <> F2.cx) or (F1.cy <> F2.cy) then
+    begin
+      Result := True;
+      SomethingChanged := True;
+    end;
+  end;
 begin
   if Assigned(FChildLayer) and not FIsDragging then
   begin
@@ -2371,13 +2432,14 @@ begin
     SomethingChanged := False;
 
     if Different(FChildLayer.Position, Position) then Position := FChildLayer.Position;
+    if Different(FChildLayer.GetNativeSize , FSize) then FSize := FChildLayer.GetNativeSize;
 
     if FChildLayer is TGRTransformationLayer then
     with TGRTransformationLayer(FChildLayer) do
     begin
       if Angle <> Self.Angle then
       begin
-        Angle := Self.Angle;
+        Self.Angle := Angle;
         SomethingChanged := True;
       end;
   
@@ -2605,7 +2667,7 @@ var
   //--------------- end local function ----------------------------------------
 
 var
-  Size: TSize;
+  vSize: TSize;
 
 begin
   Transformation := nil;
@@ -2613,7 +2675,7 @@ begin
     // We use a local transformation to avoid frequent invalidation of the main transformation.
     GetLayerTransformation(Transformation);
     TAffineTransformationAccess(FTransformation).PrepareTransform;
-    Size := GetNativeSize;
+    vSize := GetNativeSize;
 
     // Indepedent of the current transformations we always have to check 5 points.
     // These are the four corners and the center of the layer. Photoshop however snaps the center only
@@ -2622,15 +2684,15 @@ begin
     // That means e.g. the left upper corner is tested later than the lower right corner having so the last word
     // about snapping (which is likely what the user wants).
     // 1.) Center.
-    Result := TrySnap(FloatPoint(Size.cx / 2, Size.cy / 2));
+    Result := TrySnap(FloatPoint(vSize.cx / 2, vSize.cy / 2));
     // 2.) Lower left corner.
-    if TrySnap(FloatPoint(0, Size.cy)) then
+    if TrySnap(FloatPoint(0, vSize.cy)) then
       Result := True;
     // 3.) Lower right corner.
-    if TrySnap(FloatPoint(Size.cx, Size.cy)) then
+    if TrySnap(FloatPoint(vSize.cx, vSize.cy)) then
       Result := True;
     // 4.) Top right corner.
-    if TrySnap(FloatPoint(Size.cx, 0)) then
+    if TrySnap(FloatPoint(vSize.cx, 0)) then
       Result := True;
     // 5.) Top left corner.
     if TrySnap(FloatPoint(0, 0)) then
@@ -2646,7 +2708,7 @@ procedure TGRRubberBandLayer.UpdateChildLayer;
 var
   SomethingChanged: Boolean;
 
-  function Different(const F1, F2: TFloatPoint): Boolean;
+  function Different(const F1, F2: TFloatPoint): Boolean; overload;
   begin
     Result := False;
     
@@ -2657,6 +2719,16 @@ var
     end;
   end;
   
+  function Different(const F1, F2: TSize): Boolean; overload;
+  begin
+    Result := False;
+    
+    if (F1.cx <> F2.cx) or (F1.cy <> F2.cy) then
+    begin
+      Result := True;
+      SomethingChanged := True;
+    end;
+  end;
 begin
   if Assigned(FChildLayer) then
   begin
@@ -2677,6 +2749,7 @@ begin
       end;
   
       if Different(Skew, Self.Skew) then Skew := Self.Skew;
+//      if Different(FSize, Self.FSize) then FSize := Self.FSize;
       if Different(Scaling, Self.Scaling) then Scaling := Self.Scaling;
       if Different(PivotPoint, Self.PivotPoint) then PivotPoint := Self.PivotPoint;
     end;
@@ -2862,6 +2935,14 @@ function TGRBitmapLayer.DoHitTest(X, Y: Integer): Boolean;
 var
   B: TPoint;
 begin
+  {$IFDEF Designtime_Supports}
+  if FBitmap.Empty then
+  begin
+    Result := inherited DoHitTest(X, Y);
+    exit;
+  end;
+  {$ENDIF}
+  
   B := FTransformation.ReverseTransform(Point(X, Y));
 
   Result := PtInRect(Rect(0, 0, Bitmap.Width, Bitmap.Height), B);
