@@ -659,7 +659,7 @@ var
         end;
         {$ifdef Designtime_Supports}
         if not (vControl.Visible 
-          or ((csDesigning in ComponentState) and not (csNoDesignVisible in ControlStyle))) then Continue;
+          or ((csDesigning in vControl.ComponentState) and not (csNoDesignVisible in vControl.ControlStyle))) then Continue;
         {$else} 
         if not vControl.Visible then Continue;
         {$endif} 
