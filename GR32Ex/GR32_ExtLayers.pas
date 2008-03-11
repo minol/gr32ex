@@ -2864,7 +2864,6 @@ end;
 //----------------- TGRBitmapLayer ------------------------------------------------------------------------------------
 
 constructor TGRBitmapLayer.Create(ALayerCollection: TLayerCollection);
-
 begin
   inherited;
 
@@ -2876,7 +2875,6 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 destructor TGRBitmapLayer.Destroy;
-
 begin
   FBitmap.Free;
 
@@ -2898,17 +2896,17 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 procedure TGRBitmapLayer.BitmapChanged(Sender: TObject);
-
 begin
   Changing;
-  FTransformation.SrcRect := FloatRect(0, 0, Bitmap.Width - 1, Bitmap.Height - 1);
+  with GetNativeSize do
+    FTransformation.SrcRect := FloatRect(0, 0, cx - 1, cy - 1);
   Changed;
+  DoChange;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
 procedure TGRBitmapLayer.SetBitmap(Value: TBitmap32);
-
 begin
   Changing;
   FBitmap.Assign(Value);
@@ -2918,7 +2916,6 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 procedure TGRBitmapLayer.SetCropped(Value: Boolean);
-
 begin
   if Value <> FCropped then
   begin
