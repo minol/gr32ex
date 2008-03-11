@@ -34,6 +34,7 @@ uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   , GR32_Layers
   , GR32_ExtLayers
   , GR_ImageEx
+  , GR_JvInspector
   ;
 
 type
@@ -49,12 +50,15 @@ type
     FEditor: TImage32Editor;
 
     procedure InspectorAfterItemCreate(Sender: TObject; Item: TJvCustomInspectorItem);
+		procedure InspectorDataValueChanged(Sender: TObject;
+			Data: TJvCustomInspectorData);
     procedure DoSelectionChanged(Sender: TObject);
     procedure DoLayerSelectorChanged(Sender: TObject);
     procedure DoLayerListNotify(Sender: TLayerCollection; Action: TLayerListNotification;
       Layer: TCustomLayer; Index: Integer);
     procedure RefreshLayerSelector;
     procedure AddObjectToInspector(const Parent: TJvCustomInspectorItem; const aObj: TObject);
+    procedure AddEventsToInspector(const Parent: TJvCustomInspectorItem; const aObj: TObject);
 
     procedure SetEditor(const Value: TImage32Editor);
   public
@@ -77,6 +81,12 @@ type
 
 function GLayerInspector: TGRLayerInspector;
 
+
+resourcestring
+  rsSkew = 'Skew';
+  rsPivot = 'Pivot';
+  rsScaling = 'Scaling';
+
 implementation
 
 uses
@@ -87,8 +97,12 @@ uses
 
 {$R *.dfm}
 
+const
+  cNameClassSeperator = ': ';
+
 type
   TLayerCollectionAccess = class(TLayerCollection);
+  TGRTransformationLayerAccess = class(TGRTransformationLayer);
 
 var
   FLayerInspector: TGRLayerInspector;
@@ -98,6 +112,20 @@ begin
   if not Assigned(FLayerInspector) then
     FLayerInspector := TGRLayerInspector.Create(nil);
   Result := FLayerInspector;
+end;
+
+procedure CreateInspFloatPointItem(const aName: string; const Parent: TJvCustomInspectorItem; const aPoint: TFloatPoint);
+var
+  vInspCompCat: TJvInspectorCustomCategoryItem;
+  vCompItem: TJvInspectorCompoundItem;
+begin
+    vInspCompCat := TJvInspectorCustomCategoryItem.Create(Parent, nil);
+    vInspCompCat.DisplayName := aName;
+    vInspCompCat.Expanded := True;
+    vCompItem := TJvInspectorCompoundItem.Create(vInspCompCat, nil);
+    //vCompItem.SingleName := False;
+    vCompItem.AddColumn(TJvInspectorVarData.New(vCompItem, 'X', TypeInfo(TFloat), @aPoint.X));
+    vCompItem.AddColumn(TJvInspectorVarData.New(vCompItem, 'Y', TypeInfo(TFloat), @aPoint.Y));
 end;
 
 { TGRLayerInspector }
@@ -131,6 +159,7 @@ begin
   FInspector.Align := alClient;
   FInspector.Painter := FInspectorBorlandPainter;
   FInspector.AfterItemCreate  := InspectorAfterItemCreate;
+  FInspector.OnDataValueChanged := InspectorDataValueChanged;
 end;
 
 destructor TGRLayerInspector.Destroy;
@@ -140,21 +169,80 @@ begin
   inherited;
 end;
 
+procedure TGRLayerInspector.AddEventsToInspector(const Parent: TJvCustomInspectorItem; const aObj: TObject);
+var
+  vInspEventCat: TJvInspectorCustomCategoryItem;
+  //vE: TNotifyEvent;
+  vM: TMethod;
+  vEventStrs, vBehaviors: TStringList;
+  i, j: integer;
+begin
+  if aObj is TGRCustomLayer then
+  begin
+    vEventStrs := TStringList.Create;
+    try
+      TGRCustomLayer(aObj).GetRegisteredEvents(vEventStrs);
+      if vEventStrs.Count > 0 then
+      begin
+        vInspEventCat := TJvInspectorCustomCategoryItem.Create(Parent, nil);
+        vInspEventCat.DisplayName := rsEvents;
+        for i := 0 to vEventStrs.Count - 1 do
+        with TJvInspectorPropData.New(vInspEventCat, aObj, vEventStrs.Strings[i]) as TJvInspectorTMethodItem do
+        begin
+          AddInstance(aObj, 'Self');
+          vBehaviors := TStringList.Create;
+          try
+            TGRCustomLayer(aObj).GetRegisteredBehaviors(vBehaviors);
+            for j := 0 to vBehaviors.Count - 1 do
+            begin
+              vM.Code := vBehaviors.Objects[j];
+              vM.Data := aObj;
+              AddMethod(vM, vBehaviors.Strings[j]);
+            end;
+          finally
+            vBehaviors.Free;
+          end;
+        end;
+        TJvInspectorPropData.New(vInspEventCat, aObj, 'OnRightClick');
+        vInspEventCat.Expanded := True;
+      end;
+    finally
+      vEventStrs.Free;
+    end;
+  end;
+end;
+
 procedure TGRLayerInspector.AddObjectToInspector(const Parent: TJvCustomInspectorItem; const aObj: TObject);
 var
-  InspCat: TJvInspectorCustomCategoryItem;
+  vInspCat: TJvInspectorCustomCategoryItem;
 begin
-  InspCat := TJvInspectorCustomCategoryItem.Create(Parent, nil);
+  vInspCat := TJvInspectorCustomCategoryItem.Create(Parent, nil);
   if aObj is TControl then
-    InspCat.DisplayName := TControl(aObj).Name + ': '
+    vInspCat.DisplayName := TControl(aObj).Name + cNameClassSeperator
   else if aObj is TGRCustomLayer then
-    InspCat.DisplayName := TGRCustomLayer(aObj).Name + ': '
+    vInspCat.DisplayName := TGRCustomLayer(aObj).Name + cNameClassSeperator
   else
-    InspCat.DisplayName := '';
+    vInspCat.DisplayName := '';
 
-  InspCat.DisplayName := InspCat.DisplayName + aObj.ClassName;
+  vInspCat.DisplayName := vInspCat.DisplayName + aObj.ClassName;
 
-  TJvInspectorPropData.New(InspCat, aObj);
+  TJvInspectorPropData.New(vInspCat, aObj);
+
+  if aObj is TGRTransformationLayer then
+  begin
+    with TGRTransformationLayerAccess(aObj) do
+    begin
+      CreateInspFloatPointItem(rsSkew, vInspCat, FSkew);
+      CreateInspFloatPointItem(rsScaling, vInspCat, FScaling);
+      CreateInspFloatPointItem(rsPivot, vInspCat, FPivotPoint);
+    end;
+  end;
+
+  if aObj is TGRCustomLayer then
+  begin
+    AddEventsToInspector(vInspCat, aObj);
+  end;
+
 end;
 
 procedure TGRLayerInspector.DoLayerListNotify(Sender: TLayerCollection; Action: TLayerListNotification;
@@ -210,6 +298,31 @@ begin
     TJvInspectorBooleanItem(Item).ShowAsCheckbox := True;
 end;
 
+procedure TGRLayerInspector.InspectorDataValueChanged(
+  Sender: TObject; Data: TJvCustomInspectorData);
+var
+  i: integer;
+begin
+  if SameText(data.Name , 'Name') then
+    with FLayerSelector do
+    begin
+      i := ItemIndex;
+      Items[i] := data.AsString + cNameClassSeperator + TObject(Items.Objects[i]).ClassName;
+      Refresh;
+      ItemIndex := i;
+    end
+  else if (data.Name = 'X') or (data.Name = 'Y') then
+    with FLayerSelector do
+    begin
+      i := ItemIndex;
+      with TGRTransformationLayerAccess(Items.Objects[i]) do
+      begin
+        Changed;
+        DoChange;
+      end;
+    end;
+end;
+
 procedure TGRLayerInspector.RefreshLayerSelector;
 var
   i: integer;
@@ -219,7 +332,10 @@ begin
   begin
     for i  := 0 to Layers.Count - 1 do
     begin
-      FLayerSelector.Items.AddObject(Layers[i].ClassName, Layers[i]);
+      if (Layers[i] is TGRCustomLayer) and not (Layers[i] is TGRRubberBandLayer) then
+      begin
+        FLayerSelector.Items.AddObject(TGRCustomLayer(Layers[i]).Name+cNameClassSeperator+Layers[i].ClassName, Layers[i]);
+      end;
     end;
     FLayerSelector.ItemIndex := FLayerSelector.Items.IndexOfObject(FEditor.Selection);
     DoLayerSelectorChanged(FLayerSelector);
@@ -262,15 +378,11 @@ end;
 initialization
   FLayerInspector := nil;
 
-  with TJvCustomInspectorData.ItemRegister do
+  {with TJvCustomInspectorData.ItemRegister do
   begin
     Add(TJvInspectorTypeKindRegItem.Create(TJvInspectorFloatPointItem, TypeInfo(TFloatPoint)));
-  end;
+  end; //}
 
-  TJvInspectorAlignItem.RegisterAsDefaultItem;
-  TJvInspectorAnchorsItem.RegisterAsDefaultItem;
-  TJvInspectorColorItem.RegisterAsDefaultItem;
-  TJvInspectorTImageIndexItem.RegisterAsDefaultItem;
 finalization
   FreeAndNil(FLayerInspector);
 end.

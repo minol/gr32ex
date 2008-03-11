@@ -88,6 +88,9 @@ type
     {$ENDIF}
 
   public
+    class procedure GetRegisteredEvents(const aStrs: TStrings); virtual;
+    class procedure GetRegisteredBehaviors(const aStrs: TStrings); virtual;
+
     {$IFDEF Designtime_Supports}
     class function RubberbandOptions: TGRRubberBandOptions; virtual;
     {$ENDIF}
@@ -113,10 +116,22 @@ type
     FScaling: TFloatPoint;
     FPivotPoint: TFloatPoint;                    // Center of rotation and proportional scaling.
 
+    FOnClick: TNotifyEvent;
+    FOnRightClick: TNotifyEvent;
+    FOnDoubleClick: TNotifyEvent;
+    FOnRightDoubleClick: TNotifyEvent;
+
     procedure SetAngle(Value: Single);
     procedure SetPivot(const Value: TFloatPoint);
     procedure SetScaling(const Value: TFloatPoint);
     procedure SetSkew(const Value: TFloatPoint);
+
+    procedure ReadSkewData(aReader: TStream);
+    procedure WriteSkewData(aWriter: TStream);
+    procedure ReadPivotData(aReader: TStream);
+    procedure WritePivotData(aWriter: TStream);
+    procedure ReadScalingData(aReader: TStream);
+    procedure WriteScalingData(aWriter: TStream);
   protected
     {$IFDEF Designtime_Supports}
     class function RubberbandOptions: TGRRubberBandOptions; override;
@@ -124,7 +139,13 @@ type
     function DoHitTest(aX, aY: Integer): Boolean; override;
     {$ENDIF}
     function GetAdjustedRect(const R: TFloatRect): TFloatRect; override;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+
+
+    procedure DefineProperties(Filer: TFiler); override;
   public
+    class procedure GetRegisteredEvents(const aStrs: TStrings); override;
+    class procedure GetRegisteredBehaviors(const aStrs: TStrings); override;
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent);override;
@@ -140,6 +161,11 @@ type
     property PivotPoint: TFloatPoint read FPivotPoint write SetPivot;
     property Scaling: TFloatPoint read FScaling write SetScaling;
     property Skew: TFloatPoint read FSkew write SetSkew;
+
+    property OnClick: TNotifyEvent read FOnClick write FOnClick;
+    property OnRightClick: TNotifyEvent read FOnRightClick write FOnRightClick;
+    property OnDoubleClick: TNotifyEvent read FOnDoubleClick write FOnDoubleClick;
+    property OnRightDoubleClick: TNotifyEvent read FOnRightDoubleClick write FOnRightDoubleClick;
   end;
 
   TGRLayer = class(TGRBitmapLayer)
@@ -346,6 +372,14 @@ begin
 end;
 
 { TGRCustomLayer }
+class procedure TGRCustomLayer.GetRegisteredEvents(const aStrs: TStrings);
+begin
+end;
+
+class procedure TGRCustomLayer.GetRegisteredBehaviors(const aStrs: TStrings);
+begin
+end;
+
 constructor TGRCustomLayer.Create(aLayerCollection: TLayerCollection);
 begin
   inherited;
@@ -505,6 +539,27 @@ end;
 
 
 { TGRTransformationLayer }
+class procedure TGRTransformationLayer.GetRegisteredEvents(const aStrs: TStrings);
+begin
+  with aStrs do
+  begin
+    Clear;
+    Add('OnClick');
+    Add('OnDoubleClick');
+    Add('OnRightClick');
+    Add('OnRightDoubleClick');
+  end;
+end;
+
+class procedure TGRTransformationLayer.GetRegisteredBehaviors(const aStrs: TStrings);
+begin
+  with aStrs do
+  begin
+    Clear;
+    //AddObject('XxxBehavior', @TGRTransformationLayer.XxxBehavior);
+  end;
+end;
+
 class function TGRTransformationLayer.RubberbandOptions: TGRRubberBandOptions;
 begin
   Result := [rboAllowCornerResize,
@@ -533,6 +588,8 @@ begin
 end;
 
 procedure TGRTransformationLayer.Assign(Source: TPersistent);
+var
+  vM: TMethod;
 begin
   if Source is TGRTransformationLayer then
     with Source as TGRTransformationLayer do
@@ -543,10 +600,79 @@ begin
       Self.FScaling := FScaling;
       Self.FSkew := FSkew;
 
+      if Assigned(FOnClick) then
+      begin
+        vM := TMethod(FOnClick);
+        if vM.Data = Source then
+          vM.Data := Self;
+        Self.FOnClick := TNotifyEvent(vM);
+      end
+      else
+        Self.OnClick := OnClick;
+
+      if Assigned(FOnDoubleClick) then
+      begin
+        vM := TMethod(FOnDoubleClick);
+        if vM.Data = Source then
+          vM.Data := Self;
+        Self.FOnDoubleClick := TNotifyEvent(vM);
+      end
+      else
+        Self.OnDoubleClick := OnDoubleClick;
+
+      if Assigned(FOnRightClick) then
+      begin
+        vM := TMethod(FOnRightClick);
+        if vM.Data = Source then
+          vM.Data := Self;
+        Self.FOnRightClick := TNotifyEvent(vM);
+      end
+      else
+        Self.OnRightClick := OnRightClick;
+
+      if Assigned(FOnRightClick) then
+      begin
+        vM := TMethod(FOnRightDoubleClick);
+        if vM.Data = Source then
+          vM.Data := Self;
+        Self.FOnRightDoubleClick := TNotifyEvent(vM);
+      end
+      else
+        Self.OnRightDoubleClick := OnRightDoubleClick;
+
       Changed; // Layer collection.
       DoChange; // Layer only.
     end;
   inherited Assign(Source);
+end;
+
+procedure TGRTransformationLayer.DefineProperties(Filer: TFiler);
+  function DoSkewWrite: Boolean;
+  begin
+    if Filer.Ancestor <> nil then
+      Result := not (Filer.Ancestor is TSDPlayingLayer)
+    else
+      Result := (Skew.X <> 0) or (Skew.Y <> 0);
+  end;
+  function DoPivotWrite: Boolean;
+  begin
+    if Filer.Ancestor <> nil then
+      Result := not (Filer.Ancestor is TSDPlayingLayer)
+    else
+      Result := (PivotPoint.X <> 0) or (PivotPoint.Y <> 0);
+  end;
+  function DoScalingWrite: Boolean;
+  begin
+    if Filer.Ancestor <> nil then
+      Result := not (Filer.Ancestor is TSDPlayingLayer)
+    else
+      Result := (Scaling.X <> 0) or (Scaling.Y <> 0);
+  end;
+begin
+  inherited;
+  Filer.DefineBinaryProperty('Skew', ReadSkewData, WriteSkewData, DoSkewWrite);
+  Filer.DefineBinaryProperty('PivotPoint', ReadPivotData, WritePivotData, DoPivotWrite);
+  Filer.DefineBinaryProperty('Scaling', ReadScalingData, WriteScalingData, DoScalingWrite);
 end;
 
 function TGRTransformationLayer.GetAdjustedRect(const R: TFloatRect): TFloatRect;
@@ -567,6 +693,37 @@ begin
   aTransformation.Skew(FSkew.X, FSkew.Y);
   aTransFormation.Rotate(0, 0, FAngle);
   aTransformation.Translate(FLocation.Left + FPivotPoint.X, FLocation.Top + FPivotPoint.Y);
+end;
+
+procedure TGRTransformationLayer.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  {$IFDEF Designtime_Supports}
+  if LayerCollection.Owner is TImage32Editor then
+    exit;
+  {$ENDIF}
+  case Button of
+    mbLeft: 
+      begin
+        if ssDouble in Shift then
+        begin
+          if Assigned(FOnDoubleClick) then FOnDoubleClick(Self);
+        end
+        else
+          if Assigned(FOnClick) then FOnClick(Self);
+      end;
+    mbRight:
+      begin
+        if ssDouble in Shift then
+        begin
+          if Assigned(FOnRightDoubleClick) then FOnRightDoubleClick(Self);
+        end
+        else
+          if Assigned(FOnRightClick) then FOnRightClick(Self);
+      end;
+    mbMiddle:
+      begin
+      end;
+  end; //case
 end;
 
 procedure TGRTransformationLayer.ResetTransformation;
@@ -603,6 +760,36 @@ begin
     FTransformation.Translate(ShiftX, ShiftY);
   end;
   //FTransformation.SrcRect := FLocation;
+end;
+
+procedure TGRTransformationLayer.ReadSkewData(aReader: TStream);
+begin
+  aReader.Read(FSkew, SizeOf(FSkew));
+end;
+
+procedure TGRTransformationLayer.ReadPivotData(aReader: TStream);
+begin
+  aReader.Read(FPivotPoint, SizeOf(FPivotPoint));
+end;
+
+procedure TGRTransformationLayer.ReadScalingData(aReader: TStream);
+begin
+  aReader.Read(FScaling, SizeOf(FScaling));
+end;
+
+procedure TGRTransformationLayer.WriteSkewData(aWriter: TStream);
+begin
+  aWriter.Write(FSkew, SizeOf(FSkew));
+end;
+
+procedure TGRTransformationLayer.WritePivotData(aWriter: TStream);
+begin
+  aWriter.Write(FPivotPoint, SizeOf(FPivotPoint));
+end;
+
+procedure TGRTransformationLayer.WriteScalingData(aWriter: TStream);
+begin
+  aWriter.Write(FScaling, SizeOf(FScaling));
 end;
 
 procedure TGRTransformationLayer.SetAngle(Value: Single);
