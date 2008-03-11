@@ -162,12 +162,14 @@ type
     FOnChange: TNotifyEvent;                     // For individual change events.
     FChangeNotificationList: TList;
 
+    procedure SetName(const Value: string);
+
     procedure AddChangeNotification(ALayer: TGRCustomLayer);
     procedure RemoveChangeNotification(ALayer: TGRCustomLayer);
     procedure ChangeNotification(ALayer: TGRCustomLayer); virtual;
     procedure DoChange; virtual;
+    procedure Changed; overload; override;
 
-    procedure SetName(const Value: string);
   public
     constructor Create(aLayerCollection: TLayerCollection); override;
     destructor Destroy; override;
@@ -524,6 +526,8 @@ function ComponentToStr(const Component: TComponent): string;
 procedure SaveStrToFile(const aFileName, s: string);
 procedure ComponentToTextFile(const Component: TComponent; const aFileName: string);
 
+procedure LayersRemoveClasses(const aLayers: TLayerCollection; const aClasses: array of TClass);
+
 implementation
 
 uses
@@ -643,11 +647,34 @@ begin
   end;
 end;
 
+function IsInClass(const aObj: TObject; const aClasses: array of TClass): Boolean;
+var
+  i: integer;
+begin
+  for i := Low(aClasses) to High(aClasses) do
+  begin
+    Result := aObj is aClasses[i];
+    if Result then exit;
+  end;
+  Result := False;
+end;
+
+procedure LayersRemoveClasses(const aLayers: TLayerCollection; const aClasses: array of TClass);
+var
+  i: integer;
+begin
+  for i := aLayers.Count - 1 downto 0 do
+  begin
+    if IsInClass(aLayers.Items[i], aClasses) then
+      aLayers.Items[i].Free;
+  end;
+end;
+
 { TGRCustomLayer }
 constructor TGRCustomLayer.Create(aLayerCollection: TLayerCollection);
 begin
   inherited;
-  LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE; 
+  LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE;
 end;
 
 destructor TGRCustomLayer.Destroy;
@@ -664,6 +691,12 @@ procedure TGRCustomLayer.AddChangeNotification(ALayer: TGRCustomLayer);
 begin
   if not Assigned(FChangeNotificationList) then FChangeNotificationList := TList.Create;
   FChangeNotificationList.Add(ALayer);
+end;
+
+procedure TGRCustomLayer.Changed;
+begin
+  inherited;
+  DoChange;
 end;
 
 procedure TGRCustomLayer.ChangeNotification(ALayer: TGRCustomLayer); 
@@ -726,7 +759,7 @@ begin
     FName := Value;
     Changed;
 
-    DoChange;
+    //DoChange;
   end;
 end;
 
@@ -759,9 +792,9 @@ begin
       Self.FScaled := FScaled;
 
       Changed; // Layer collection.
-      DoChange; // Layer only.
+      //DoChange; // Layer only.
     end;
-  inherited Assign(Source);
+  //inherited Assign(Source);
 end;
 
 function TGRPositionLayer.GetAdjustedPosition(const P: TFloatPoint): TFloatPoint;
@@ -859,7 +892,7 @@ begin
   FPosition := Value;
   Changed;
 
-  DoChange;
+  //DoChange;
 end;
 
 procedure TGRPositionLayer.SetScaled(const Value: Boolean);
@@ -921,7 +954,7 @@ begin
       Self.FSize := FSize;
 
       Changed; // Layer collection.
-      DoChange; // Layer only.
+      //DoChange; // Layer only.
     end;
   inherited Assign(Source);
 end;
@@ -934,7 +967,7 @@ begin
   FAngle := Value;
   Changed; // Layer collection.
 
-  DoChange; // Layer only.
+  //DoChange; // Layer only.
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -945,7 +978,7 @@ begin
   FPivotPoint := Value;
   Changed;
 
-  DoChange;
+  //DoChange;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -956,7 +989,7 @@ begin
   FScaling := Value;
   Changed;
 
-  DoChange;
+  //DoChange;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -967,7 +1000,7 @@ begin
   FSize := Value;
   Changed;
 
-  DoChange;
+  //DoChange;
 end;
 
 procedure TGRTransformationLayer.SetSkew(const Value: TFloatPoint);
@@ -976,7 +1009,7 @@ begin
   FSkew := Value;
   Changed;
 
-  DoChange;
+  //DoChange;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -1122,7 +1155,7 @@ begin
   FAngle := 0;
   Changed;
 
-  DoChange;
+  //DoChange;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -1210,7 +1243,7 @@ begin
     FElements := Value;
     Changed;
 
-    DoChange;
+    //DoChange;
   end;
 end;
 
@@ -1225,7 +1258,7 @@ begin
     FGridSize := Value;
     Changed;
 
-    DoChange;
+    //DoChange;
   end;
 end;
 
@@ -1729,7 +1762,7 @@ begin
     FOptions := Value;
     Changed;
     
-    DoChange;
+    //DoChange;
   end;
 end;
 
@@ -1744,7 +1777,7 @@ begin
     FOuterColor := Value;
     Changed;
 
-    DoChange;
+    //DoChange;
   end;
 end;
 
@@ -2379,7 +2412,7 @@ begin
       UpdateChildLayer;
       Changed;
 
-      DoChange;
+      //DoChange;
     end;
   end;
 
@@ -2759,7 +2792,7 @@ begin
     if SomethingChanged then
     begin
       FChildLayer.Changed; // trigger for LayerCollection
-      FChildLayer.DoChange; // trigger for Layer
+      //FChildLayer.DoChange; // trigger for Layer
     end;
   end;
 end;
@@ -2782,7 +2815,7 @@ begin
     UpdateChildLayer;
     Changed;
 
-    DoChange;
+    //DoChange;
   end;
 end;
 
@@ -2901,7 +2934,7 @@ begin
   with GetNativeSize do
     FTransformation.SrcRect := FloatRect(0, 0, cx - 1, cy - 1);
   Changed;
-  DoChange;
+  //DoChange;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------

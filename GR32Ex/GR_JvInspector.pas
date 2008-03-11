@@ -45,6 +45,15 @@ type
 		property PropColor: TColor read GetPropColor write SetPropColor;
 	end;
 
+	{
+	TInspectorCursorItem = class(TJvInspectorEnumItem)
+		class procedure RegisterAsDefaultItem;
+  protected
+    function GetDisplayValue: string; override;
+    procedure GetValueList(const Strings: TStrings); override;
+    procedure SetDisplayValue(const Value: string); override;
+	end; //}
+
 procedure RegisterInspectorItems;
 
 
