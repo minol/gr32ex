@@ -153,6 +153,10 @@ type
   TGRGridLayer = class;
 
   TGRLayerClass = class of TGRPositionLayer;
+
+  {$IFDEF Designtime_Supports}
+  TGRSetNameEvent = procedure (Sender: TObject; var Allowed: Boolean) of object;
+  {$ENDIF}
   TGRCustomLayer = class(TCustomLayer)
   private
     function GetCaptured: Boolean;
@@ -161,11 +165,13 @@ type
     FName: string;
     FOnChange: TNotifyEvent;                     // For individual change events.
     FChangeNotificationList: TList;
-
-    procedure SetName(const Value: string);
+  {$IFDEF Designtime_Supports}
+    FOnSetName: TGRSetNameEvent;
+  {$ENDIF}
 
     procedure AddChangeNotification(ALayer: TGRCustomLayer);
     procedure RemoveChangeNotification(ALayer: TGRCustomLayer);
+    procedure SetName(const Value: string);virtual;
     procedure ChangeNotification(ALayer: TGRCustomLayer); virtual;
     procedure DoChange; virtual;
     procedure Changed; overload; override;
@@ -180,6 +186,9 @@ type
   public
     property Captured: Boolean read GetCaptured write SetCaptured;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
+  {$IFDEF Designtime_Supports}
+    property OnSetName: TGRSetNameEvent read FOnSetName write FOnSetName;
+  {$ENDIF}
   public
     property Name: string read FName write SetName;
   end;
@@ -471,7 +480,6 @@ type
 
     FLayers: TGRLayerCollection;
 
-
     FInvalidRects: TRectList;
     FScaleX: Single;
     FScaleY: Single;
@@ -528,6 +536,9 @@ procedure ComponentToTextFile(const Component: TComponent; const aFileName: stri
 
 procedure LayersRemoveClasses(const aLayers: TLayerCollection; const aClasses: array of TClass);
 
+function IndexOfLayers(const aLayers: TLayerCollection; const aName: string): Integer;
+function GetMethodString(const aMethod: TMethod): string;
+
 implementation
 
 uses
@@ -550,6 +561,33 @@ const
 
 var
   FLayerClasses: TThreadList;
+
+function IndexOfLayers(const aLayers: TLayerCollection; const aName: string): Integer;
+var
+  vItem: TCustomLayer;
+begin
+  for Result := 0 to aLayers.Count - 1 do
+  begin
+    vItem := aLayers.Items[Result];
+    if vItem is TGRCustomLayer then
+    begin
+      if SameText(aName, TGRCustomLayer(vItem).Name) then
+        exit;
+    end;
+  end;
+  Result := -1;
+end;
+
+function GetMethodString(const aMethod: TMethod): string;
+begin
+    Result := '';
+    if (TObject(aMethod.Data) is TGRCustomLayer) then
+    begin
+      Result := TGRCustomLayer(aMethod.Data).MethodName(aMethod.Code);
+      if (Result <> '') then
+        Result := TGRCustomLayer(aMethod.Data).Name + '.' + Result;
+    end;
+end;
 
 function GetLayerClass(const aClassName: string): TGRLayerClass;
 var
@@ -752,13 +790,24 @@ begin
 end;
 
 procedure TGRCustomLayer.SetName(const Value: string);
+{$IFDEF Designtime_Supports}
+var
+  vAllowed: Boolean;
+{$ENDIF}
 begin
   if Value <> FName then
   begin
-    Changing;
-    FName := Value;
-    Changed;
-
+{$IFDEF Designtime_Supports}
+    vAllowed := True;
+    vAllowed := IndexOfLayers(LayerCollection, Value) < 0;
+    if Assigned(FOnSetName) then FOnSetName(Self, vAllowed);
+    if vAllowed then
+{$ENDIF}
+    begin
+      Changing;
+      FName := Value;
+      Changed;
+    end;
     //DoChange;
   end;
 end;
