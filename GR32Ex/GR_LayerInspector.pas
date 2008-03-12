@@ -143,7 +143,8 @@ end;
 constructor TGRLayerInspector.Create(aComponent: TComponent);
 begin
   inherited;
-  FLayerInspector := Self;
+  if not Assigned(FLayerInspector) then
+    FLayerInspector := Self;
 
   FLayerSelector := TComboBox.Create(Self);
   FLayerSelector.Parent := Self;

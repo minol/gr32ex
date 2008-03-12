@@ -79,6 +79,7 @@ type
     procedure ExecClearBackgnd(Dest: TBitmap32; StageNum: Integer); override;
     procedure LoadFromStream(const aStream: TStream);virtual;
     procedure SaveToStream(const aStream: TStream);virtual;
+    function IndexOf(const aName: string): Integer;
     procedure LoadFromFile(const aFileName: string);
     procedure SaveToFile(const aFileName: string);
     procedure LoadFromString(const s: string);
@@ -111,9 +112,14 @@ type
 
 procedure Register;
 
+resourcestring
+  rsUnNamed = 'Unnamed';
+
 implementation
 
 uses
+  RTLConsts,
+  uMeInjector,
   GR_LayerEditors;
 
 type
@@ -126,39 +132,162 @@ type
   TMyShiftState  = (ssShift, ssAlt, ssCtrl, ssLeft, ssRight, ssMiddle, ssDouble);
   TMyShiftStates = set of TMyShiftState;
 
+  TGRLayerWriter = class(TWriter)
+  protected
+    function FindMethodName(Method: TMethod): string; override;
+  end;
+
+  TGRLayerReader = class(TReader)
+  protected
+    FCurrentPropInfo: Pointer;
+    FCurrentInstance: string;
+    FFixupList: TStrings;
+    function GetFixupList: TStrings;
+    function FindMethodInstance(Root: TComponent; const MethodName: string): TMethod;override;
+    procedure ReadPropValue(Instance: TPersistent; PropInfo: Pointer);
+  public
+    destructor Destroy; override;
+    property FixupList: TStrings read GetFixupList;
+  end;
+
 //Not double click in shift state
 function IsMouseButtonDown(Shift: TMyShiftStates; Button: TMyShiftState): Boolean;
 begin
   Result := (Button in Shift) and not (ssDouble in Shift);
 end;
 
+{ TGRLayerWriter }
+function TGRLayerWriter.FindMethodName(Method: TMethod): string;
+var
+  vObj: TObject;
+begin
+  vObj := Method.Data;
+  if vObj is TGRCustomLayer then
+  begin
+    Result := vObj.MethodName(Method.Code);
+    if Result <> '' then
+      Result := TGRCustomLayer(vObj).Name + '.' + Result;
+  end
+  else 
+    Result := inherited FindMethodName(Method);
+end;
+
+{ TGRLayerReader }
+destructor TGRLayerReader.Destroy;
+begin
+  FreeAndNil(FFixupList);
+  inherited;
+end;
+
+function TGRLayerReader.FindMethodInstance(Root: TComponent; const MethodName: string): TMethod;
+var
+  i: Integer;
+  vObjName, vMethodName: string;
+begin
+  i := Pos('.', MethodName);
+  if i > 0 then
+  begin
+    vObjName := Copy(MethodName, 1, i-1);
+    vMethodName := Copy(MethodName, i+1, Length(MethodName));
+    if Root is TImage32Ex then
+    begin
+      i := TImage32Ex(Root).IndexOf(vObjName);
+      if i >= 0 then
+      begin
+        Result.Data := TImage32Ex(Root).Layers[i];
+        Result.Code := TImage32Ex(Root).Layers[i].MethodAddress(vMethodName);
+        if Result.Code = nil then 
+          raise EReadError.CreateRes(@SInvalidPropertyValue);
+      end
+      else
+        FixupList.AddObject(FCurrentInstance+'='+MethodName, FCurrentPropInfo);
+      Exit;
+    end;
+  end
+  else begin
+    vObjName := '';
+    vMethodName := MethodName;
+  end;
+  Result := inherited FindMethodInstance(Root, MethodName);
+end;
+
+function TGRLayerReader.GetFixupList: TStrings;
+begin
+  if not Assigned(FFixupList) then
+    FFixupList := TStringList.Create;
+  Result := FFixupList;
+end;
+
+var
+  FOldReadPropValueProc: procedure(const aSelf: TObject; Instance: TPersistent; PropInfo: Pointer) = nil;
+  vReadPropValueInjector: TMeInjector;
+
+procedure TGRLayerReader.ReadPropValue(Instance: TPersistent; PropInfo: Pointer);
+begin
+  if Self is TGRLayerReader then
+  begin
+    FCurrentPropInfo := PropInfo;
+    if Instance is TGRCustomLayer then
+      FCurrentInstance := TGRCustomLayer(Instance).Name
+    else
+      FCurrentInstance := '';
+  end;
+  if Assigned(FOldReadPropValueProc) then
+    FOldReadPropValueProc(Self, Instance, PropInfo);
+end;
+
 { TImage32Ex }
 procedure TImage32Ex.LoadFromStream(const aStream: TStream);
-{var
-  vReader: TReader;
-  //}
+var
+  vReader: TGRReader;
+  vLayer: TGRCustomLayer;
+  vObjName, vMethodName: string;
+  vM: TMethod;
+  i, j: integer;
 begin
-  aStream.ReadComponent(Self);
-{  vReader := TReader.Create(aStream, 4096);
+  vReader := TGRReader.Create(aStream, 4096);
   try
     vReader.ReadRootComponent(Self);
+    if vReader.FixupList.Count > 0 then
+    begin
+      with vReader do for i := 0 to FixupList.Count - 1 do
+      begin
+        j := IndexOf(FixupList.Names[i]);
+        if j >= 0 then
+        begin
+          vLayer := Layers[j];
+          vMethodName := FixupList.ValueFromIndex[i];
+          j := Pos('.', vMethodName);
+          if j > 0 then
+          begin
+            vObjName := Copy(vMethodName, 1, i -1);
+            Delete(vMethodName, 1, i);
+            j := IndexOf(vObjName);
+            if j >= 0 then
+            begin
+              vM.Data := Layers[j];
+              vM.Code := Layers[j].MethodAddress(vMethodName);
+              if vM.Code <> nil then SetMethodProp(vLayer, FixupList.Objects[i], vM);
+            end;
+          end;
+        end;
+      end;
+    end;
   finally
     vReader.Free;
-  end; //}
+  end;
 end;
 
 procedure TImage32Ex.SaveToStream(const aStream: TStream);
-{var
-  vWriter: TWriter;
-  //}
+var
+  vWriter: TGRWriter;
 begin
-  aStream.WriteComponent(Self);
-{  vWriter := TWriter.Create(aStream, 4096);
+  vWriter := TGRWriter.Create(aStream, 4096);
   try
     vWriter.WriteDescendent(Self, nil);
   finally
     vWriter.Free;
-  end; //}
+  end;
 end;
 
 procedure TImage32Ex.LoadFromFile(const aFileName: string);
@@ -305,6 +434,22 @@ begin
     inherited;
 end;
 
+function TImage32Ex.IndexOf(const aName: string): Integer;
+var
+  vItem: TCustomLayer;
+begin
+  for Result := 0 to Layers.Count - 1 do
+  begin
+    vItem := Layers.Items[Result];
+    if vItem is TGRCustomLayer then
+    begin
+      if SameText(aName, TGRCustomLayer(vItem).Name) then
+        exit;
+    end;
+  end;
+  Result := -1;
+end;
+
 procedure TImage32Ex.SetTransparent(const Value: Boolean);
 begin
   if FTransparent <> Value then
@@ -430,6 +575,7 @@ end;
 function TImage32Editor.CreateLayer(const aClass: TGRLayerClass): TGRPositionLayer;
 var
   P: TPoint;
+  i : Integer;
 begin
   with GetViewportRect do
     P := ControlToBitmap(Point((Right + Left) div 2, (Top + Bottom) div 2));
@@ -441,6 +587,10 @@ begin
     if TGRLayerEditor.Execute(TGRLayer(Result)) then
     begin
       Selection := TGRLayer(Result);
+      i := 1;
+      while IndexOf(rsUnNamed + IntToStr(i)) >= 0 do
+        Inc(i);
+      Result.Name := rsUnNamed + IntToStr(i);
     end
     else
       FreeAndNil(Result);
@@ -539,5 +689,11 @@ begin
   RegisterComponents('Graphics32', [TImage32Ex, TImage32Editor]);
 end;
 
+initialization
+  if vReadPropValueInjector.InjectProcedure(@TReader.ReadPropValue, @TGRReader.ReadPropValue) then
+    @FOldReadPropValueProc := vReadPropValueInjector.OriginalProc
+
+finalization
+  vReadPropValueInjector.Enabled := False;
 end.
 
