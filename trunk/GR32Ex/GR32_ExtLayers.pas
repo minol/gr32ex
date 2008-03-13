@@ -524,6 +524,7 @@ type
     property Buffer: TBitmap32 read FBuffer;
     property RepaintMode: TRepaintMode read FRepaintMode write SetRepaintMode default rmFull;
   end;
+  //TStringDynArray = array of string;
 
 procedure RegisterLayer(const aLayerClass: TGRLayerClass);
 function GetLayerClass(const aClassName: string): TGRLayerClass;
@@ -538,6 +539,7 @@ procedure LayersRemoveClasses(const aLayers: TLayerCollection; const aClasses: a
 
 function IndexOfLayers(const aLayers: TLayerCollection; const aName: string): Integer;
 function GetMethodString(const aMethod: TMethod): string;
+function StringsToDynArray(const aStrs: TStrings): TStringDynArray;
 
 implementation
 
@@ -587,6 +589,22 @@ begin
       if (Result <> '') then
         Result := TGRCustomLayer(aMethod.Data).Name + '.' + Result;
     end;
+end;
+
+function StringsToDynArray(const aStrs: TStrings): TStringDynArray;
+var
+  i: integer;
+begin
+  if Assigned(aStrs) then
+  begin
+    SetLength(Result, aStrs.Count);
+    for i := 0 to aStrs.Count - 1 do
+    begin
+      Result[i] := aStrs[i];
+    end;
+  end
+  else
+    SetLength(Result, 0);
 end;
 
 function GetLayerClass(const aClassName: string): TGRLayerClass;
