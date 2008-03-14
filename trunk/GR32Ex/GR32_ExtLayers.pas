@@ -524,7 +524,7 @@ type
     property Buffer: TBitmap32 read FBuffer;
     property RepaintMode: TRepaintMode read FRepaintMode write SetRepaintMode default rmFull;
   end;
-  //TStringDynArray = array of string;
+  TVariantDynArray = array of Variant;
 
 procedure RegisterLayer(const aLayerClass: TGRLayerClass);
 function GetLayerClass(const aClassName: string): TGRLayerClass;
@@ -2540,6 +2540,11 @@ begin
       if Angle <> Self.Angle then
       begin
         Self.Angle := Angle;
+        SomethingChanged := True;
+      end;
+      if Scaled <> Self.Scaled then
+      begin
+        Self.Scaled := Scaled;
         SomethingChanged := True;
       end;
   
