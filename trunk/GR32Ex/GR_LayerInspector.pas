@@ -111,6 +111,7 @@ uses
   JclRTTI
   //, JVCLVer
   , JvInspExtraEditors
+  , GR_ScriptEditDialog
   ;
 
 {$R *.dfm}

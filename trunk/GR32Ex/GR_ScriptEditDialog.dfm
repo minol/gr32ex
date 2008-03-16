@@ -1,0 +1,39 @@
+object dlgScriptEdit: TdlgScriptEdit
+  Left = 192
+  Top = 107
+  BorderStyle = bsDialog
+  ClientHeight = 214
+  ClientWidth = 313
+  Caption = 'ScriptEdit'
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  OnShow = FormShow
+  PixelsPerInch = 96
+  Position = poScreenCenter
+  TextHeight = 13
+  object btnOK: TButton
+    Left = 79
+    Top = 180
+    Width = 75
+    Height = 25
+    Caption = '&OK'
+    Default = True
+    ModalResult = 1
+    TabOrder = 1
+  end
+  object btnCancel: TButton
+    Left = 159
+    Top = 180
+    Width = 75
+    Height = 25
+    Cancel = True
+    Caption = '&Cancel'
+    ModalResult = 2
+    TabOrder = 2
+  end
+end
