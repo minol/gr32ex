@@ -1,7 +1,7 @@
 package GR_DSGN_D7;
 
 {$R *.res}
-{$R '..\GR32_Reg.dcr'}
+{$R 'GR_Reg.dcr'}
 {$ALIGN 8}
 {$ASSERTIONS ON}
 {$BOOLEVAL OFF}
