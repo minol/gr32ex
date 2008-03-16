@@ -1,7 +1,7 @@
 package GR_DSGN_D10;
 
 {$R *.res}
-{$R '..\GR32_Reg.dcr'}
+{$R 'GR_Reg.dcr'}
 {$ALIGN 8}
 {$ASSERTIONS ON}
 {$BOOLEVAL OFF}
@@ -33,6 +33,6 @@ requires
   GR_D10;
 
 contains
-  GR_ExReg in '..\GR_ExReg.pas';
+  GR_Reg in '..\GR_Reg.pas';
 
 end.

@@ -52,7 +52,7 @@ uses
 { Registration }
 procedure Register;
 begin
-  RegisterComponents('GR32 Controls', [TGRPanel, TGRLabel, TGRSpeedButton]);
+  RegisterComponents('GR32 Controls', [TGRPanel, TGRLabel, TGRButton, TGRSpeedButton]);
 end;
 
 end.
