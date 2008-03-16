@@ -19,7 +19,7 @@
  * All Rights Reserved.
  *
  * Contributor(s):
- *   Based on the newsgroup post (March 18, 2002,  news://news.g32.org/g32org.public.graphics32)
+ *   Based on the newsgroup post GR32_ExtLayers (March 18, 2002,  news://news.g32.org/g32org.public.graphics32)
  *   <public@lischke-online.de ; <news:a755io$6t1$1@webserver9.elitedev.com>...
  *
  * ***** END LICENSE BLOCK ***** *)
@@ -31,13 +31,15 @@ interface
 
 uses
   Windows, Messages,
-  SysUtils, Classes
+  SysUtils, Classes, Types
   , GR32
   , GR32_Resamplers
   , GR32_Containers
   , GR32_Layers
   , GR32_RepaintOpt
   , GR32_Image
+  , GR32_Types
+  , GR32_Transforms
   //, GR32_ExtLayers
   , GR_Animation
   ;
@@ -79,21 +81,20 @@ type
     procedure ChangeNotification(ALayer: TGRCustomLayer); virtual;
     procedure DoChange; virtual;
     procedure Notification(ALayer: TCustomLayer); override;
+    procedure Changed; overload; override;
 
 
     {$IFDEF Designtime_Supports}
     procedure SetGridLayer(const Value: TGRGridLayer);
-    class function RubberbandOptions: TGRRubberBandOptions; override;
+    class function RubberbandOptions: TGRRubberBandOptions; virtual;
     procedure Paint(Buffer: TBitmap32); override;
     {$ENDIF}
 
   public
-    class procedure GetRegisteredEvents(const aStrs: TStrings); virtual;
-    class procedure GetRegisteredBehaviors(const aStrs: TStrings); virtual;
+    //the RegisteredEvents are TGRNotifyEventStr only!
+    class procedure GetRegisteredEvents(const aStrs: TStrings);
+    class procedure GetRegisteredBehaviors(const aStrs: TStrings);
 
-    {$IFDEF Designtime_Supports}
-    class function RubberbandOptions: TGRRubberBandOptions; virtual;
-    {$ENDIF}
     constructor Create(aLayerCollection: TLayerCollection); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent);override;
@@ -116,11 +117,6 @@ type
     FScaling: TFloatPoint;
     FPivotPoint: TFloatPoint;                    // Center of rotation and proportional scaling.
 
-    FOnClick: TNotifyEvent;
-    FOnRightClick: TNotifyEvent;
-    FOnDoubleClick: TNotifyEvent;
-    FOnRightDoubleClick: TNotifyEvent;
-
     procedure SetAngle(Value: Single);
     procedure SetPivot(const Value: TFloatPoint);
     procedure SetScaling(const Value: TFloatPoint);
@@ -139,13 +135,10 @@ type
     function DoHitTest(aX, aY: Integer): Boolean; override;
     {$ENDIF}
     function GetAdjustedRect(const R: TFloatRect): TFloatRect; override;
-    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
 
 
     procedure DefineProperties(Filer: TFiler); override;
   public
-    class procedure GetRegisteredEvents(const aStrs: TStrings); override;
-    class procedure GetRegisteredBehaviors(const aStrs: TStrings); override;
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent);override;
@@ -162,16 +155,24 @@ type
     property Scaling: TFloatPoint read FScaling write SetScaling;
     property Skew: TFloatPoint read FSkew write SetSkew;
 
-    property OnClick: TNotifyEvent read FOnClick write FOnClick;
-    property OnRightClick: TNotifyEvent read FOnRightClick write FOnRightClick;
-    property OnDoubleClick: TNotifyEvent read FOnDoubleClick write FOnDoubleClick;
-    property OnRightDoubleClick: TNotifyEvent read FOnRightDoubleClick write FOnRightDoubleClick;
   end;
 
-  TGRLayer = class(TGRBitmapLayer)
+  TGRNotifyEvent = procedure(const Sender: TObject; const aParams: string = '') of object;
+  TGRNotifyEventStr = type string;
+
+  TGRLayer = class(TGRTransformationLayer)
+    //the behaviors: the last string MUST be 'Behavior'
+    procedure ScriptBehavior(const Sender: TObject; const aScript: string; const aEvent: string = ''; const aParams: string = '');
   protected
     FWidth: Integer;
     FHeight: Integer;
+
+    //the script or method name.
+    FOnClickStr: TGRNotifyEventStr;
+    FOnRightClickStr: TGRNotifyEventStr;
+    FOnDoubleClickStr: TGRNotifyEventStr;
+    FOnRightDoubleClickStr: TGRNotifyEventStr;
+    FOnMiddleClickStr: TGRNotifyEventStr;
 
     function GetLeft: Integer;
     function GetTop: Integer;
@@ -180,30 +181,58 @@ type
     procedure SetHeight(const Value: Integer);
     procedure SetWidth(const Value: Integer);
 
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure RunScriptBehavior(const aScript: TGRNotifyEventStr; const aEvent: string = ''; aParams: string = '');
 
   public
     constructor Create(ALayerCollection: TLayerCollection);override;
+    procedure Assign(Source: TPersistent);override;
   published
     property Left:Integer read GetLeft write SetLeft;
     property Top:Integer read GetTop write SetTop;
     property Width:Integer read FWidth write SetWidth;
     property Height:Integer read FHeight write SetHeight;
 
+    property OnClick: TGRNotifyEventStr read FOnClickStr write FOnClickStr;
+    property OnRightClick: TGRNotifyEventStr read FOnRightClickStr write FOnRightClickStr;
+    property OnDoubleClick: TGRNotifyEventStr read FOnDoubleClickStr write FOnDoubleClickStr;
+    property OnRightDoubleClick: TGRNotifyEventStr read FOnRightDoubleClickStr write FOnRightDoubleClickStr;
+    property OnMiddleClick: TGRNotifyEventStr  read FOnMiddleClickStr write FOnMiddleClickStr;
+
     property Name;
-    property Bitmap;
     property Cursor;
     //property Cropped;
     //property DrawMode;
     property Angle;
-    property Skew;
-    property PivotPoint;
+    //property Skew;
+    //property PivotPoint;
     property Scaled;
-    property Scaling;
+    //property Scaling;
     property Visible;
     property MouseEvents;
-    property OnMouseDown;
-    property OnMouseMove;
-    property OnMouseUp;
+  end;
+
+  TGRBitmapLayer = class(TGRLayer)
+  protected
+    FBitmap: TBitmap32;
+    FCropped: Boolean;
+    procedure SetCropped(Value: Boolean);
+    procedure SetBitmap(Value: TBitmap32);
+  protected
+    function DoHitTest(X, Y: Integer): Boolean; override;
+    function GetNativeSize: TSize; override;
+    procedure Paint(Buffer: TBitmap32); override;
+
+    procedure BitmapChanged(Sender: TObject);virtual;
+  public
+    constructor Create(ALayerCollection: TLayerCollection); override;
+    destructor Destroy; override;
+    procedure Assign(Source: TPersistent);override;
+
+    procedure PaintTo(Buffer: TBitmap32; const R: TRect);
+
+    property Bitmap: TBitmap32 read FBitmap write SetBitmap;
+    property Cropped: Boolean read FCropped write SetCropped;
   end;
 
   TGRAnimationLayer = class(TGRLayer)
@@ -242,6 +271,68 @@ type
     constructor Create(const aLayer: TGRLayer; const aMaxStep: Integer);
   end;
 
+  TGRLayerCollection = class(TLayerCollection)
+  end;
+
+  TGRLayerContainer = class(TGRCustomLayer)
+  protected
+    FLeft: Integer;
+    FTop: Integer;
+    FWidth: Integer;
+    FHeight: Integer;
+    FBuffer: TBitmap32;
+    FBufferOversize: Integer;
+    FBufferValid: Boolean;
+    FForceFullRepaint: Boolean;
+    FRepaintOptimizer: TCustomRepaintOptimizer;
+    FRepaintMode: TRepaintMode;
+
+    FLayers: TGRLayerCollection;
+
+    FInvalidRects: TRectList;
+    FScaleX: Single;
+    FScaleY: Single;
+    FScaleMode: TScaleMode;
+    FUpdateCount: Integer;
+
+    CachedBitmapRect: TRect;
+    CachedXForm: TCoordXForm;
+    CacheValid: Boolean;
+    OldSzX, OldSzY: Integer;
+
+    procedure SetRepaintMode(const Value: TRepaintMode); virtual;
+    function GetBitmapRect: TRect;
+
+    function  CustomRepaint: Boolean; virtual;
+    procedure DoPaintBuffer; virtual;
+    procedure UpdateCache; virtual;
+    property  UpdateCount: Integer read FUpdateCount;
+    procedure InvalidateCache;
+    procedure Invalidate;
+    function  InvalidRectsAvailable: Boolean; virtual;
+    procedure DoPrepareInvalidRects; virtual;
+    procedure ResetInvalidRects;
+    procedure Paint(aBuffer: TBitmap32); override;
+
+    procedure LayerCollectionChangeHandler(Sender: TObject);
+    procedure LayerCollectionGDIUpdateHandler(Sender: TObject);
+    procedure LayerCollectionGetViewportScaleHandler(Sender: TObject; var ScaleX, ScaleY: Single);
+    procedure LayerCollectionGetViewportShiftHandler(Sender: TObject; var ShiftX, ShiftY: Single);
+
+    property  BufferValid: Boolean read FBufferValid write FBufferValid;
+    property  InvalidRects: TRectList read FInvalidRects;
+  public
+    constructor Create(aLayerCollection: TLayerCollection);override;
+    destructor Destroy;override;
+    function  GetViewportRect: TRect; virtual;
+
+    property Left: Integer read FLeft write FLeft;
+    property Top: Integer read FTop write FTop;
+    property Width: Integer read FWidth write FWidth;
+    property Height: Integer read FHeight write FHeight;
+    property Buffer: TBitmap32 read FBuffer;
+    property RepaintMode: TRepaintMode read FRepaintMode write SetRepaintMode default rmFull;
+  end;
 
 procedure RegisterLayer(const aLayerClass: TGRLayerClass);
 function GetLayerClass(const aClassName: string): TGRLayerClass;
@@ -254,7 +345,7 @@ procedure ComponentToTextFile(const Component: TComponent; const aFileName: stri
 implementation
 
 uses
-  Math, TypInfo, GR32_MicroTiles, GR_ImageEx;
+  Math, StrUtils, TypInfo, uMeTypInfo, GR32_MicroTiles, GR_ImageEx;
 
 const
   cAniIntervalCount = 33; //ms
@@ -373,11 +464,61 @@ end;
 
 { TGRCustomLayer }
 class procedure TGRCustomLayer.GetRegisteredEvents(const aStrs: TStrings);
+var
+  vPropCount: Integer;
+  vPropList: PPropList;
+  vPropInfo: PPropInfo;
+  I: integer;
 begin
+  vPropCount := GetPropList(ClassInfo, tkProperties, nil);
+  GetMem(vPropList, vPropCount * SizeOf(PPropInfo));
+  with aStrs do
+  try
+    GetPropList(Self.ClassInfo, tkProperties, vPropList);
+    Clear;
+    for I := 0 to Pred(vPropCount) do
+    begin
+      vPropInfo := vPropList[I];
+      if vPropInfo.PropType^ = TypeInfo(TGRNotifyEventStr) then
+        Add(vPropInfo.Name);
+    end;
+  finally
+    FreeMem(vPropList);
+  end;
+  //MessageBox(0, PChar(IntToStr(aStrs.Count)),'vPropCount', MB_OK);
 end;
 
+const
+  cBehavior = 'Behavior';
 class procedure TGRCustomLayer.GetRegisteredBehaviors(const aStrs: TStrings);
+  procedure AddClassBehaviors(const aClass: TClass);
+  var
+    i: integer;
+    vItem: PPublishedMethodEntry;
+  begin
+    vItem := GetFirstPublishedMethodEntry(aClass);
+    for i := 0 to GetPublishedMethodCount(aClass)-1 do
+    begin
+      if Assigned(vItem) and (RightStr(vItem.Name, Length(cBehavior)) = cBehavior) then 
+      begin
+          aStrs.AddObject(vItem.Name, vItem.Address);
+      end;
+      vItem := GetNextPublishedMethodEntry(aClass, vItem);
+    end;
+  end;
+var
+  vParent: TClass;
 begin
+  with aStrs do
+  begin
+    Clear;
+    vParent := Self;
+    while vParent <> nil do
+    begin
+      AddClassBehaviors(vParent);
+      vParent := vParent.ClassParent;
+    end;
+  end;
 end;
 
 constructor TGRCustomLayer.Create(aLayerCollection: TLayerCollection);
@@ -428,6 +569,12 @@ end;
 
 procedure TGRCustomLayer.ChangeNotification(ALayer: TGRCustomLayer); 
 begin
+end;
+
+procedure TGRCustomLayer.Changed;
+begin
+  inherited;
+  DoChange;
 end;
 
 procedure TGRCustomLayer.DoChange;
@@ -495,8 +642,6 @@ begin
     Changing;
     FName := Value;
     Changed;
-
-    DoChange;
   end;
 end;
 
@@ -539,27 +684,7 @@ end;
 
 
 { TGRTransformationLayer }
-class procedure TGRTransformationLayer.GetRegisteredEvents(const aStrs: TStrings);
-begin
-  with aStrs do
-  begin
-    Clear;
-    Add('OnClick');
-    Add('OnDoubleClick');
-    Add('OnRightClick');
-    Add('OnRightDoubleClick');
-  end;
-end;
-
-class procedure TGRTransformationLayer.GetRegisteredBehaviors(const aStrs: TStrings);
-begin
-  with aStrs do
-  begin
-    Clear;
-    //AddObject('XxxBehavior', @TGRTransformationLayer.XxxBehavior);
-  end;
-end;
-
+{$IFDEF Designtime_Supports}
 class function TGRTransformationLayer.RubberbandOptions: TGRRubberBandOptions;
 begin
   Result := [rboAllowCornerResize,
@@ -569,6 +694,7 @@ begin
     rboShowHandles
   ];
 end;
+{$ENDIF Designtime_Supports}
 
 constructor TGRTransformationLayer.Create(ALayerCollection: TLayerCollection);
 begin
@@ -600,48 +726,7 @@ begin
       Self.FScaling := FScaling;
       Self.FSkew := FSkew;
 
-      if Assigned(FOnClick) then
-      begin
-        vM := TMethod(FOnClick);
-        if vM.Data = Source then
-          vM.Data := Self;
-        Self.FOnClick := TNotifyEvent(vM);
-      end
-      else
-        Self.OnClick := OnClick;
-
-      if Assigned(FOnDoubleClick) then
-      begin
-        vM := TMethod(FOnDoubleClick);
-        if vM.Data = Source then
-          vM.Data := Self;
-        Self.FOnDoubleClick := TNotifyEvent(vM);
-      end
-      else
-        Self.OnDoubleClick := OnDoubleClick;
-
-      if Assigned(FOnRightClick) then
-      begin
-        vM := TMethod(FOnRightClick);
-        if vM.Data = Source then
-          vM.Data := Self;
-        Self.FOnRightClick := TNotifyEvent(vM);
-      end
-      else
-        Self.OnRightClick := OnRightClick;
-
-      if Assigned(FOnRightClick) then
-      begin
-        vM := TMethod(FOnRightDoubleClick);
-        if vM.Data = Source then
-          vM.Data := Self;
-        Self.FOnRightDoubleClick := TNotifyEvent(vM);
-      end
-      else
-        Self.OnRightDoubleClick := OnRightDoubleClick;
-
       Changed; // Layer collection.
-      DoChange; // Layer only.
     end;
   inherited Assign(Source);
 end;
@@ -650,23 +735,23 @@ procedure TGRTransformationLayer.DefineProperties(Filer: TFiler);
   function DoSkewWrite: Boolean;
   begin
     if Filer.Ancestor <> nil then
-      Result := not (Filer.Ancestor is TSDPlayingLayer)
+      Result := not (Filer.Ancestor is TGRTransformationLayer)
     else
       Result := (Skew.X <> 0) or (Skew.Y <> 0);
   end;
   function DoPivotWrite: Boolean;
   begin
     if Filer.Ancestor <> nil then
-      Result := not (Filer.Ancestor is TSDPlayingLayer)
+      Result := not (Filer.Ancestor is TGRTransformationLayer)
     else
       Result := (PivotPoint.X <> 0) or (PivotPoint.Y <> 0);
   end;
   function DoScalingWrite: Boolean;
   begin
     if Filer.Ancestor <> nil then
-      Result := not (Filer.Ancestor is TSDPlayingLayer)
+      Result := not (Filer.Ancestor is TGRTransformationLayer)
     else
-      Result := (Scaling.X <> 0) or (Scaling.Y <> 0);
+      Result := (Scaling.X <> 1) or (Scaling.Y <> 1);
   end;
 begin
   inherited;
@@ -695,37 +780,6 @@ begin
   aTransformation.Translate(FLocation.Left + FPivotPoint.X, FLocation.Top + FPivotPoint.Y);
 end;
 
-procedure TGRTransformationLayer.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-begin
-  {$IFDEF Designtime_Supports}
-  if LayerCollection.Owner is TImage32Editor then
-    exit;
-  {$ENDIF}
-  case Button of
-    mbLeft: 
-      begin
-        if ssDouble in Shift then
-        begin
-          if Assigned(FOnDoubleClick) then FOnDoubleClick(Self);
-        end
-        else
-          if Assigned(FOnClick) then FOnClick(Self);
-      end;
-    mbRight:
-      begin
-        if ssDouble in Shift then
-        begin
-          if Assigned(FOnRightDoubleClick) then FOnRightDoubleClick(Self);
-        end
-        else
-          if Assigned(FOnRightClick) then FOnRightClick(Self);
-      end;
-    mbMiddle:
-      begin
-      end;
-  end; //case
-end;
-
 procedure TGRTransformationLayer.ResetTransformation;
 begin
   Changing;
@@ -735,8 +789,6 @@ begin
   //FScaling := FloatPoint(1, 1);
   //FAngle := 0;
   Changed;
-
-  DoChange;
 end;
 
 procedure TGRTransformationLayer.UpdateTransformation;
@@ -797,8 +849,6 @@ begin
   Changing;
   FAngle := Value;
   Changed; // Layer collection.
-
-  DoChange; // Layer only.
 end;
 
 procedure TGRTransformationLayer.SetPivot(const Value: TFloatPoint);
@@ -806,8 +856,6 @@ begin
   Changing;
   FPivotPoint := Value;
   Changed;
-
-  DoChange;
 end;
 
 procedure TGRTransformationLayer.SetScaling(const Value: TFloatPoint);
@@ -815,8 +863,6 @@ begin
   Changing;
   FScaling := Value;
   Changed;
-
-  DoChange;
 end;
 
 procedure TGRTransformationLayer.SetSkew(const Value: TFloatPoint);
@@ -824,8 +870,6 @@ begin
   Changing;
   FSkew := Value;
   Changed;
-
-  DoChange;
 end;
 
 { TGRLayer }
@@ -833,6 +877,22 @@ constructor TGRLayer.Create(aLayerCollection: TLayerCollection);
 begin
   inherited;
   //LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE; 
+end;
+
+procedure TGRLayer.Assign(Source: TPersistent);
+var
+  vM: TMethod;
+begin
+  if Source is TGRLayer then
+    with Source as TGRLayer do
+    begin
+      Self.FOnClickStr := FOnClickStr;
+      Self.FOnRightClickStr := FOnRightClickStr;
+      Self.FOnDoubleClickStr := FOnDoubleClickStr;
+      Self.FOnRightDoubleClickStr := FOnRightDoubleClickStr;
+      Self.FOnMiddleClickStr := FOnMiddleClickStr;
+    end;
+  inherited Assign(Source);
 end;
 
 function TGRLayer.GetLeft: Integer;
@@ -845,6 +905,44 @@ begin
   Result := Trunc(FPosition.Y);
 end;
 
+procedure TGRLayer.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  {$IFDEF Designtime_Supports}
+  if LayerCollection.Owner is TImage32Editor then
+    exit;
+  {$ENDIF}
+  case Button of
+    mbLeft: 
+      begin
+        if ssDouble in Shift then
+        begin
+          if FOnDoubleClickStr <> '' then RunScriptBehavior(FOnDoubleClickStr, 'OnDoubleClick', '');
+        end
+        else
+          if FOnClickStr <> '' then RunScriptBehavior(FOnClickStr, 'OnClick', '');
+      end;
+    mbRight:
+      begin
+        if ssDouble in Shift then
+        begin
+          if FOnRightDoubleClickStr <> '' then RunScriptBehavior(FOnRightDoubleClickStr, 'OnRightDoubleClick', '');
+        end
+        else
+          if FOnRightClickStr <> '' then RunScriptBehavior(FOnRightClickStr, 'OnRightClick', '');
+      end;
+    mbMiddle:
+      begin
+        if FOnMiddleClickStr <> '' then RunScriptBehavior(FOnMiddleClickStr, 'OnMiddleClick', '');
+      end;
+  end; //case
+end;
+
+procedure TGRLayer.ScriptBehavior(const Sender: TObject; const aScript: string; const aEvent: string; const aParams: string);
+begin
+  //TODO ScriptBehavior
+  MessageBox(0, PChar(aScript+#13#10+'Event:'+aEvent),'Run Script', MB_OK);
+end;
+
 procedure TGRLayer.SetHeight(const Value: Integer);
 begin
   if FSize.cy <> value then
@@ -852,8 +950,7 @@ begin
     Changing;
     FSize.cy := Value;
     Changed;
-
-    DoChange;
+;
   end;
 end;
 
@@ -864,8 +961,6 @@ begin
     Changing;
     FPosition.X := Value;
     Changed;
-
-    DoChange;
   end;
 end;
 
@@ -876,8 +971,6 @@ begin
     Changing;
     FPosition.Y := Value;
     Changed;
-
-    DoChange;
   end;
 end;
 
@@ -888,8 +981,132 @@ begin
     Changing;
     FSize.cx := Value;
     Changed;
+  end;
+end;
 
-    DoChange;
+//----------------- TGRBitmapLayer ------------------------------------------------------------------------------------
+
+constructor TGRBitmapLayer.Create(ALayerCollection: TLayerCollection);
+begin
+  inherited;
+
+  FBitmap := TBitmap32.Create;
+  FBitmap.DrawMode := dmBlend;
+  FBitmap.OnChange := BitmapChanged;
+end;
+
+//----------------------------------------------------------------------------------------------------------------------
+
+destructor TGRBitmapLayer.Destroy;
+begin
+  FBitmap.Free;
+
+  inherited;
+end;
+
+procedure TGRBitmapLayer.Assign(Source: TPersistent);
+begin
+  if Source is TGRBitmapLayer then
+    with Source as TGRBitmapLayer do
+    begin
+      Changing;
+      Self.FBitmap.Assign(FBitmap);
+      Self.FCropped := FCropped;
+      Changed;
+    end;
+  inherited Assign(Source);
+end;
+
+procedure TGRBitmapLayer.BitmapChanged(Sender: TObject);
+begin
+  Changing;
+  with GetNativeSize do
+    FTransformation.SrcRect := FloatRect(0, 0, cx - 1, cy - 1);
+  Changed;
+  //DoChange;
+end;
+
+procedure TGRBitmapLayer.SetBitmap(Value: TBitmap32);
+begin
+  Changing;
+  FBitmap.Assign(Value);
+  Changed;
+end;
+
+procedure TGRBitmapLayer.SetCropped(Value: Boolean);
+begin
+  if Value <> FCropped then
+  begin
+    Changing;
+    FCropped := Value;
+    Changed;
+  end;
+end;
+
+function TGRBitmapLayer.DoHitTest(X, Y: Integer): Boolean;
+
+var
+  B: TPoint;
+begin
+  {$IFDEF Designtime_Supports}
+  if FBitmap.Empty then
+  begin
+    Result := inherited DoHitTest(X, Y);
+    exit;
+  end;
+  {$ENDIF}
+  
+  B := FTransformation.ReverseTransform(Point(X, Y));
+
+  Result := PtInRect(Rect(0, 0, Bitmap.Width, Bitmap.Height), B);
+  if Result and AlphaHit and (Bitmap.PixelS[B.X, B.Y] and $FF000000 = 0) then
+    Result := False;
+end;
+
+function TGRBitmapLayer.GetNativeSize: TSize;
+begin
+  {$IFDEF Designtime_Supports}
+  if FBitmap.Empty then
+  begin
+    Result := inherited GetNativeSize;
+    exit;
+  end;
+  {$ENDIF}
+  Result.cx := FBitmap.Width;
+  Result.cy := FBitmap.Height;
+end;
+
+procedure TGRBitmapLayer.Paint(Buffer: TBitmap32);
+begin 
+  {$IFDEF Designtime_Supports}
+  if FBitmap.Empty then
+  begin
+    inherited Paint(Buffer);
+    exit;
+  end;
+  {$ENDIF}
+  UpdateTransformation;
+  // TODO: cropping
+  if not TAffineTransformationAccess(FTransformation).TransformValid then
+    TAffineTransformationAccess(FTransformation).PrepareTransform;
+  Transform(Buffer, FBitmap, FTransformation);
+end;
+
+procedure TGRBitmapLayer.PaintTo(Buffer: TBitmap32; const R: TRect);
+// Paints the bitmap to the given buffer using the position and size/location given in R.
+var
+  Transformation: TAffineTransformation;
+begin
+  Transformation := nil;
+  try
+    GetLayerTransformation(Transformation);
+    Transformation.SrcRect := FloatRect(0, 0, Bitmap.Width - 1, Bitmap.Height - 1);
+    TAffineTransformationAccess(FTransformation).PrepareTransform;
+    Transformation.Scale((R.Right - R.Left) / Bitmap.Width, (R.Bottom - R.Top) / Bitmap.Height);
+    Transformation.Translate(R.Left, R.Top);
+    Transform(Buffer, FBitmap, Transformation);
+  finally
+    Transformation.Free;
   end;
 end;
 
@@ -979,6 +1196,236 @@ begin
       FLayer.EndUpdate;
     end;
   end;
+end;
+
+{ TGRLayerContainer }
+
+constructor TGRLayerContainer.Create(aLayerCollection: TLayerCollection);
+begin
+  inherited;
+  FBuffer := TBitmap32.Create;
+  FBufferOversize := 40;
+  FForceFullRepaint := True;
+  FInvalidRects := TRectList.Create;
+  FRepaintOptimizer := DefaultRepaintOptimizerClass.Create(Buffer, InvalidRects);
+  Height := 192;
+  Width := 192;
+
+
+  FLayers := TGRLayerCollection.Create(Self);
+  with FLayers do
+  begin
+{$IFDEF DEPRECATEDMODE}
+    CoordXForm := @CachedXForm;
+{$ENDIF}
+    OnChange := LayerCollectionChangeHandler;
+    OnGDIUpdate := LayerCollectionGDIUpdateHandler;
+    OnGetViewportScale := LayerCollectionGetViewportScaleHandler;
+    OnGetViewportShift := LayerCollectionGetViewportShiftHandler;
+  end;
+
+  FRepaintOptimizer.RegisterLayerCollection(FLayers);
+  RepaintMode := rmFull;
+end;
+
+destructor TGRLayerContainer.Destroy;
+begin
+  FRepaintOptimizer.Free;
+  FInvalidRects.Free;
+  FBuffer.Free;
+  inherited;
+end;
+
+procedure TGRLayerContainer.LayerCollectionChangeHandler(Sender: TObject);
+begin
+  Changed;
+end;
+
+procedure TGRLayerContainer.LayerCollectionGDIUpdateHandler(Sender: TObject);
+begin
+  Changed;
+end;
+
+procedure TGRLayerContainer.LayerCollectionGetViewportScaleHandler(Sender: TObject; var ScaleX, ScaleY: Single);
+begin
+  UpdateCache;
+  ScaleX := CachedXForm.ScaleX / FixedOne;
+  ScaleY := CachedXForm.ScaleY / FixedOne;
+end;
+
+procedure TGRLayerContainer.LayerCollectionGetViewportShiftHandler(Sender: TObject; var ShiftX, ShiftY: Single);
+begin
+  UpdateCache;
+  ShiftX := CachedXForm.ShiftX;
+  ShiftY := CachedXForm.ShiftY;
+end;
+
+procedure TGRLayerContainer.UpdateCache;
+begin
+  if CacheValid then Exit;
+  CachedBitmapRect := GetBitmapRect;
+  CachedXForm := UnitXForm;
+  CacheValid := True;
+end;
+
+function TGRLayerContainer.InvalidRectsAvailable: Boolean;
+begin
+  // avoid calling inherited, we have a totally different behaviour here...
+  DoPrepareInvalidRects;
+  Result := FInvalidRects.Count > 0;
+end;
+
+procedure TGRLayerContainer.InvalidateCache;
+begin
+  if FRepaintOptimizer.Enabled then FRepaintOptimizer.Reset;
+  CacheValid := False;
+end;
+
+procedure TGRLayerContainer.Invalidate;
+begin
+  BufferValid := False;
+  CacheValid := False;
+end;
+
+procedure TGRLayerContainer.DoPrepareInvalidRects;
+begin
+  if FRepaintOptimizer.Enabled and not FForceFullRepaint then
+    FRepaintOptimizer.PerformOptimization;
+end;
+
+function TGRLayerContainer.GetBitmapRect: TRect;
+begin
+    with Result do
+    begin
+      Left := 0;
+      Right := 0;
+      Top := 0;
+      Bottom := 0;
+    end
+end;
+
+procedure TGRLayerContainer.Paint(aBuffer: TBitmap32);
+var
+  I: Integer;
+  vRect: TRect;
+begin
+  if FRepaintOptimizer.Enabled then
+  begin
+{$IFDEF CLX}
+    if CustomRepaint then DoPrepareInvalidRects;
+{$ENDIF}
+    FRepaintOptimizer.BeginPaint;
+  end;
+
+  if not FBufferValid then
+  begin
+{$IFDEF CLX}
+    TBitmap32Access(FBuffer).ImageNeeded;
+{$ENDIF}
+    DoPaintBuffer;
+{$IFDEF CLX}
+    TBitmap32Access(FBuffer).CheckPixmap;
+{$ENDIF}
+  end;
+
+  FBuffer.Lock;
+  try
+    if FInvalidRects.Count > 0 then
+      for i := 0 to FInvalidRects.Count - 1 do
+      begin
+        vRect := FInvalidRects[i]^;
+        with vRect do
+          BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
+      end
+    else begin
+      vRect := GetViewportRect;
+      with vRect do
+        BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
+    end;
+  finally
+    FBuffer.Unlock;
+  end;
+
+  
+  if FRepaintOptimizer.Enabled then
+    FRepaintOptimizer.EndPaint;
+  ResetInvalidRects;
+  FForceFullRepaint := False;
+end;
+
+function TGRLayerContainer.CustomRepaint: Boolean;
+begin
+  Result := FRepaintOptimizer.Enabled and not FForceFullRepaint and
+    FRepaintOptimizer.UpdatesAvailable;
+end;
+
+procedure TGRLayerContainer.DoPaintBuffer;
+var
+  I, J: Integer;
+begin
+  if FRepaintOptimizer.Enabled then
+    FRepaintOptimizer.BeginPaintBuffer;
+
+  UpdateCache;
+
+
+  Buffer.BeginUpdate;
+  if FInvalidRects.Count = 0 then
+  begin
+    Buffer.ClipRect := GetViewportRect;
+
+    for I := 0 to FLayers.Count - 1 do
+      if (FLayers.Items[I].LayerOptions and LOB_VISIBLE) <> 0 then
+        TLayerAccess(FLayers.Items[I]).DoPaint(Buffer);
+  end
+  else
+  begin
+    for J := 0 to FInvalidRects.Count - 1 do
+    begin
+      Buffer.ClipRect := FInvalidRects[J]^;
+      for I := 0 to FLayers.Count - 1 do
+        if (FLayers.Items[I].LayerOptions and LOB_VISIBLE) <> 0 then
+          TLayerAccess(FLayers.Items[I]).DoPaint(Buffer);
+    end;
+
+    Buffer.ClipRect := GetViewportRect;
+  end;
+  Buffer.EndUpdate;
+
+  if FRepaintOptimizer.Enabled then
+    FRepaintOptimizer.EndPaintBuffer;
+
+  // avoid calling inherited, we have a totally different behaviour here...
+  FBufferValid := True;
+end;
+
+function TGRLayerContainer.GetViewportRect: TRect;
+begin
+  // returns position of the buffered area within the control bounds
+  with Result do
+  begin
+    // by default, the whole control is buffered
+    Left := 0;
+    Top := 0;
+    Right := Width;
+    Bottom := Height;
+  end;
+end;
+
+procedure TGRLayerContainer.SetRepaintMode(const Value: TRepaintMode);
+begin
+  if Assigned(FRepaintOptimizer) then
+  begin
+    FRepaintOptimizer.Enabled := Value = rmOptimizer;
+
+    FRepaintMode := Value;
+    Invalidate;
+  end;
+end;
+
+procedure TGRLayerContainer.ResetInvalidRects;
+begin
+  FInvalidRects.Clear;
 end;
 
 initialization

@@ -59,6 +59,7 @@ type
     procedure RefreshLayerSelector;
     procedure AddObjectToInspector(const Parent: TJvCustomInspectorItem; const aObj: TObject);
     procedure AddEventsToInspector(const Parent: TJvCustomInspectorItem; const aObj: TObject);
+    procedure AddSettingObjectToInspector;
 
     procedure SetEditor(const Value: TImage32Editor);
   public
@@ -79,6 +80,19 @@ type
       const AData: TJvCustomInspectorData); override;
   end;
 
+  TGRInspectorEventItem = class(TJvCustomInspectorItem)
+    class procedure RegisterAsDefaultItem;
+  protected
+    function GetDisplayValue: string; override;
+    procedure GetValueList(const Strings: TStrings); override;
+    procedure SetDisplayValue(const Value: string); override;
+    procedure SetFlags(const Value: TInspectorItemFlags); override;
+    procedure Edit; override;
+    procedure EditMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer); override;
+  end;
+
+
 function GLayerInspector: TGRLayerInspector;
 
 
@@ -86,6 +100,10 @@ resourcestring
   rsSkew = 'Skew';
   rsPivot = 'Pivot';
   rsScaling = 'Scaling';
+  rsEvents = 'Events';
+  rsSettings = 'Settings';
+  rsScriptBehavior = 'ScriptBehavior';
+
 
 implementation
 
@@ -188,8 +206,9 @@ begin
         vInspEventCat := TJvInspectorCustomCategoryItem.Create(Parent, nil);
         vInspEventCat.DisplayName := rsEvents;
         for i := 0 to vEventStrs.Count - 1 do
-        with TJvInspectorPropData.New(vInspEventCat, aObj, vEventStrs.Strings[i]) as TJvInspectorTMethodItem do
+        with TJvInspectorPropData.New(vInspEventCat, aObj, vEventStrs.Strings[i]) {as TJvInspectorTMethodItem} do
         begin
+          {
           AddInstance(aObj, 'Self');
           vBehaviors := TStringList.Create;
           try
@@ -203,8 +222,8 @@ begin
           finally
             vBehaviors.Free;
           end;
+          //}
         end;
-        TJvInspectorPropData.New(vInspEventCat, aObj, 'OnRightClick');
         vInspEventCat.Expanded := True;
       end;
     finally
@@ -244,6 +263,21 @@ begin
     AddEventsToInspector(vInspCat, aObj);
   end;
 
+end;
+
+procedure TGRLayerInspector.AddSettingObjectToInspector;
+var
+  vInspCat: TJvInspectorCustomCategoryItem;
+begin
+  vInspCat := TJvInspectorCustomCategoryItem.Create(FInspector.Root, nil);
+  vInspCat.DisplayName := rsSettings;
+  TJvInspectorPropData.New(vInspCat, Editor, 'Bitmap');
+  TJvInspectorPropData.New(vInspCat, Editor, 'BitmapAlign');
+  TJvInspectorPropData.New(vInspCat, Editor, 'Scale');
+  TJvInspectorPropData.New(vInspCat, Editor, 'ScaleMode');
+  TJvInspectorPropData.New(vInspCat, Editor, 'ShowHint');
+  //TJvInspectorPropData.New(vInspCat, Editor);
+  vInspCat.Expanded := True;
 end;
 
 procedure TGRLayerInspector.DoLayerListNotify(Sender: TLayerCollection; Action: TLayerListNotification;
@@ -376,8 +410,83 @@ begin
   AddColumnPrim(FY);
 end;
 
+{ TGRInspectorEventItem }
+class procedure TGRInspectorEventItem.RegisterAsDefaultItem;
+begin
+  TJvCustomInspectorData.ItemRegister.Add(
+    TJvInspectorTypeInfoRegItem.Create(
+      TGRInspectorEventItem, TypeInfo(TGRNotifyEventStr)));
+end;
+
+function TGRInspectorEventItem.GetDisplayValue: string;
+begin
+  Result := Data.AsString;
+  if (Length(Result) >= 2) and (Result[1] = '<') then
+    Result := rsScriptBehavior;
+end;
+
+procedure TGRInspectorEventItem.GetValueList(const Strings: TStrings);
+var
+  vInstance: TSDPlayingLayer;
+begin
+  if (Data is TJvInspectorPropData) then
+  begin
+    vInstance := TSDPlayingLayer(TJvInspectorPropData(Data).Instance);
+    if vInstance is TSDPlayingLayer then
+    begin
+      vInstance.GetRegisteredBehaviors(Strings);
+    end;
+  end;
+end;
+
+procedure TGRInspectorEventItem.SetDisplayValue(const Value: string);
+begin
+  if Value = rsScriptBehavior then 
+  begin
+    if Data.AsString = '' then 
+    begin
+      Data.AsString := '<>';
+      Edit;
+    end;
+  end
+  else
+    Data.AsString := Value;
+end;
+
+procedure TGRInspectorEventItem.SetFlags(const Value: TInspectorItemFlags);
+var
+  NewValue: TInspectorItemFlags;
+begin
+  NewValue := Value + [iifValueList, iifAutoUpdate];
+  inherited SetFlags(NewValue);
+end;
+
+procedure TGRInspectorEventItem.Edit;
+var
+  s: string;
+begin
+  s := Data.AsString;
+  if (Length(s) >= 2) and (s[1] = '<')  then
+  begin
+    System.Delete(s,1, 1);
+    System.Delete(s, Length(s), 1);
+    s := Trim(TdlgScriptEdit.Execute(s));
+    s := '<' + s + '>';
+    Data.AsString := s;
+  end;
+end;
+
+procedure TGRInspectorEventItem.EditMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if (Button = mbLeft) and (ssDouble in Shift) then
+    Edit;
+end;
+
 initialization
   FLayerInspector := nil;
+  TGRInspectorEventItem.RegisterAsDefaultItem;
+
 
   {with TJvCustomInspectorData.ItemRegister do
   begin
