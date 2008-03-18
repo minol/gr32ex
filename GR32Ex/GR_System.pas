@@ -27,14 +27,44 @@ interface
 {$I Setting.inc}
 
 uses
-  SysUtils,
+  Windows,
+  SysUtils, Classes
   {$IFDEF CLX}
-  Qt, Types {$IFDEF LINUX}, Libc {$ELSE}, Windows{$ENDIF}
+  Qt, Types {$IFDEF LINUX}, Libc {$ENDIF}
   {$ELSE}
-  Windows
   {$ENDIF};
 
 type
+
+  {: the abstract buffer collection item }
+  TGRBufferItem = class(TCollectionItem)
+  protected
+    {: keep it in the memory if > 0 even through the Cached property is not be set }
+    FInUse: Integer;
+    FCached: Boolean;
+    FName: string;
+    FURL: string;
+
+    function GetDisplayName: string; override;
+    procedure LoadBuffer; virtual;abstract;
+    procedure ReleaseBuffer; virtual;abstract;
+    function DoURLChanged(const aURL: string): Boolean; virtual;
+    procedure SetURL(const Value: string);
+  public
+    procedure Assign(Source: TPersistent); override;
+    procedure Use;
+    procedure UnUse;
+
+    property Name: string read FName write FName;
+    { http://
+      file://
+      res://
+    }
+    property URL: string read FURL write SetURL;
+    property InUse: Integer read FInUse;
+    { Summary: whether cache this picture in the memory }
+    property Cached: Boolean read FCached write FCached;
+  end;
 
   //like the record do not call constructor to create a instance.
   //faster than class.
@@ -202,6 +232,60 @@ begin
 end;
 {$ENDIF}
 
+{ TGRBufferItem }
+procedure TGRBufferItem.Assign(Source: TPersistent);
+begin
+  if Source is TGRBufferItem then
+  begin
+    Name := TGRBufferItem(Source).Name;
+    Cached := TGRBufferItem(Source).Cached;
+  end
+  else
+    inherited;
+end;
+
+function TGRBufferItem.DoURLChanged(const aURL: string): Boolean;
+begin
+  Result := True;
+end;
+
+function TGRBufferItem.GetDisplayName: string;
+begin
+  Result := FName;
+end;
+
+procedure TGRBufferItem.SetURL(const Value: string);
+begin
+  if FURL <> Value then
+  begin
+    if DoURLChanged(Value) then
+      FURL := Value;
+  end;
+end;
+
+procedure TGRBufferItem.UnUse;
+begin
+  if not FCached then
+    if (InterlockedDecrement(FInUse) <= 0) then
+    begin
+      ReleaseBuffer;
+    end;
+end;
+
+procedure TGRBufferItem.Use;
+begin
+  if not FCached then
+  begin
+    if (FInUse <= 0) then
+    begin
+      if (InterlockedIncrement(FInUse) <= 0) then
+        InterlockedExchange(FInUse, 1);
+      LoadBuffer;
+    end;
+  end;
+end;
+
+{ TGRCounter }
 function TGRCounter.GetElapsed: Extended;
 begin
   Result := (FStopValue - FStartValue - FCalibrate) / FFrequency;

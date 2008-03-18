@@ -1,4 +1,4 @@
-Riceball LEE(* ***** BEGIN LICENSE BLOCK *****
+(* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1
  *
  * The contents of this file are subject to the Mozilla Public License Version
@@ -14,7 +14,7 @@ Riceball LEE(* ***** BEGIN LICENSE BLOCK *****
  * The Original Code is GR_ImageList
  *
  * The Initial Developer of the Original Code is Riceball LEE
- * Portions created by Riceball LEE are Copyright (C) 2004-2007
+ * Portions created by Riceball LEE are Copyright (C) 2004-2008
  * All Rights Reserved.
  *
  * Contributor(s):
@@ -24,7 +24,7 @@ unit GR_ImageList;
 
 interface
 
-{$I GR32.inc}
+{$I Setting.inc}
 
 uses
 {$IFDEF CLX}
@@ -34,38 +34,55 @@ uses
 {$ELSE}
   Windows, Messages, Controls, Graphics,
 {$ENDIF}
-  Classes, SysUtils, GR32;
+  Classes, SysUtils
+  , SyncObjs
+  , GR32
+  , GR_System
+  ;
 
 type
   TGRPictureItemClass = class of TGRPictureItem;
-  { Summary A Graphic container designed to be inserted into
-    TGRGraphicCollection }
-  TGRPictureItem = class(TCollectionItem)
-  private
-    FName: string;
+  { Summary A Picture container designed to be inserted into TGRPictureCollection }
+  {
+    Usage:
+      with PictureItem.Picture do
+      try
+        ....
+      fianlly
+        //delete the picture from memory if no Cached Setting.
+        PictureItem.UnUse;
+      end;
+  }
+  TGRPictureItem = class(TGRBufferItem)
+  protected
     FPicture: TPicture;
     procedure SetPicture(const Value: TPicture);
   protected
-    function GetDisplayName: string; override;
+    function GetPicture: TPicture;
+    procedure LoadBuffer; override;
+    procedure ReleaseBuffer; override;
+    function DoURLChanged(const aURL: string): Boolean;override;
   public
     constructor Create(Collection: TCollection); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
+
   published
-    property Name: string read FName write FName;
-    property Picture: TPicture read FPicture write SetPicture;
+    property Picture: TPicture read GetPicture write SetPicture;
+    property Name;
+    property Cached;
   end;
   
   { Summary A collection of TGRGraphicItem objects }
   TGRPictureCollection = class(TCollection)
-  private
+  protected
     FOwner: TPersistent;
     function GetItem(Index: Integer): TGRPictureItem;
     procedure SetItem(Index: Integer; Value: TGRPictureItem);
   protected
     function GetOwner: TPersistent; override;
   public
-    constructor Create(AOwner: TPersistent; ItemClass: TGRGraphicItemClass);
+    constructor Create(AOwner: TPersistent; ItemClass: TGRPictureItemClass);
     function Add: TGRPictureItem;
     function Find(const aName: string): TGRPictureItem;
     property Items[Index: Integer]: TGRPictureItem read GetItem write SetItem;
@@ -74,16 +91,17 @@ type
   
   { Summary A component that stores TGRGraphicCollection }
   TGRPictureList = class(TComponent)
-  private
+  protected
     FPictureCollection: TGRPictureCollection;
-    function GetPicture(Index: Integer): TPicture;
-    procedure SetPicture(Index: Integer; Value: TPicture);
+    function GetPicture(const Index: Integer): TGRPictureItem;
+    procedure SetPicture(const Index: Integer; const Value: TGRPictureItem);
     procedure SetPictures(const Value: TGRPictureCollection);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    property Picture[Index: Integer]: TPicture read GetPicture write SetPicture;
+    property Picture[const Index: Integer]: TGRPictureItem read GetPicture write SetPicture;
       default;
+    //property PictureByName[const Name: string]: TGRPictureItem read Find;
   published
     property Pictures: TGRPictureCollection read FPictureCollection write
       SetPictures;
@@ -113,16 +131,30 @@ procedure TGRPictureItem.Assign(Source: TPersistent);
 begin
   if Source is TGRPictureItem then
   begin
-    Name := TGRPictureItem(Source).Name;
     Picture := TGRPictureItem(Source).Picture;
   end
   else
     inherited;
 end;
 
-function TGRPictureItem.GetDisplayName: string;
+function TGRPictureItem.DoURLChanged(const aURL: string): Boolean;
 begin
-  Result := FName;
+  //TODO
+  Result := inherited DoURLChanged(aURL);
+end;
+
+procedure TGRPictureItem.LoadBuffer;
+begin
+end;
+
+procedure TGRPictureItem.ReleaseBuffer; 
+begin
+end;
+
+function TGRPictureItem.GetPicture: TPicture;
+begin
+  Use;
+  Result := FPicture;
 end;
 
 procedure TGRPictureItem.SetPicture(const Value: TPicture);
@@ -132,7 +164,7 @@ begin
 end;
 
 constructor TGRPictureCollection.Create(AOwner: TPersistent; ItemClass:
-  TGRGraphicItemClass);
+  TGRPictureItemClass);
 begin
   inherited Create(ItemClass);
   FOwner := AOwner;
@@ -186,19 +218,19 @@ begin
   inherited;
 end;
 
-function TGRPictureList.GetPicture(Index: Integer): TPicture;
+function TGRPictureList.GetPicture(const Index: Integer): TGRPictureItem;
 begin
-  Result := FPictureCollection.Items[Index].Picture;
+  Result := FPictureCollection.Items[Index];
 end;
 
-procedure TGRPictureList.SetPicture(Index: Integer; Value: TPicture);
+procedure TGRPictureList.SetPicture(const Index: Integer; const Value: TGRPictureItem);
 begin
-  FPictureCollection.Items[Index].Picture := Value;
+  FPictureCollection.Items[Index] := Value;
 end;
 
 procedure TGRPictureList.SetPictures(const Value: TGRPictureCollection);
 begin
-  if FPictureCollection <> Value
+  if FPictureCollection <> Value then
     FPictureCollection.Assign(Value);
 end;
 
