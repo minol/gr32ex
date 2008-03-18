@@ -36,7 +36,7 @@ uses
 {$ENDIF}
   Classes, SysUtils
   , SyncObjs
-  , GR32
+  //, GR32
   , GR_System
   ;
 
@@ -70,6 +70,7 @@ type
   published
     property Picture: TPicture read GetPicture write SetPicture;
     property Name;
+    property URL;
     property Cached;
   end;
   
@@ -110,10 +111,10 @@ type
 
 implementation
 
-uses Math, TypInfo, GR32_System;
+//uses Math, TypInfo, GR32_System;
 
-type
-  TBitmap32Access = class(TBitmap32);
+//type
+  //TBitmap32Access = class(TBitmap32);
 
 constructor TGRPictureItem.Create(Collection: TCollection);
 begin
