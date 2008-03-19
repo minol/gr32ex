@@ -274,6 +274,7 @@ end;
 
 procedure TGRPictureList.RemoveChangeNotification(const aComponent: TComponent);
 begin
+  FNotifyList.Remove(aComponent);
 end;
 
 function TGRPictureList.GetPicture(const Index: Integer): TGRPictureItem;
