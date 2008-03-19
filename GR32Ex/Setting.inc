@@ -4,6 +4,7 @@
 
 {Include Delphi Versions File}
 {$I GR32.inc}
+{$I Jedi.inc}
 
 {------------------------------------------------------------------------------}
 { Please change this to suit your needs                                        }
@@ -44,6 +45,7 @@
 {$DEFINE OPTIMIZE_CALLFUNCTIONS_CP_ADD}    { ...and filling }
 {$DEFINE OPTIMIZE_CALLFUNCTIONS}           {very very litle}
 {$DEFINE OPTIMIZE_GLYPHPOLYGONE_STORAGE}   {2% in Filling mode- 20% without filling mode}
+
 {-------------
 
 {------------------------------------------------------------------------------}
@@ -54,7 +56,7 @@
   {$DEFINE MBCSSUPPORT}
 {$ENDIF}
 
-{***************** These compiler settings shouldn't be changed ***************}
+{***************** These compiler settings should not be changed ***************}
   {$A+ Force alignment on word/dword boundaries}
   {$S+ stack checking}
 
@@ -82,6 +84,16 @@
 
 {$IFNDEF COMPILER7}
   {$undef XPTHEMES}
+{$ENDIF}
+
+{the CompoundFile}
+{$IFDEF COMPILER4_UP}
+  {$DEFINE HasLongWord}       { D4 and above have a true LongWord type }
+  {$DEFINE HasInt64 }         { D4 and above have a 64-bit Integer }
+{$ENDIF}
+{$IFDEF LINUX}
+  {$DEFINE HasLongWord}       { Kylix has a true LongWord type }
+  {$DEFINE HasInt64 }         { Kylix has a 64-bit Integer }
 {$ENDIF}
 
 {$ENDIF ~SETTING_INC}
