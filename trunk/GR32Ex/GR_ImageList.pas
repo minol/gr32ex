@@ -41,6 +41,9 @@ uses
   , GR_System
   ;
 
+const
+  opChanged = 2;
+
 type
   TGRPictureItemClass = class of TGRPictureItem;
   { Summary A Picture container designed to be inserted into TGRPictureCollection }
@@ -63,8 +66,9 @@ type
     procedure LoadBuffer; override;
     procedure ReleaseBuffer; override;
     function DoURLChanged(const aURL: string): Boolean;override;
+    procedure PictureChanged(Sender: TObject);
   public
-    constructor Create(Collection: TCollection); override;
+    constructor Create(aCollection: TCollection); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
 
@@ -83,6 +87,7 @@ type
     procedure SetItem(Index: Integer; Value: TGRPictureItem);
   protected
     function GetOwner: TPersistent; override;
+    procedure PictureChanged(const Sender: TGRPictureItem);
   public
     constructor Create(AOwner: TPersistent; ItemClass: TGRPictureItemClass);
     function Add: TGRPictureItem;
@@ -91,36 +96,46 @@ type
       default;
   end;
   
+  TGRPictureChangedEvent = procedure (const Sender: TGRPictureItem) of object;
   { Summary A component that stores TGRGraphicCollection }
   TGRPictureList = class(TComponent)
   protected
+    FNotifyList: TList;
+    FOnPictureChanged: TGRPictureChangedEvent;
     FPictureCollection: TGRPictureCollection;
     function GetPicture(const Index: Integer): TGRPictureItem;
     procedure SetPicture(const Index: Integer; const Value: TGRPictureItem);
     procedure SetPictures(const Value: TGRPictureCollection);
+
+    procedure PictureChanged(const Sender: TGRPictureItem);
+    procedure ClearNotifyList;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    property Picture[const Index: Integer]: TGRPictureItem read GetPicture write SetPicture;
-      default;
+    procedure ChangeNotification(const aComponent: TComponent);
+    procedure RemoveChangeNotification(const aComponent: TComponent);
+
+    property Picture[const Index: Integer]: TGRPictureItem read GetPicture write SetPicture; default;
     //property PictureByName[const Name: string]: TGRPictureItem read Find;
+    property OnPictureChanged: TGRPictureChangedEvent read FOnPictureChanged write FOnPictureChanged;
   published
-    property Pictures: TGRPictureCollection read FPictureCollection write
-      SetPictures;
+    property Pictures: TGRPictureCollection read FPictureCollection write SetPictures;
   end;
   
-
 implementation
 
 //uses Math, TypInfo, GR32_System;
 
-//type
+type
+  TComponentAccess = class(TComponent);
   //TBitmap32Access = class(TBitmap32);
 
-constructor TGRPictureItem.Create(Collection: TCollection);
+{ TGRPictureItem }
+constructor TGRPictureItem.Create(aCollection: TCollection);
 begin
   inherited;
   FPicture := TPicture.Create;
+  FPicture.OnChange := PictureChanged;
 end;
 
 destructor TGRPictureItem.Destroy;
@@ -149,6 +164,12 @@ procedure TGRPictureItem.LoadBuffer;
 begin
 end;
 
+procedure TGRPictureItem.PictureChanged(Sender: TObject);
+begin
+  if Collection is TGRPictureCollection then
+    TGRPictureCollection(Collection).PictureChanged(Self);
+end;
+
 procedure TGRPictureItem.ReleaseBuffer; 
 begin
 end;
@@ -165,6 +186,7 @@ begin
     FPicture.Assign(Value);
 end;
 
+{ TGRPictureCollection }
 constructor TGRPictureCollection.Create(AOwner: TPersistent; ItemClass:
   TGRPictureItemClass);
 begin
@@ -203,26 +225,70 @@ begin
   Result := FOwner;
 end;
 
+procedure TGRPictureCollection.PictureChanged(const Sender: TGRPictureItem);
+begin
+  if FOwner is TGRPictureList then
+    TGRPictureList(FOwner).PictureChanged(Sender);
+end;
+
 procedure TGRPictureCollection.SetItem(Index: Integer; Value: TGRPictureItem);
 begin
   inherited SetItem(Index, Value);
 end;
 
+{ TGRPictureList }
 constructor TGRPictureList.Create(AOwner: TComponent);
 begin
   inherited;
   FPictureCollection := TGRPictureCollection.Create(Self, TGRPictureItem);
+  FNotifyList := TList.Create;
 end;
 
 destructor TGRPictureList.Destroy;
 begin
+  ClearNotifyList;
+  FNotifyList.Free;
   FPictureCollection.Free;
   inherited;
+end;
+
+procedure TGRPictureList.ClearNotifyList;
+var
+  i: Integer;
+  vItem: TComponent;
+begin
+  for i := 0 to FNotifyList.Count - 1 do
+  begin
+    vItem := FNotifyList.Items[i];
+    if vItem is TComponent then
+      vItem.RemoveFreeNotification(Self);
+  end;
+  FNotifyList.Clear;
+end;
+
+procedure TGRPictureList.ChangeNotification(const aComponent: TComponent);
+begin
+  if Assigned(aComponent) and (FNotifyList.IndexOf(aComponent) < 0) then
+    FNotifyList.Add(aComponent);
+end;
+
+procedure TGRPictureList.RemoveChangeNotification(const aComponent: TComponent);
+begin
 end;
 
 function TGRPictureList.GetPicture(const Index: Integer): TGRPictureItem;
 begin
   Result := FPictureCollection.Items[Index];
+end;
+
+procedure TGRPictureList.PictureChanged(const Sender: TGRPictureItem);
+var
+  i: Integer;
+begin
+  for i := 0 to FNotifyList.Count - 1 do
+  begin
+    TComponentAccess(FNotifyList.Items[i]).Notification(TComponent(Sender), TOperation(opChanged));
+  end;  
 end;
 
 procedure TGRPictureList.SetPicture(const Index: Integer; const Value: TGRPictureItem);
@@ -235,6 +301,5 @@ begin
   if FPictureCollection <> Value then
     FPictureCollection.Assign(Value);
 end;
-
 
 end.
