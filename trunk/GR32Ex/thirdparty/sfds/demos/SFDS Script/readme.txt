@@ -1,0 +1,1 @@
+Builds a SFDS file based on a text script.

@@ -1,0 +1,1 @@
+Dir := ExtractFileDir(DirAndMask); //nu extrage * la urma !!! , deci nu merge
