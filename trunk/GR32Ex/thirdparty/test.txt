@@ -1,0 +1,16 @@
+test file: setup.exe 
+  Orig Size: 122 605 568 bytes(116M)
+
+Abbrevia:
+AddFile:
+ Time(QueryPerformCount)  297 033 382
+ Size: 138 412 032 Bytes(132M)
+ExtractFile:
+  Time: 53 667 231
+
+GPSS:
+AddFile:
+  Time: 197 888 724
+  Size: 123 084 800 Bytes(117M)
+ExtractFile:
+  Time: 14 409 009
