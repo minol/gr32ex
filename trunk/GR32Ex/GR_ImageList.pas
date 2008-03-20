@@ -49,7 +49,7 @@ type
   { Summary A Picture container designed to be inserted into TGRPictureCollection }
   {
     Usage:
-      with PictureItem.Picture do
+      with PictureItem.GetPicture do
       try
         ....
       fianlly
@@ -60,26 +60,31 @@ type
   TGRPictureItem = class(TGRBufferItem)
   protected
     FPicture: TPicture;
+    FIsPictureStored: Boolean;
     procedure SetPicture(const Value: TPicture);
   protected
-    function GetPicture: TPicture;
     procedure LoadBuffer; override;
     procedure ReleaseBuffer; override;
     function DoURLChanged(const aURL: string): Boolean;override;
     procedure PictureChanged(Sender: TObject);
+    function GetIsPictureStored: Boolean;
   public
     constructor Create(aCollection: TCollection); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
+    function GetPicture: TPicture;
 
   published
-    property Picture: TPicture read GetPicture write SetPicture;
+    property Picture: TPicture read FPicture write SetPicture stored GetIsPictureStored;
+    {  Summary: whether need store the Picture to the local DFM stream when URL is not empty. }
+    property IsPictureStored: Boolean read FIsPictureStored write FIsPictureStored;
     property Name;
+    { Summary the URL address of the Picture. }
     property URL;
     property Cached;
   end;
   
-  { Summary A collection of TGRGraphicItem objects }
+  { Summary: A collection of TGRGraphicItem objects }
   TGRPictureCollection = class(TCollection)
   protected
     FOwner: TPersistent;
@@ -97,7 +102,7 @@ type
   end;
   
   TGRPictureChangedEvent = procedure (const Sender: TGRPictureItem) of object;
-  { Summary A component that stores TGRGraphicCollection }
+  { Summary A component that stores the TGRGraphicCollection }
   TGRPictureList = class(TComponent)
   protected
     FNotifyList: TList;
@@ -158,6 +163,11 @@ function TGRPictureItem.DoURLChanged(const aURL: string): Boolean;
 begin
   //TODO
   Result := inherited DoURLChanged(aURL);
+end;
+
+function TGRPictureItem.GetIsPictureStored: Boolean;
+begin
+  Result := FIsPictureStored or (URL = '');
 end;
 
 procedure TGRPictureItem.LoadBuffer;
@@ -286,10 +296,12 @@ procedure TGRPictureList.PictureChanged(const Sender: TGRPictureItem);
 var
   i: Integer;
 begin
+  if Assigned(FOnPictureChanged) then
+    FOnPictureChanged(Sender);
   for i := 0 to FNotifyList.Count - 1 do
   begin
     TComponentAccess(FNotifyList.Items[i]).Notification(TComponent(Sender), TOperation(opChanged));
-  end;  
+  end;
 end;
 
 procedure TGRPictureList.SetPicture(const Index: Integer; const Value: TGRPictureItem);

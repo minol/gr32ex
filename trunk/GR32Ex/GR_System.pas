@@ -56,9 +56,11 @@ type
     procedure UnUse;
 
     property Name: string read FName write FName;
+    { Summary the URL address of the Item. }
     { http://
       file://
       res://
+      pack://
     }
     property URL: string read FURL write SetURL;
     property InUse: Integer read FInUse;
