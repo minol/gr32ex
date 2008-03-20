@@ -1,0 +1,35 @@
+History
+
+15.08.2007 Version 1.4.1
+- FPC compatibility fix.
+
+17.07.2007 Version 1.4
+- Added zlib compression support via passzlib when compiling with FPC. (Windows, Linux, etc)
+- Option to auto rename stream names as UNIX or Windows valid filenames/paths when loading a SFDS file (keep real names in a new parameter in SFDS_FileEntryRecord called OriginalFileName).
+- Added the posibility to parse SFDS stream and get info, whitout loading the file.
+- Option to change the ChunkSize used for allocating reading/writing buffer.
+
+29.06.2007 Version 1.3
+- Made some optimizations.
+- Enhanced the SFDS Script demo.
+
+15.05.2007 Version 1.2
+- Fixed a bug affecting files larger than 2GB.
+- Added the posibility to store any binary data (not only string, number, date, boolean) as metadata.
+- Made some optimizations.
+- Now it's also Thread-safe to open(clone) a stream using TSFDSMemoryStreamReader (see MultiThreading demo).
+- New Demos.
+
+15.09.2006 Version 1.01
+- added Delphi 5 support, thanks to Paul Nicholls.
+- fixed a small bug in the SFDS_FindFirst, SFDS_FindNext search functions, thanks to Jessie Xie.
+- added a new parameter CompressionStrategy to the OpenStream, WriteFile and WriteFileEx functions of the SFDSxxxWriter. (only has effect when compression is zlib, and can be used to tune the zlib compression algorithm for specific data, but most of the time you will use csDefault)
+- SFDS compression support is now modular. (ZLib compression/decompression support is in sfds_compressorzlib.pas and BZip2 compression/decompression support is in sfds_compressorbzip2.pas), and each application can chose to add only the compression it needs (if you need zlib compression/decompression simply add sfds_compressorzlib to the uses clause somewhere inside your project; the same for BZip2)
+- added an overloaded version of TSFDSCustomReader.OpenStream method to allow openning a stream via file index.
+- added an overloaded verion of TSFDSCustomReader.ExtractFile and TSFDSCustomReader.ExtractFileEx to allow extracting/testing a stream via file index.
+- added AssignUniqueNames parameter to TSFDSCustomReader.Create constructor; now some applications can make sure that all streams have an unique name, so they can be manipulated only via filename.
+- added the posibility to create links to existent streams (the new entries will point to the same data).
+- changed the package directory structure to a simplified version.
+
+25.08.2006 Version 1.0
+First release

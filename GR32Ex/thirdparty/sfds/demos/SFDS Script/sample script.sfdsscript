@@ -1,0 +1,67 @@
+;Sample script
+;This is a comment. It will be printed.
+ This is also a comment. It will NOT be printed.
+;The syntax is Option=Value
+;
+;
+OutputFile=test sfds file.sfds
+
+	Internal File List Compression Format:
+	0 - None; 1 - ZLib; 2 - BZip2;
+InternalFileListCompressionFormat=1
+
+	SFX Mode: 0 - NO SFX; 1 - SFX MODE 1; 2 - SFX MODE 2
+SFXMode=0
+
+	SFX Self Extracting Executable File
+SFX=
+
+	GUID of file. Example: {00000000-0000-0000-0000-000000000000}
+GUID=
+Title=
+Subject=
+Author=
+Version=
+Maker=
+MakerVersion=
+KeyWords=
+Comments=
+        Copy Metadata from the FileMetadataSource SFDS File to the output
+        Use Basic SFDS File Creator to create an empty SFDS file, with the metadata you want.
+FileMetadataSource=MetaSample.sfds
+        ChunkSize used for allocating file reading buffer Min 8KB / MAX 10MB / Default 32KB (write value in bytes)
+ChunkSize=
+
+	Add Files (Loop)
+DiskFileName=.\SFDSScript.exe
+FileName=Exe\SFDSScript\SFDSScript.exe
+FileAttributes=0
+
+	Compression Format: 0 - None; 1 - ZLib; 2 - BZip2;
+CompressionFormat=1
+
+	Compression Strategy (only used with ZLib)
+        Default = 0, Filtered = 1, Huffman = 2, RLE = 3, Fixed = 4
+CompressionStrategy=0
+
+	Compression Level: 0 - Fastest; 1 - Default; 2 - Maximum;
+CompressionLevel=2
+ExtraDataStr=
+ExtraDataInt=0
+
+	Add File
+Execute=SFDSFile::AddFile
+
+	New File To Add
+DiskFileName=.\sample script.sfdsscript
+FileName=sample script\sample script.sfdsscript
+	Previous CompressionFormat, CompressionLevel, etc values are preserved so there is no need to write them again.
+
+	Add File
+Execute=SFDSFile::AddFile
+
+	Close SFDS File
+Execute=SFDSFile::Close
+
+;After SFDSFile::Close, no more text will be parsed.
+;You won't see this 2 last lines.

@@ -1,0 +1,33 @@
+;Recursive pack dir script
+OutputFile=test sfds file (rec).sfds
+InternalFileListCompressionFormat=1
+SFXMode=0
+SFX=
+GUID=
+Title=
+Subject=
+Author=
+Version=
+Maker=
+MakerVersion=
+KeyWords=
+Comments=
+ChunkSize=
+FileMetadataSource=MetaSample.sfds
+    Write dirpath + mask
+    /s add files from subdirectories (recursive)
+    mask: *.pas
+          *.pas;*.dfm
+          unit?.pas;unit?.dfm
+DiskFileName=..\Basic SFDS File Creator\* /s
+    SubDir In Archive:
+    Files Names will be SubDir\FileName
+FileName=SubDirInArchive
+FileAttributes=0
+CompressionFormat=1
+CompressionStrategy=0
+CompressionLevel=2
+ExtraDataStr=
+ExtraDataInt=0
+Execute=SFDSFile::AddFile
+Execute=SFDSFile::Close

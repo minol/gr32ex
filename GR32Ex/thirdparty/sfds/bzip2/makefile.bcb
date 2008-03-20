@@ -1,0 +1,115 @@
+# Makefile for BZIP2
+# Borland C++ Builder
+# usage: make -f makefile.bcb
+# Edison Mera Menéndez (efmera@yahoo.com)
+# bzip2 1.0.2 available at http://sources.redhat.com/bzip2/
+
+# ------------------------------- Borland C++ -------------------------------
+!ifndef BCB
+BCB = $(MAKEDIR)\..
+!endif
+# ---------------------------------------------------------------------------
+CFLAGS= -O2 -Hc -w- -k- -r -vi -c -a4 -b- -w-par -w-inl -Vx -Ve -x \
+  -D__MSC -I$(BCB)\include -L$(BCB)\lib
+ZFLAGS= -DBZ_NO_STDIO
+CC=bcc32
+LD=bcc32
+LIB=tlib
+LDFLAGS= -L$(BCB)\lib\obj;$(BCB)\lib
+LDLLFLAGS= $(LDFLAGS) -aa -x -Tpd
+LINKER = ilink32
+ALLLIB = libbz2.lib vcl.lib import32.lib cp32mt.lib
+DLLOBJ = c0d32.obj
+DEFFILE = libbz2.def
+O=.obj
+
+OBJS = blocksort$(O) huffman$(O) crctable$(O) randtable$(O) compress$(O) \
+  decompress$(O) bzlib$(O)
+
+OBJSP = blocksort$(O)+huffman$(O)+crctable$(O)+randtable$(O)+compress$(O)+\
+  decompress$(O)+bzlib$(O)
+
+OBJS2 = nostdio\blocksort$(O) nostdio\huffman$(O) nostdio\compress$(O) \
+  nostdio\decompress$(O) nostdio\bzlib$(O)
+
+all: libbz2.lib nostdio bzip2.exe bzip2recover.exe minibz2.exe libbz2.dll test
+
+libbz2.lib: $(OBJS)
+	if exist libbz2.lib del libbz2.lib
+	$(LIB) libbz2 +$(OBJSP)
+
+nostdio: mdnostdio $(OBJS2)
+
+bzip2.exe: bzip2.obj libbz2.lib
+	$(LD) $(LDFLAGS) bzip2.obj libbz2.lib
+
+bzip2recover.exe: bzip2recover.obj libbz2.lib
+	$(LD) $(LDFLAGS) bzip2recover.obj libbz2.lib
+
+libbz2.dll: libbz2.lib $(DEFFILE)
+        $(LINKER) $(LDLLFLAGS) $(DLLOBJ), libbz2.dll,, $(ALLLIB), $(DEFFILE),
+
+minibz2.exe: dlltest.obj libbz2.lib
+        $(LD) $(LDFLAGS) -eminibz2.exe dlltest.obj libbz2.lib
+
+test: bzip2.exe
+	type words1
+	.\\bzip2 -1  < sample1.ref > sample1.rb2
+	.\\bzip2 -2  < sample2.ref > sample2.rb2
+	.\\bzip2 -3  < sample3.ref > sample3.rb2
+	.\\bzip2 -d  < sample1.bz2 > sample1.tst
+	.\\bzip2 -d  < sample2.bz2 > sample2.tst
+	.\\bzip2 -ds < sample3.bz2 > sample3.tst
+	fc sample1.bz2 sample1.rb2 
+	fc sample2.bz2 sample2.rb2
+	fc sample3.bz2 sample3.rb2
+	fc sample1.tst sample1.ref
+	fc sample2.tst sample2.ref
+	fc sample3.tst sample3.ref
+	type words3
+
+clean:
+	del *.obj
+	del *.exe
+	del *.lib
+	del *.rb2
+	del *.tst
+	del *.dll
+	del *.il*
+	del *.tds
+	deltree /Y nostdio
+
+mdnostdio:
+	md nostdio
+
+nostdio\blocksort.obj: blocksort.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $(ZFLAGS) -nnostdio blocksort.c
+nostdio\bzlib.obj: bzlib.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $(ZFLAGS) -nnostdio bzlib.c
+nostdio\compress.obj: compress.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $(ZFLAGS) -nnostdio compress.c
+nostdio\decompress.obj: decompress.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $(ZFLAGS) -nnostdio decompress.c
+nostdio\huffman.obj: huffman.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $(ZFLAGS) -nnostdio huffman.c
+
+bzlib.obj: bzlib.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $*.c
+blocksort.obj: blocksort.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $*.c
+compress.obj: compress.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $*.c
+decompress.obj: decompress.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $*.c
+huffman.obj: huffman.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $*.c
+bzip2.obj: bzip2.c bzlib.h
+	$(CC) -c $(CFLAGS) -D_S_IFREG=S_IFREG -DMY_STAT=stat $*.c
+bzip2recover.obj: bzip2recover.c
+	$(CC) -c $(CFLAGS) $*.c
+crctable.obj: crctable.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $*.c
+dlltest.obj: dlltest.c bzlib.h
+	$(CC) -c $(CFLAGS) $*.c
+randtable.obj: randtable.c bzlib_private.h
+	$(CC) -c $(CFLAGS) $*.c
