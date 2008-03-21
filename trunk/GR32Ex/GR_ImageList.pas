@@ -88,11 +88,14 @@ type
   TGRPictureCollection = class(TCollection)
   protected
     FOwner: TPersistent;
+    FOnPictureChanged: TGRPictureChangedEvent;
     function GetItem(Index: Integer): TGRPictureItem;
     procedure SetItem(Index: Integer; Value: TGRPictureItem);
   protected
     function GetOwner: TPersistent; override;
     procedure PictureChanged(const Sender: TGRPictureItem);
+
+    property OnPictureChanged: TGRPictureChangedEvent read FOnPictureChanged write FOnPictureChanged;
   public
     constructor Create(AOwner: TPersistent; ItemClass: TGRPictureItemClass);
     function Add: TGRPictureItem;
@@ -237,8 +240,10 @@ end;
 
 procedure TGRPictureCollection.PictureChanged(const Sender: TGRPictureItem);
 begin
-  if FOwner is TGRPictureList then
-    TGRPictureList(FOwner).PictureChanged(Sender);
+  if Assigned(FOnPictureChanged) then
+    FOnPictureChanged(Sender);
+  //if FOwner is TGRPictureList then
+    //TGRPictureList(FOwner).PictureChanged(Sender);
 end;
 
 procedure TGRPictureCollection.SetItem(Index: Integer; Value: TGRPictureItem);
@@ -251,6 +256,7 @@ constructor TGRPictureList.Create(AOwner: TComponent);
 begin
   inherited;
   FPictureCollection := TGRPictureCollection.Create(Self, TGRPictureItem);
+  FPictureCollection.OnPictureChanged := PictureChanged;
   FNotifyList := TList.Create;
 end;
 
