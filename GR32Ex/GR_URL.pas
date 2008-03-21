@@ -42,9 +42,9 @@ type
                               const RqType : TGRResourceSupport;
                               const Error  : TGRResourceResult) of object;
 
-  TGRCustomResourceConnection = class;
+  TGRResourceConnection = class;
 
-  TGRResourceConnectionClass = class of TGRCustomResourceConnection;
+  TGRResourceConnectionClass = class of TGRResourceConnection;
 
   TGRResourceLocator = class
   protected
@@ -65,7 +65,7 @@ type
     function GetResourceHeader(const aURL: string; const aInfo: TStrings): TGRResourceResult;
   end;
 
-  TGRCustomResourceConnection = class
+  TGRResourceConnection = class
   protected
     FURL: string;
 
@@ -78,7 +78,7 @@ type
     function iPut(const aStream: TStream): TGRResourceResult; virtual; abstract;
     function iDelete(): TGRResourceResult; virtual; abstract;
   public
-    class function CreateConnection(const aURL: string): TGRCustomResourceConnection;
+    class function CreateConnection(const aURL: string): TGRResourceConnection;
     class function Supports: TGRResourceSupports; virtual; abstract;
     //list this connection supports protocols, seperate by ";"
     //eg, http;https
@@ -152,8 +152,8 @@ function TGRResourceLocator.PutResource(const aURL: string; const aStream: TStre
 begin
 end;
 
-{ TGRCustomResourceConnection }
-class function TGRCustomResourceConnection.CreateConnection(const aURL: string): TGRCustomResourceConnection;
+{ TGRResourceConnection }
+class function TGRResourceConnection.CreateConnection(const aURL: string): TGRResourceConnection;
 var
   i: Integer;
 begin
@@ -166,7 +166,7 @@ begin
     Result := nil;
 end;
 
-class function TGRCustomResourceConnection.CanProcessed(const aProtocol: string): Boolean;
+class function TGRResourceConnection.CanProcessed(const aProtocol: string): Boolean;
 var
   s: string;
 begin
@@ -178,7 +178,7 @@ begin
   end;
 end;
 
-class function TGRCustomResourceConnection.IndexOfConnectionClass(const aURL: string): Integer;
+class function TGRResourceConnection.IndexOfConnectionClass(const aURL: string): Integer;
 var
   vProtocol: string;
 begin
@@ -194,20 +194,20 @@ begin
   Result := -1;
 end;
 
-class procedure TGRCustomResourceConnection.Register;
+class procedure TGRResourceConnection.Register;
 begin
   with GResourceConnectionClasses do
     if IndexOf(ClassType) < 0 then
       Add(ClassType);
 end;
 
-constructor TGRCustomResourceConnection.Create(const aURL: string = '');
+constructor TGRResourceConnection.Create(const aURL: string = '');
 begin
   inherited;
   URL := aURL;
 end;
 
-procedure TGRCustomResourceConnection.SetURL(const aURL: string);
+procedure TGRResourceConnection.SetURL(const aURL: string);
 begin
   if FURL <> aURL then
   begin
@@ -216,7 +216,7 @@ begin
   end;
 end;
 
-function TGRCustomResourceConnection.GetResourceHeader(const aInfo: TStrings): TGRResourceResult;
+function TGRResourceConnection.GetResourceHeader(const aInfo: TStrings): TGRResourceResult;
 begin
   if rsfHead in Supports then
     Result := iGetHeader(aInfo)
@@ -224,7 +224,7 @@ begin
     Result := rrNoSupports;
 end;
 
-function TGRCustomResourceConnection.GetResource(const aStream: TStream): TGRResourceResult;
+function TGRResourceConnection.GetResource(const aStream: TStream): TGRResourceResult;
 begin
   if rsfGet in Supports then
     Result := iGet(aStream)
@@ -232,7 +232,7 @@ begin
     Result := rrNoSupports;
 end;
 
-function TGRCustomResourceConnection.PutResource(const aStream: TStream): TGRResourceResult;
+function TGRResourceConnection.PutResource(const aStream: TStream): TGRResourceResult;
 begin
   if rsfPut in Supports then
     Result := iPut(aStream)
@@ -240,7 +240,7 @@ begin
     Result := rrNoSupports;
 end;
 
-function TGRCustomResourceConnection.DeleteResource(): TGRResourceResult;
+function TGRResourceConnection.DeleteResource(): TGRResourceResult;
 begin
   if rsfDelete in Supports then
     Result := iDelete()
@@ -248,46 +248,62 @@ begin
     Result := rrNoSupports;
 end;
 
-class function TGRCustomResourceConnection.GetResourceHeader(const aURL: string; const aInfo: TStrings): TGRResourceResult;
+class function TGRResourceConnection.GetResourceHeader(const aURL: string; const aInfo: TStrings): TGRResourceResult;
 var
-  vConn: TGRCustomResourceConnection;
+  vConn: TGRResourceConnection;
 begin
   vConn := CreateConnection(aURL);
   if Assigned(vConn) then
+  try
     Result := vConn.GetResourceHeader(aInfo);
+  finally
+    vConn.Free;
+  end
   else
     Result := rrNoSuchProtocol;  
 end;
 
-class function TGRCustomResourceConnection.GetResource(const aURL: string; const aStream: TStream): TGRResourceResult;
+class function TGRResourceConnection.GetResource(const aURL: string; const aStream: TStream): TGRResourceResult;
 var
-  vConn: TGRCustomResourceConnection;
+  vConn: TGRResourceConnection;
 begin
   vConn := CreateConnection(aURL);
   if Assigned(vConn) then
+  try
     Result := vConn.GetResource(aStream);
+  finally
+    vConn.Free;
+  end
   else
     Result := rrNoSuchProtocol;  
 end;
 
-class function TGRCustomResourceConnection.PutResource(const aURL: string; const aStream: TStream): TGRResourceResult;
+class function TGRResourceConnection.PutResource(const aURL: string; const aStream: TStream): TGRResourceResult;
 var
-  vConn: TGRCustomResourceConnection;
+  vConn: TGRResourceConnection;
 begin
   vConn := CreateConnection(aURL);
   if Assigned(vConn) then
+  try
     Result := vConn.PutResource(aStream);
+  finally
+    vConn.Free;
+  end
   else
     Result := rrNoSuchProtocol;  
 end;
 
-class function TGRCustomResourceConnection.DeleteResource(const aURL: string): TGRResourceResult;
+class function TGRResourceConnection.DeleteResource(const aURL: string): TGRResourceResult;
 var
-  vConn: TGRCustomResourceConnection;
+  vConn: TGRResourceConnection;
 begin
   vConn := CreateConnection(aURL);
   if Assigned(vConn) then
+  try
     Result := vConn.DeleteResource();
+  finally
+    vConn.Free;
+  end
   else
     Result := rrNoSuchProtocol;  
 end;
