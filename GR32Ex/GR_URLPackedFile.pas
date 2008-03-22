@@ -31,12 +31,16 @@ interface
 
 uses
   SysUtils, Classes
+  , GpStructuredStorage
   , GR_URL
   ;
 
 type
 
   TGRPackedFileConnection = class(TGRResourceConnection)
+  protected
+    FStorage: IGpStructuredStorage;
+    FFileName: string;
   protected
     function UpdateURL(const Value: string): Boolean; override;
     function iGetHeader(const aInfo: TStrings): TGRResourceResult; override;
@@ -45,9 +49,8 @@ type
     function iDelete(): TGRResourceResult; override;
   public
     class function Supports: TGRResourceSupports; override;
-    //list this connection supports protocols, seperate by ";"
-    //eg, http;https
     class function Protocols: string; override;
+    constructor Create(const aURL: string = ''); override;
   end;
 
 implementation
@@ -66,8 +69,15 @@ begin
   Result := 'pack';
 end;
 
+constructor TGRResourceConnection.Create(const aURL: string);
+begin
+  inherited;
+end;
+
 function TGRResourceConnection.UpdateURL(const Value: string): Boolean;
 begin
+  FStorage := CreateStructuredStorage;
+
 end;
 
 function TGRResourceConnection.iGetHeader(const aInfo: TStrings): TGRResourceResult;

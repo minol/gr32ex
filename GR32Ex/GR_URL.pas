@@ -49,30 +49,18 @@ type
   TGRResourceLocator = class
   protected
   public
-    constructor Create;
-    destructor Destroy; override;
-
-    function GetResource(const aURL: string; const aStream: TStream): TGRResourceResult;
-    function PutResource(const aURL: string; const aStream: TStream): TGRResourceResult;
-    function DeleteResource(const aURL: string): TGRResourceResult;
-    {
-      Return the ResourceInfo in aInfo: AttributeName=value
-        Such as:
-        Size=XX
-        Date=XX
-        Revision=
-    }
-    function GetResourceHeader(const aURL: string; const aInfo: TStrings): TGRResourceResult;
   end;
 
   TGRResourceConnection = class
   protected
+    //the current protocol.
+    FProtocol: string;
     FURL: string;
 
     procedure SetURL(const aURL: string);
     class function IndexOfConnectionClass(const aURL: string): Integer;
 
-    function UpdateURL(const Value: string): Boolean; virtual; abstract;
+    function UpdateURL(Var Value: string): Boolean; virtual;
     function iGetHeader(const aInfo: TStrings): TGRResourceResult; virtual; abstract;
     function iGet(const aStream: TStream): TGRResourceResult; virtual; abstract;
     function iPut(const aStream: TStream): TGRResourceResult; virtual; abstract;
@@ -106,6 +94,21 @@ type
     class function DeleteResource(const aURL: string): TGRResourceResult; overload;
 
     property URL: string read FURL write SetURL;
+    property Protocol: string read FProtocol;
+  end;
+
+  { Summary: the abstract file resource. }
+  {
+    the file resource MUST like this: "Protocol://[user:passwd@][d:/folder/../]filename:/folder/../rsource.txt"
+    pack://user:pwd@d:/test/aFile.pak:/folder/test.txt
+  }
+  TGRCustomFileConnection = class(TGRResourceConnection)
+  protected
+    FFileName: string;
+    FUserName: string;
+    FPassword: string;
+
+    function UpdateURL(Var Value: string): Boolean; override;
   end;
 
 { the registered resource connections classes }
@@ -127,30 +130,6 @@ begin
 end;
 
 { TGRResourceLocator }
-constructor TGRResourceLocator.Create;
-begin
-  inherited;
-  FProtocols := TList.Create;
-end;
-
-destructor TGRResourceLocator.Destroy; 
-begin
-  FResourceLocator := nil;
-  FreeAndNil(FProtocols);
-  inherited;
-end;
-
-function TGRResourceLocator.DeleteResource(const aURL: string): TGRResourceResult;
-begin
-end;
-
-function TGRResourceLocator.GetResource(const aURL: string; const aStream: TStream): TGRResourceResult;
-begin
-end;
-
-function TGRResourceLocator.PutResource(const aURL: string; const aStream: TStream): TGRResourceResult;
-begin
-end;
 
 { TGRResourceConnection }
 class function TGRResourceConnection.CreateConnection(const aURL: string): TGRResourceConnection;
@@ -160,7 +139,7 @@ begin
   i := IndexOfConnectionClass(aURL);
   if i >= 0 then
   begin
-    Result := TGRResourceConnectionClass(GResourceConnectionClasses.Items[Result]).Create(aURL);
+    Result := TGRResourceConnectionClass(GResourceConnectionClasses.Items[i]).Create(aURL);
   end
   else
     Result := nil;
@@ -174,7 +153,7 @@ begin
   Result := False;
   while (s <> '') and not Result do
   begin
-    Result := AnsiCompareText(StrFetch(s), aProtocol) = 0;
+    Result := AnsiCompareText(StrFetch(s, ';', True), aProtocol) = 0;
   end;
 end;
 
@@ -188,7 +167,7 @@ begin
     vProtocol := Copy(aURL, 1, Result - 1);
     with GResourceConnectionClasses do
       for Result := 0 to Count -1 do
-        if AnsiCompareText(vProtocol, TGRResourceConnectionClass(Items[Result]).Protocol) = 0 then
+        if AnsiCompareText(vProtocol, TGRResourceConnectionClass(Items[Result]).Protocols) = 0 then
           exit;
   end;
   Result := -1;
@@ -203,15 +182,18 @@ end;
 
 constructor TGRResourceConnection.Create(const aURL: string = '');
 begin
-  inherited;
+  inherited Create;
   URL := aURL;
 end;
 
 procedure TGRResourceConnection.SetURL(const aURL: string);
+var
+  s: string;
 begin
   if FURL <> aURL then
   begin
-    if UpdateURL(aURL) then
+    s := aURL;
+    if UpdateURL(s) then
       FURL := aURL;
   end;
 end;
@@ -306,6 +288,35 @@ begin
   end
   else
     Result := rrNoSuchProtocol;  
+end;
+
+function TGRResourceConnection.UpdateURL(Var Value: string): Boolean;
+begin
+  FProtocol := StrFetch(Value, ':', True);
+  Result := (FProtocol <> '') and CanProcessed(FProtocol);
+  //if not Result then FProtocol := '';
+end;
+
+{ TGRCustomFileConnection }
+function TGRCustomFileConnection.UpdateURL(Var Value: string): Boolean;
+Var
+  s: string;
+begin
+  Result := inherited UpdateURL(Value);
+  if Result then
+  begin
+    s := StrRFetch(Value, ':', True);
+    Result := s <> '';
+    if Result then
+    begin
+      FFileName := s;
+      s := StrFetch(FFileName, '@', True);
+      FUserName := s;
+      FPassword := StrFetch(FUserName, ':', True);
+    end
+    else
+      Result := False;
+  end;
 end;
 
 initialization
