@@ -1,0 +1,33 @@
+
+
+                    Compound Documents Viewer
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~
+                       Robert R. Marsh, SJ
+                         rrm@sprynet.com
+                 http://home.sprynet.com/sprynet/rrm/
+
+
+   The Compound Document Viewer is a simple demonstration of the
+   CompDoc components. It simply browses through the hierarchical
+   storage system in OLE2 structured storage files showing the
+   storage and stream names in a outline.
+
+   It will compile under all versions of Delphi (note that to compile
+   under Delphi 1 the included OLE2_16.DCU must be available).
+
+   You can find out more about Compound Documents / OLE Structured
+   Storage from the excellent book "Inside OLE" (2nd ed.) by Kraig
+   Brockschmidt (Microsoft Press) or from the Microsoft Developers
+   Network library (via http://microsoft.com/msdn/). Good luck!
+
+   These components are supplied as is. The author disclaims all
+   warranties, expressed or implied, including, without limitation,
+   the warranties of merchantability and of fitness for any purpose.
+   The author assumes no liability for damages, direct or
+   consequential, which may result from their use.
+
+           Copyright (c) 1998 Robert R. Marsh, S.J. &
+          the British Province of the Society of Jesus
+
+Robert R. Marsh, S.J.
+January 6, 1998
