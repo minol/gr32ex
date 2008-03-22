@@ -22,3 +22,19 @@ AddFile:
   Size: 122 605 568(116M)
 ExtractFile:
   Time: 53 846 967
+________________________________________
+test file: 24.2 MB (25,453,533 ×Ö½Ú)
+MS COM+ Structured Storage:
+AddFile:
+  Time: 8 446 312
+  Size: 24.4 MB (25,656,797 ×Ö½Ú)
+ExtractFile:
+  Time: 607 068
+
+GPSS:
+AddFile:
+  Time: 7 152 427
+  Size: 24.3 MB (25,556,957 ×Ö½Ú)
+ExtractFile:
+  Time: 460 319
+
