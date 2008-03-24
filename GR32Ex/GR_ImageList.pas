@@ -45,6 +45,8 @@ const
   opChanged = 2;
 
 type
+  TGRPictureIndex = type Integer;
+
   TGRPictureItemClass = class of TGRPictureItem;
   { Summary A Picture container designed to be inserted into TGRPictureCollection }
   {
