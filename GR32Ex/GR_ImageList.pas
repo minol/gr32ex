@@ -46,6 +46,8 @@ const
 
 type
   TGRPictureIndex = type Integer;
+  TGRPictureItem = class;
+  TGRPictureChangedEvent = procedure (const Sender: TGRPictureItem) of object;
 
   TGRPictureItemClass = class of TGRPictureItem;
   { Summary A Picture container designed to be inserted into TGRPictureCollection }
@@ -106,7 +108,6 @@ type
       default;
   end;
   
-  TGRPictureChangedEvent = procedure (const Sender: TGRPictureItem) of object;
   { Summary A component that stores the TGRGraphicCollection }
   TGRPictureList = class(TComponent)
   protected
