@@ -118,6 +118,7 @@ How to set the transparent to the GRControls:
 Note: 
 No Register function and Component Icon!
 GR32单元的修改支持高级字体：你只需要将 Updater.exe 和 gr32v183Patch.upd 文件放在GR32目录下，然后运行 update.exe 即可应用该修改。
+以及对 PNG 的支持。
 
 here are my changes in GR32.pas:
 
