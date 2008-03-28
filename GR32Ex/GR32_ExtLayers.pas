@@ -1860,7 +1860,7 @@ var
 begin
   //Result := Visible and inherited DoHitTest(X, Y);
  {$IFDEF Debug}
-  SendDebug('DoHitTest='+IntToStr(Integer(Result))+' X='+IntToStr(X)+' Y='+IntToStr(Y));
+  //SendDebug('DoHitTest='+IntToStr(Integer(Result))+' X='+IntToStr(X)+' Y='+IntToStr(Y));
  {$ENDIF}
 
   //if Result and not (rboAllowRotation in Options) then
@@ -1871,14 +1871,14 @@ begin
       Local := ReverseTransform(Point(X, Y));
 
  {$IFDEF Debug}
-  SendDebug(' Local.X='+IntToStr(Local.X)+' Y='+IntToStr(Local.Y));
-  SendDebug(' Sizel.left='+IntToStr(-FThreshold)+' right='+IntToStr(FSize.cx + FThreshold));
+  //SendDebug(' Local.X='+IntToStr(Local.X)+' Y='+IntToStr(Local.Y));
+  //SendDebug(' Sizel.left='+IntToStr(-FThreshold)+' right='+IntToStr(FSize.cx + FThreshold));
  {$ENDIF}
 
     Result := PtInRect(Rect(-FThreshold, -FThreshold, FSize.cx + FThreshold, FSize.cy + FThreshold), Local);
 
    {$IFDEF Debug}
-    sendDebug('DoHitTest.PtInRect='+IntToStr(Integer(Result)));
+    //sendDebug('DoHitTest.PtInRect='+IntToStr(Integer(Result)));
    {$ENDIF}
   end;
 end;
@@ -2170,9 +2170,13 @@ end;
 procedure TGRRubberBandLayer.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 
 begin
-  //update the DragState first.
-  FDragState := GetHitCode(X, Y, Shift);
-  FIsDragging := FDragState <> rdsNone;
+  FIsDragging := (Button = mbLeft);
+  if FIsDragging then
+  begin
+    //update the DragState first.
+    FDragState := GetHitCode(X, Y, Shift);
+    FIsDragging := (FDragState <> rdsNone);
+  end;
  {$IFDEF Debug}
   sendDebug('MouseDown: IsDrag='+IntTOStr(Integer(FIsDragging)));
   sendDebug('X='+IntToStr(X)+' Y='+IntToStr(Y));
@@ -2260,6 +2264,7 @@ var
 begin
   if not TAffineTransformationAccess(FTransformation).TransformValid then
     TAffineTransformationAccess(FTransformation).PrepareTransform;
+  FIsDragging := FIsDragging and (ssLeft in Shift);
   if not FIsDragging then
   begin
     FDragState := GetHitCode(X, Y, Shift);
