@@ -37,7 +37,7 @@ uses
 {$ENDIF}
   Classes, SysUtils
   , SyncObjs
-  //, GR32
+  , GR32
   , GR_System
   ;
 
@@ -46,11 +46,13 @@ const
 
 type
   TGRPictureIndex = type Integer;
-  TGRPictureItem = class;
-  TGRPictureChangedEvent = procedure (const Sender: TGRPictureItem) of object;
+  TGRCustomPictureItem = class;
+  TGRPictureChangedEvent = procedure (const Sender: TGRCustomPictureItem) of object;
 
-  TGRPictureItemClass = class of TGRPictureItem;
-  { Summary A Picture container designed to be inserted into TGRPictureCollection }
+  TGRPictureItemClass = class of TGRCustomPictureItem;
+  TGRPictureCollectionClass = class of TGRCustomPictureCollection;
+
+  { Summary A Picture container designed to be inserted into TGRCustomPictureCollection }
   {
     Usage:
       with PictureItem.GetPicture do
@@ -61,11 +63,9 @@ type
         PictureItem.UnUse;
       end;
   }
-  TGRPictureItem = class(TGRBufferItem)
+  TGRCustomPictureItem = class(TGRBufferItem)
   protected
-    FPicture: TPicture;
     FIsPictureStored: Boolean;
-    procedure SetPicture(const Value: TPicture);
   protected
     procedure LoadBuffer; override;
     procedure ReleaseBuffer; override;
@@ -73,13 +73,9 @@ type
     procedure PictureChanged(Sender: TObject);
     function GetIsPictureStored: Boolean;
   public
-    constructor Create(aCollection: TCollection); override;
-    destructor Destroy; override;
     procedure Assign(Source: TPersistent); override;
-    function GetPicture: TPicture;
 
   published
-    property Picture: TPicture read FPicture write SetPicture stored GetIsPictureStored;
     {  Summary: whether need store the Picture to the local DFM stream when URL is not empty. }
     property IsPictureStored: Boolean read FIsPictureStored write FIsPictureStored;
     property Name;
@@ -88,51 +84,101 @@ type
     property Cached;
   end;
   
-  { Summary: A collection of TGRGraphicItem objects }
-  TGRPictureCollection = class(TCollection)
+  TGRPictureItem = class(TGRCustomPictureItem)
+  protected
+    FPicture: TPicture;
+    procedure SetPicture(const Value: TPicture);
+  public
+    constructor Create(aCollection: TCollection); override;
+    destructor Destroy; override;
+    procedure Assign(Source: TPersistent); override;
+    function GetPicture: TPicture;
+  published
+    property Picture: TPicture read FPicture write SetPicture stored GetIsPictureStored;
+  end;
+
+  TGRBitmapItem = class(TGRCustomPictureItem)
+  protected
+    FPicture: TBitmap32;
+    procedure SetPicture(const Value: TBitmap32);
+  public
+    constructor Create(aCollection: TCollection); override;
+    destructor Destroy; override;
+    procedure Assign(Source: TPersistent); override;
+    function GetPicture: TBitmap32;
+  published
+    property Picture: TBitmap32 read FPicture write SetPicture stored GetIsPictureStored;
+  end;
+
+  { Summary: A collection of TGRPictureItem objects }
+  TGRCustomPictureCollection = class(TCollection)
   protected
     FOwner: TPersistent;
     FOnPictureChanged: TGRPictureChangedEvent;
-    function GetItem(Index: Integer): TGRPictureItem;
-    procedure SetItem(Index: Integer; Value: TGRPictureItem);
+    function GetItem(Index: Integer): TGRCustomPictureItem;
+    procedure SetItem(Index: Integer; Value: TGRCustomPictureItem);
   protected
     function GetOwner: TPersistent; override;
-    procedure PictureChanged(const Sender: TGRPictureItem);
+    procedure PictureChanged(const Sender: TGRCustomPictureItem);
 
     property OnPictureChanged: TGRPictureChangedEvent read FOnPictureChanged write FOnPictureChanged;
   public
-    constructor Create(AOwner: TPersistent; ItemClass: TGRPictureItemClass);
-    function Add: TGRPictureItem;
-    function Find(const aName: string): TGRPictureItem;
-    property Items[Index: Integer]: TGRPictureItem read GetItem write SetItem;
-      default;
+    constructor Create(AOwner: TPersistent);virtual;
+    function Add: TGRCustomPictureItem;
+    function Find(const aName: string): TGRCustomPictureItem;
+    class function ItemClass: TGRPictureItemClass; virtual;abstract;
+
+    property Items[Index: Integer]: TGRCustomPictureItem read GetItem write SetItem; default;
+  end;
+  
+  TGRPictureCollection = class(TGRCustomPictureCollection)
+  protected
+  public
+    class function ItemClass: TGRPictureItemClass; override;
+  end;
+
+  { Summary: A collection of TGRBitmapItem objects }
+  TGRBitmapCollection = class(TGRCustomPictureCollection)
+  public
+    class function ItemClass: TGRPictureItemClass; override;
   end;
   
   { Summary A component that stores the TGRGraphicCollection }
-  TGRPictureList = class(TComponent)
+  TGRCustomPictureList = class(TComponent)
   protected
     FNotifyList: TList;
     FOnPictureChanged: TGRPictureChangedEvent;
-    FPictureCollection: TGRPictureCollection;
-    function GetPicture(const Index: Integer): TGRPictureItem;
-    procedure SetPicture(const Index: Integer; const Value: TGRPictureItem);
-    procedure SetPictures(const Value: TGRPictureCollection);
+    FPictureCollection: TGRCustomPictureCollection;
+    function GetPicture(const Index: Integer): TGRCustomPictureItem;
+    procedure SetPicture(const Index: Integer; const Value: TGRCustomPictureItem);
+    procedure SetPictures(const Value: TGRCustomPictureCollection);
 
-    procedure PictureChanged(const Sender: TGRPictureItem);
+    procedure PictureChanged(const Sender: TGRCustomPictureItem);
     procedure ClearNotifyList;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure ChangeNotification(const aComponent: TComponent);
     procedure RemoveChangeNotification(const aComponent: TComponent);
+    class function CollectionClass: TGRPictureCollectionClass; virtual;abstract;
 
-    property Picture[const Index: Integer]: TGRPictureItem read GetPicture write SetPicture; default;
-    //property PictureByName[const Name: string]: TGRPictureItem read Find;
+    property Picture[const Index: Integer]: TGRCustomPictureItem read GetPicture write SetPicture; default;
+    //property PictureByName[const Name: string]: TGRCustomPictureItem read Find;
     property OnPictureChanged: TGRPictureChangedEvent read FOnPictureChanged write FOnPictureChanged;
   published
-    property Pictures: TGRPictureCollection read FPictureCollection write SetPictures;
+    property Pictures: TGRCustomPictureCollection read FPictureCollection write SetPictures;
+  end;
+
+  TGRPictureList = class(TGRCustomPictureList)
+  public
+    class function CollectionClass: TGRPictureCollectionClass; override;
   end;
   
+  TGRBitmapList = class(TGRCustomPictureList)
+  public
+    class function CollectionClass: TGRPictureCollectionClass; override;
+  end;
+
 implementation
 
 //uses Math, TypInfo, GR32_System;
@@ -140,6 +186,41 @@ implementation
 type
   TComponentAccess = class(TComponent);
   //TBitmap32Access = class(TBitmap32);
+
+{ TGRCustomPictureItem }
+procedure TGRCustomPictureItem.Assign(Source: TPersistent);
+begin
+  if Source is TGRCustomPictureItem then
+  begin
+    IsPictureStored := TGRCustomPictureItem(Source).IsPictureStored;
+  end;
+  inherited;
+end;
+
+function TGRCustomPictureItem.DoURLChanged(const aURL: string): Boolean;
+begin
+  //TODO
+  Result := inherited DoURLChanged(aURL);
+end;
+
+function TGRCustomPictureItem.GetIsPictureStored: Boolean;
+begin
+  Result := FIsPictureStored or (URL = '');
+end;
+
+procedure TGRCustomPictureItem.LoadBuffer;
+begin
+end;
+
+procedure TGRCustomPictureItem.PictureChanged(Sender: TObject);
+begin
+  if Collection is TGRCustomPictureCollection then
+    TGRCustomPictureCollection(Collection).PictureChanged(Self);
+end;
+
+procedure TGRCustomPictureItem.ReleaseBuffer; 
+begin
+end;
 
 { TGRPictureItem }
 constructor TGRPictureItem.Create(aCollection: TCollection);
@@ -160,34 +241,8 @@ begin
   if Source is TGRPictureItem then
   begin
     Picture := TGRPictureItem(Source).Picture;
-  end
-  else
-    inherited;
-end;
-
-function TGRPictureItem.DoURLChanged(const aURL: string): Boolean;
-begin
-  //TODO
-  Result := inherited DoURLChanged(aURL);
-end;
-
-function TGRPictureItem.GetIsPictureStored: Boolean;
-begin
-  Result := FIsPictureStored or (URL = '');
-end;
-
-procedure TGRPictureItem.LoadBuffer;
-begin
-end;
-
-procedure TGRPictureItem.PictureChanged(Sender: TObject);
-begin
-  if Collection is TGRPictureCollection then
-    TGRPictureCollection(Collection).PictureChanged(Self);
-end;
-
-procedure TGRPictureItem.ReleaseBuffer; 
-begin
+  end;
+  inherited;
 end;
 
 function TGRPictureItem.GetPicture: TPicture;
@@ -202,20 +257,54 @@ begin
     FPicture.Assign(Value);
 end;
 
-{ TGRPictureCollection }
-constructor TGRPictureCollection.Create(AOwner: TPersistent; ItemClass:
-  TGRPictureItemClass);
+{ TGRBitmapItem }
+constructor TGRBitmapItem.Create(aCollection: TCollection);
+begin
+  inherited;
+  FPicture := TBitmap32.Create;
+  FPicture.OnChange := PictureChanged;
+end;
+
+destructor TGRBitmapItem.Destroy;
+begin
+  FPicture.Free;
+  inherited;
+end;
+
+procedure TGRBitmapItem.Assign(Source: TPersistent);
+begin
+  if Source is TGRBitmapItem then
+  begin
+    Picture := TGRBitmapItem(Source).Picture;
+  end;
+  inherited;
+end;
+
+function TGRBitmapItem.GetPicture: TBitmap32;
+begin
+  Use;
+  Result := FPicture;
+end;
+
+procedure TGRBitmapItem.SetPicture(const Value: TBitmap32);
+begin
+  if FPicture <> Value then
+    FPicture.Assign(Value);
+end;
+
+{ TGRCustomPictureCollection }
+constructor TGRCustomPictureCollection.Create(AOwner: TPersistent);
 begin
   inherited Create(ItemClass);
   FOwner := AOwner;
 end;
 
-function TGRPictureCollection.Add: TGRPictureItem;
+function TGRCustomPictureCollection.Add: TGRCustomPictureItem;
 begin
-  Result := TGRPictureItem(inherited Add);
+  Result := TGRCustomPictureItem(inherited Add);
 end;
 
-function TGRPictureCollection.Find(const aName: string): TGRPictureItem;
+function TGRCustomPictureCollection.Find(const aName: string): TGRCustomPictureItem;
 var
   I: Integer;
 begin
@@ -231,39 +320,51 @@ begin
   end;
 end;
 
-function TGRPictureCollection.GetItem(Index: Integer): TGRPictureItem;
+function TGRCustomPictureCollection.GetItem(Index: Integer): TGRCustomPictureItem;
 begin
-  Result := TGRPictureItem(inherited GetItem(Index));
+  Result := TGRCustomPictureItem(inherited GetItem(Index));
 end;
 
-function TGRPictureCollection.GetOwner: TPersistent;
+function TGRCustomPictureCollection.GetOwner: TPersistent;
 begin
   Result := FOwner;
 end;
 
-procedure TGRPictureCollection.PictureChanged(const Sender: TGRPictureItem);
+procedure TGRCustomPictureCollection.PictureChanged(const Sender: TGRCustomPictureItem);
 begin
   if Assigned(FOnPictureChanged) then
     FOnPictureChanged(Sender);
-  //if FOwner is TGRPictureList then
-    //TGRPictureList(FOwner).PictureChanged(Sender);
+  //if FOwner is TGRCustomPictureList then
+    //TGRCustomPictureList(FOwner).PictureChanged(Sender);
 end;
 
-procedure TGRPictureCollection.SetItem(Index: Integer; Value: TGRPictureItem);
+procedure TGRCustomPictureCollection.SetItem(Index: Integer; Value: TGRCustomPictureItem);
 begin
   inherited SetItem(Index, Value);
 end;
 
-{ TGRPictureList }
-constructor TGRPictureList.Create(AOwner: TComponent);
+{ TGRPictureCollection }
+class function TGRPictureCollection.ItemClass: TGRPictureItemClass;
+begin
+  Result := TGRPictureItem;
+end;
+
+{ TGRBitmapCollection }
+class function TGRBitmapCollection.ItemClass: TGRPictureItemClass;
+begin
+  Result := TGRBitmapItem;
+end;
+
+{ TGRCustomPictureList }
+constructor TGRCustomPictureList.Create(AOwner: TComponent);
 begin
   inherited;
-  FPictureCollection := TGRPictureCollection.Create(Self, TGRPictureItem);
+  FPictureCollection := CollectionClass.Create(Self);
   FPictureCollection.OnPictureChanged := PictureChanged;
   FNotifyList := TList.Create;
 end;
 
-destructor TGRPictureList.Destroy;
+destructor TGRCustomPictureList.Destroy;
 begin
   ClearNotifyList;
   FNotifyList.Free;
@@ -271,7 +372,7 @@ begin
   inherited;
 end;
 
-procedure TGRPictureList.ClearNotifyList;
+procedure TGRCustomPictureList.ClearNotifyList;
 var
   i: Integer;
   vItem: TComponent;
@@ -285,23 +386,23 @@ begin
   FNotifyList.Clear;
 end;
 
-procedure TGRPictureList.ChangeNotification(const aComponent: TComponent);
+procedure TGRCustomPictureList.ChangeNotification(const aComponent: TComponent);
 begin
   if Assigned(aComponent) and (FNotifyList.IndexOf(aComponent) < 0) then
     FNotifyList.Add(aComponent);
 end;
 
-procedure TGRPictureList.RemoveChangeNotification(const aComponent: TComponent);
+procedure TGRCustomPictureList.RemoveChangeNotification(const aComponent: TComponent);
 begin
   FNotifyList.Remove(aComponent);
 end;
 
-function TGRPictureList.GetPicture(const Index: Integer): TGRPictureItem;
+function TGRCustomPictureList.GetPicture(const Index: Integer): TGRCustomPictureItem;
 begin
   Result := FPictureCollection.Items[Index];
 end;
 
-procedure TGRPictureList.PictureChanged(const Sender: TGRPictureItem);
+procedure TGRCustomPictureList.PictureChanged(const Sender: TGRCustomPictureItem);
 var
   i: Integer;
 begin
@@ -313,15 +414,27 @@ begin
   end;
 end;
 
-procedure TGRPictureList.SetPicture(const Index: Integer; const Value: TGRPictureItem);
+procedure TGRCustomPictureList.SetPicture(const Index: Integer; const Value: TGRCustomPictureItem);
 begin
   FPictureCollection.Items[Index] := Value;
 end;
 
-procedure TGRPictureList.SetPictures(const Value: TGRPictureCollection);
+procedure TGRCustomPictureList.SetPictures(const Value: TGRCustomPictureCollection);
 begin
   if FPictureCollection <> Value then
     FPictureCollection.Assign(Value);
+end;
+
+{ TGRPictureList }
+class function TGRPictureList.CollectionClass: TGRPictureCollectionClass;
+begin
+  Result := TGRPictureCollection;
+end;
+
+{ TGRBitmapList }
+class function TGRBitmapList.CollectionClass: TGRPictureCollectionClass;
+begin
+  Result := TGRBitmapCollection;
 end;
 
 end.
