@@ -326,6 +326,7 @@ type
     destructor Destroy;override;
     function  GetViewportRect: TRect; virtual;
 
+    property Layers: TGRLayerCollection read FLayers;
     property Left: Integer read FLeft write FLeft;
     property Top: Integer read FTop write FTop;
     property Width: Integer read FWidth write FWidth;
@@ -1233,6 +1234,7 @@ begin
   FRepaintOptimizer.Free;
   FInvalidRects.Free;
   FBuffer.Free;
+  FLayers.Free;
   inherited;
 end;
 

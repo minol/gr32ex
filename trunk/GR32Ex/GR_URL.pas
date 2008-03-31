@@ -99,8 +99,8 @@ type
 
   { Summary: the abstract file resource. }
   {
-    the file resource MUST like this: "Protocol://[user:passwd@][d:/folder/../]filename:/folder/../rsource.txt"
-    pack://user:pwd@d:/test/aFile.pak:/folder/test.txt
+    the file resource MUST like this: "Protocol://[user:passwd@][/folder/../]filename:/folder/../rsource.txt"
+    pack://user:pwd@/test/aFile.pak:/folder/test.txt
   }
   TGRCustomFileConnection = class(TGRResourceConnection)
   protected
