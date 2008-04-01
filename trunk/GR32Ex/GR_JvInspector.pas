@@ -4,6 +4,7 @@ interface
 
 uses
   Windows, SysUtils, Classes, Graphics, Dialogs, ExtDlgs, Forms
+  , Controls //MouseType
   , GR32
   , JvInspector, TypInfo
   , JclRTTI
