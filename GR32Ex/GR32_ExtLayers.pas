@@ -132,6 +132,7 @@ uses
   , GR32_Image
   , GR32_Types
   , GR32_Transforms
+  , GR_BitmapEx
   ;
 
 type
@@ -446,10 +447,10 @@ type
 
   TGRBitmapLayer = class(TGRPropertyLayer)
   protected
-    FBitmap: TBitmap32;
+    FBitmap: TBitmap32Ex;
     FCropped: Boolean;
     procedure SetCropped(Value: Boolean);
-    procedure SetBitmap(Value: TBitmap32);
+    procedure SetBitmap(Value: TBitmap32Ex);
   protected
     function DoHitTest(X, Y: Integer): Boolean; override;
     function GetNativeSize: TSize; override;
@@ -463,7 +464,7 @@ type
 
     procedure PaintTo(Buffer: TBitmap32; const R: TRect);
 
-    property Bitmap: TBitmap32 read FBitmap write SetBitmap;
+    property Bitmap: TBitmap32Ex read FBitmap write SetBitmap;
     property Cropped: Boolean read FCropped write SetCropped;
   end;
 
@@ -3020,7 +3021,7 @@ constructor TGRBitmapLayer.Create(ALayerCollection: TLayerCollection);
 begin
   inherited;
 
-  FBitmap := TBitmap32.Create;
+  FBitmap := TBitmap32Ex.Create;
   FBitmap.DrawMode := dmBlend;
   FBitmap.OnChange := BitmapChanged;
 end;
@@ -3059,7 +3060,7 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-procedure TGRBitmapLayer.SetBitmap(Value: TBitmap32);
+procedure TGRBitmapLayer.SetBitmap(Value: TBitmap32Ex);
 begin
   Changing;
   FBitmap.Assign(Value);

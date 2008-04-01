@@ -6,6 +6,8 @@ uses
   Windows, SysUtils, Classes, Graphics, Dialogs, ExtDlgs, Forms
   , Controls //MouseType
   , GR32
+  , GR32_Resamplers
+  , GR_BitmapEx
   , JvInspector, TypInfo
   , JclRTTI
   , JvInspExtraEditors
@@ -32,6 +34,13 @@ type
     procedure SetFlags(const Value: TInspectorItemFlags); override;
     procedure EditMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer); override;
+  end;
+
+  TInspectorBitmap32ExItem = class(TInspectorBitmap32Item)
+    class procedure RegisterAsDefaultItem;
+    //class procedure UnregisterAsDefaultItem;
+  protected
+    procedure Edit; override;
   end;
 
   TInspectorColorItemEx = class(TJvInspectorColorItem)
@@ -64,6 +73,17 @@ type
     property OnEdit: TJvTMethodEditEvent read FOnEdit write FOnEdit;
   end;
 
+  //For TGRResamplerClassName Resampler Class Name in Bitmap32Ex
+  TJvInspectorResamplerClassNameItem = class(TJvCustomInspectorItem)
+    class procedure RegisterAsDefaultItem;
+  protected
+    function GetDisplayValue: string; override;
+    procedure GetValueList(const aStrings: TStrings); override;
+    procedure SetDisplayValue(const Value: string); override;
+    procedure SetFlags(const Value: TInspectorItemFlags); override;
+  end;
+
+
   {
   TInspectorCursorItem = class(TJvInspectorEnumItem)
     class procedure RegisterAsDefaultItem;
@@ -85,6 +105,7 @@ procedure RegisterInspectorItems;
 begin
   TInspectorPictureItem.RegisterAsDefaultItem;
   TInspectorBitmap32Item.RegisterAsDefaultItem;
+  TInspectorBitmap32ExItem.RegisterAsDefaultItem;
   TInspectorColorItemEx.RegisterAsDefaultItem;
 
   TJvInspectorAlignItem.RegisterAsDefaultItem;
@@ -171,6 +192,21 @@ begin
   inherited SetFlags(NewValue);
 end;
 
+{ TInspectorBitmap32ExItem }
+class procedure TInspectorBitmap32ExItem.RegisterAsDefaultItem;
+begin
+  TJvCustomInspectorData.ItemRegister.Add(
+    TJvInspectorTypeInfoRegItem.Create(
+      TInspectorBitmap32ExItem, TypeInfo(TBitmap32Ex)));
+end;
+
+procedure TInspectorBitmap32ExItem.Edit;
+begin
+  if ExecutePictureDialog then
+    TBitmap32Ex(Data.AsOrdinal).LoadFromFile(FFilename);
+end;
+
+
 { TInspectorColorItemEx }
 
 var
@@ -253,6 +289,49 @@ begin
   TJvCustomInspectorData.ItemRegister.Add(
     TJvInspectorTypeKindRegItem.Create(
       TJvInspectorTMethodItemEx, tkMethod));
+end;
+
+{ TJvInspectorResamplerClassNameItem }
+class procedure TJvInspectorResamplerClassNameItem.RegisterAsDefaultItem;
+begin
+  TJvCustomInspectorData.ItemRegister.Add(
+    TJvInspectorTypeInfoRegItem.Create(
+      TJvInspectorResamplerClassNameItem, TypeInfo(TGRResamplerClassName)));
+end;
+
+function TJvInspectorResamplerClassNameItem.GetDisplayValue: string;
+begin
+  Result := Data.AsString;
+end;
+
+procedure TJvInspectorResamplerClassNameItem.GetValueList(const aStrings: TStrings);
+var
+  i: Integer;
+begin
+  if (Data is TJvInspectorPropData) then
+  begin
+    aStrings.Clear;
+    if Assigned(ResamplerList) then
+    with ResamplerList do
+      for i := 0 to Count - 1 do
+      begin
+        if Assigned(Items[i]) then
+          aStrings.Add(Items[i].ClassName);
+      end;
+  end;
+end;
+
+procedure TJvInspectorResamplerClassNameItem.SetDisplayValue(const Value: string);
+begin
+  Data.AsString := Value;
+end;
+
+procedure TJvInspectorResamplerClassNameItem.SetFlags(const Value: TInspectorItemFlags);
+var
+  NewValue: TInspectorItemFlags;
+begin
+  NewValue := Value + [iifValueList, iifAutoUpdate];
+  inherited SetFlags(NewValue);
 end;
 
 initialization
