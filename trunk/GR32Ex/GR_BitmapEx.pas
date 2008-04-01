@@ -44,6 +44,8 @@ uses
   ;
 
 type
+  TGRResamplerClassName = type string;
+
   TBitmap32Ex = class(TBitmap32)
   private
     function GetFont: TFont32;
@@ -55,7 +57,11 @@ type
     procedure DrawTextW(Text: widestring; var aRect: TRect; aFormat: LongWord);
     procedure RenderText(X, Y: Integer; const Text: String); overload;
     procedure RenderTextW(X, Y: Integer; const Text: WideString); overload;
+    procedure LoadFromFile(const FileName: string);
+
     property Font: TFont32 read GetFont write SetFont;
+  published
+    property ResamplerClassName: TGRResamplerClassName read GetResamplerClassName write SetResamplerClassName;
   end;
   
 
@@ -98,6 +104,24 @@ end;
 function TBitmap32Ex.GetFont: TFont32;
 begin
   Result := TFont32(inherited Font);
+end;
+
+procedure TBitmap32Ex.LoadFromFile(const FileName: string);
+var
+  P: TPicture;
+begin
+  P := TPicture.Create;
+  try
+    P.LoadFromFile(FileName);
+    if P.Graphic is TBitmap then
+      with P.Graphic as TBitmap do
+      begin
+        Transparent := True;
+      end;
+    Assign(P);
+  finally
+    P.Free;
+  end;
 end;
 
 procedure TBitmap32Ex.RenderText(X, Y: Integer; const Text: String);
