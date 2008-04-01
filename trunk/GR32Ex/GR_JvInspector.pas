@@ -29,6 +29,8 @@ type
     function ExecutePictureDialog: Boolean;
     procedure Edit; override;
     procedure SetFlags(const Value: TInspectorItemFlags); override;
+    procedure EditMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer); override;
   end;
 
   TInspectorColorItemEx = class(TJvInspectorColorItem)
@@ -151,6 +153,13 @@ procedure TInspectorBitmap32Item.Edit;
 begin
   if ExecutePictureDialog then
     TBitmap32(Data.AsOrdinal).LoadFromFile(FFilename);
+end;
+
+procedure TInspectorBitmap32Item.EditMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if (Button = mbLeft) and (ssDouble in Shift) then
+    Edit;
 end;
 
 procedure TInspectorBitmap32Item.SetFlags(const Value: TInspectorItemFlags);

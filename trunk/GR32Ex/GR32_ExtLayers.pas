@@ -182,6 +182,7 @@ type
     {$IFDEF Designtime_Supports}
     class function RubberbandOptions: TGRRubberBandOptions; virtual;
     {$ENDIF}
+    procedure Assign(Source: TPersistent);override;
 
   public
     property Captured: Boolean read GetCaptured write SetCaptured;
@@ -743,6 +744,17 @@ begin
   inherited;
 end;
 
+procedure TGRCustomLayer.Assign(Source: TPersistent);
+begin
+  if Source is TGRPositionLayer then
+    with Source as TGRPositionLayer do
+    begin
+      Self.Name := FName;
+      //Self.FPosition := FPosition;
+      //Self.FScaled := FScaled;
+    end;
+end;
+
 procedure TGRCustomLayer.AddChangeNotification(ALayer: TGRCustomLayer);
 begin
   if not Assigned(FChangeNotificationList) then FChangeNotificationList := TList.Create;
@@ -861,7 +873,7 @@ begin
       Changed; // Layer collection.
       //DoChange; // Layer only.
     end;
-  //inherited Assign(Source);
+  inherited Assign(Source);
 end;
 
 function TGRPositionLayer.GetAdjustedPosition(const P: TFloatPoint): TFloatPoint;
