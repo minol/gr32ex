@@ -148,6 +148,7 @@ type
 const
   DefaultRubberbandOptions = [rboAllowCornerResize, rboAllowEdgeResize, rboAllowMove,
     rboShowFrame, rboShowHandles];
+  cUnNamed = 'Unnamed';
 
 type
   TGRGridLayer = class;
@@ -174,7 +175,6 @@ type
     procedure SetName(const Value: string);virtual;
     procedure ChangeNotification(ALayer: TGRCustomLayer); virtual;
     procedure DoChange; virtual;
-    procedure Changed; overload; override;
 
   public
     constructor Create(aLayerCollection: TLayerCollection); override;
@@ -183,6 +183,7 @@ type
     class function RubberbandOptions: TGRRubberBandOptions; virtual;
     {$ENDIF}
     procedure Assign(Source: TPersistent);override;
+    procedure Changed; overload; override;
 
   public
     property Captured: Boolean read GetCaptured write SetCaptured;
@@ -206,8 +207,9 @@ type
     procedure SetPosition(const Value: TFloatPoint);
     procedure SetScaled(const Value: Boolean);
     {$IFDEF Designtime_Supports}
-    procedure SeTGRGridLayer(const Value: TGRGridLayer);
-    class function RubberbandOptions: TGRRubberBandOptions; override;
+    procedure SetGridLayer(const Value: TGRGridLayer);
+    procedure Paint(Buffer: TBitmap32); override;
+    function DoHitTest(aX, aY: Integer): Boolean; override;
     {$ENDIF}
 
   protected
@@ -218,12 +220,11 @@ type
     destructor Destroy; override;
     procedure Assign(Source: TPersistent);override;
     {$IFDEF Designtime_Supports}
-    procedure Paint(Buffer: TBitmap32); override;
-    function DoHitTest(aX, aY: Integer): Boolean; override;
+    class function RubberbandOptions: TGRRubberBandOptions; override;
     {$ENDIF}
 
     {$IFDEF Designtime_Supports}
-    property GridLayer: TGRGridLayer read FGridLayer write SeTGRGridLayer;
+    property GridLayer: TGRGridLayer read FGridLayer write SetGridLayer;
     {$ENDIF}
     property Position: TFloatPoint read FPosition write SetPosition;
     property Scaled: Boolean read FScaled write SetScaled; //Scaled with the viewport of a possible owner ImgView32.
@@ -246,20 +247,23 @@ type
     procedure SetSize(const Value: TSize);
   protected
     {$IFDEF Designtime_Supports}
-    class function RubberbandOptions: TGRRubberBandOptions; override;
     procedure Paint(Buffer: TBitmap32); override;
     function DoHitTest(aX, aY: Integer): Boolean; override;
     {$ENDIF}
     function GetNativeSize: TSize;override;
+    procedure iResetTransformation; virtual;
 
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent);override;
+    {$IFDEF Designtime_Supports}
+    class function RubberbandOptions: TGRRubberBandOptions; override;
+    {$ENDIF}
 
     procedure GetLayerTransformation(var Transformation: TAffineTransformation);
     function GetTransformedTargetRect: TFloatRect;
-    procedure ResetTransformation; virtual;
+    procedure ResetTransformation;
     procedure UpdateTransformation; virtual;
 
     property AlphaHit: Boolean read FAlphaHit write FAlphaHit;
@@ -542,6 +546,8 @@ function IndexOfLayers(const aLayers: TLayerCollection; const aName: string): In
 function GetMethodString(const aMethod: TMethod): string;
 function StringsToDynArray(const aStrs: TStrings): TStringDynArray;
 
+function CreateUniqueDefaultName(const aLayers: TLayerCollection; const aNamePrefix: string = cUnNamed): string;
+
 implementation
 
 uses
@@ -564,6 +570,16 @@ const
 
 var
   FLayerClasses: TThreadList;
+
+function CreateUniqueDefaultName(const aLayers: TLayerCollection; const aNamePrefix: string): string;
+var
+  i : Integer;
+begin
+  i := 1;
+  while IndexOfLayers(aLayers, aNamePrefix + IntToStr(i)) >= 0 do
+    Inc(i);
+  Result := aNamePrefix + IntToStr(i);
+end;
 
 function IndexOfLayers(const aLayers: TLayerCollection; const aName: string): Integer;
 var
@@ -649,7 +665,7 @@ procedure ComponentToTextFile(const Component: TComponent; const aFileName: stri
 var
   vBinStream:TMemoryStream;
   vFileStream: TFileStream;
-  s: string;
+  //s: string;
 begin
   vBinStream := TMemoryStream.Create;
   try
@@ -731,7 +747,7 @@ end;
 constructor TGRCustomLayer.Create(aLayerCollection: TLayerCollection);
 begin
   inherited;
-  LayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE;
+  FLayerOptions := LOB_MOUSE_EVENTS or LOB_VISIBLE;
 end;
 
 destructor TGRCustomLayer.Destroy;
@@ -925,8 +941,11 @@ end;
 
 procedure TGRPositionLayer.Paint(Buffer: TBitmap32);
 var
-  SrcRect, DstRect, ClipRect, TempRect: TRect;
-  ImageRect: TRect;
+  //SrcRect, 
+  DstRect, 
+  ClipRect, 
+  TempRect: TRect;
+  //ImageRect: TRect;
 begin
   with GetAdjustedPosition(FPosition) do
   begin
@@ -946,7 +965,7 @@ begin
   end;
 end;
 
-procedure TGRPositionLayer.SeTGRGridLayer(const Value: TGRGridLayer);
+procedure TGRPositionLayer.SetGridLayer(const Value: TGRGridLayer);
 begin
   if Value <> FGridLayer then
   begin
@@ -1008,7 +1027,7 @@ begin
   FSize.cx := 32;
   FSize.cy := 32;
 
-  ResetTransformation;
+  iResetTransformation;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -1114,10 +1133,12 @@ end;
 {$IFDEF Designtime_Supports}
 procedure TGRTransformationLayer.Paint(Buffer: TBitmap32); 
 var
-  SrcRect, DstRect, ClipRect, TempRect: TRect;
-  ImageRect: TRect;
+  //SrcRect, 
+  //DstRect, 
+  //ClipRect, 
+  //TempRect: TRect;
+  //ImageRect: TRect;
 
-var
   Contour: TGRContour;
 
   //--------------- local functions -------------------------------------------
@@ -1227,12 +1248,22 @@ procedure TGRTransformationLayer.ResetTransformation;
 
 begin
   Changing;
+  iResetTransformation;
+  Changed;
+
+  //DoChange;
+end;
+
+procedure TGRTransformationLayer.iResetTransformation;
+
+begin
+  //Changing;
   FTransformation.Clear;
   FSkew := FloatPoint(0, 0);
   FPosition := FloatPoint(0, 0);
   FScaling := FloatPoint(1, 1);
   FAngle := 0;
-  Changed;
+  //Changed;
 
   //DoChange;
 end;
