@@ -47,9 +47,11 @@ type
   TGRResamplerClassName = type string;
 
   TBitmap32Ex = class(TBitmap32)
-  private
+  protected
     function GetFont: TFont32;
     procedure SetFont(Value: TFont32);
+    function GetResamplerClassName: TGRResamplerClassName;
+    procedure SetResamplerClassName(Value: TGRResamplerClassName);
   public
     class function CreateFont: TFont; override;
     procedure DrawGraphic(Graphic: TGraphic; DstRect: TRect);
@@ -216,5 +218,14 @@ begin
   inherited Font.Assign(Value);
 end;
 
+function TBitmap32Ex.GetResamplerClassName: TGRResamplerClassName;
+begin
+  Result := inherited ResamplerClassName;
+end;
+
+procedure TBitmap32Ex.SetResamplerClassName(Value: TGRResamplerClassName);
+begin
+  inherited ResamplerClassName := Value;
+end;
 
 end.
