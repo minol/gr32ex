@@ -34,7 +34,9 @@ uses
   ;
 
 type
+  {$Z4}
   TGRResourceResult = (rrOk, rrNoSuchProtocol, rrNoSupports, rrNoSuchResource, rrNoPermission, rrUnkownError);
+  {$Z1}
   TGRResourceSupport = (rsfGet, rsfPut, rsfDelete, rsfHead);
   TGRResourceSupports = set of TGRResourceSupport;
 
