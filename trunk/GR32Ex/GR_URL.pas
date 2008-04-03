@@ -58,6 +58,7 @@ type
     //the current protocol.
     FProtocol: string;
     FURL: string;
+    FLocalBaseDir: string;
 
     procedure SetURL(const aURL: string);
     class function IndexOfConnectionClass(const aURL: string): Integer;
@@ -68,7 +69,7 @@ type
     function iPut(const aStream: TStream): TGRResourceResult; virtual; abstract;
     function iDelete(): TGRResourceResult; virtual; abstract;
   public
-    class function CreateConnection(const aURL: string): TGRResourceConnection;
+    class function CreateConnection(const aURL: string; const aLocalBaseDir: string = ''): TGRResourceConnection;
     class function Supports: TGRResourceSupports; virtual; abstract;
     //list this connection supports protocols, seperate by ";"
     //eg, http;https
@@ -76,7 +77,7 @@ type
     class procedure Register;
     //test whether this Protocol can be processed.
     class function CanProcessed(const aProtocol: string): Boolean;
-    constructor Create(const aURL: string = ''); virtual;
+    constructor Create(const aURL: string = ''; const aLocalBaseDir: string = ''); virtual;
 
     {
       Return the ResourceInfo in aInfo: AttributeName=value
@@ -90,13 +91,14 @@ type
     function PutResource(const aStream: TStream): TGRResourceResult; overload;
     function DeleteResource(): TGRResourceResult; overload;
 
-    class function GetResourceHeader(const aURL: string; const aInfo: TStrings): TGRResourceResult; overload;
-    class function GetResource(const aURL: string; const aStream: TStream): TGRResourceResult; overload;
-    class function PutResource(const aURL: string; const aStream: TStream): TGRResourceResult; overload;
-    class function DeleteResource(const aURL: string): TGRResourceResult; overload;
+    class function GetResourceHeader(const aURL: string; const aInfo: TStrings; const aLocalBaseDir: string = ''): TGRResourceResult; overload;
+    class function GetResource(const aURL: string; const aStream: TStream; const aLocalBaseDir: string = ''): TGRResourceResult; overload;
+    class function PutResource(const aURL: string; const aStream: TStream; const aLocalBaseDir: string = ''): TGRResourceResult; overload;
+    class function DeleteResource(const aURL: string; const aLocalBaseDir: string = ''): TGRResourceResult; overload;
 
     property URL: string read FURL write SetURL;
     property Protocol: string read FProtocol;
+    property LocalBaseDir: string read FLocalBaseDir write FLocalBaseDir;
   end;
 
   { Summary: the abstract file resource. }
@@ -134,7 +136,7 @@ end;
 { TGRResourceLocator }
 
 { TGRResourceConnection }
-class function TGRResourceConnection.CreateConnection(const aURL: string): TGRResourceConnection;
+class function TGRResourceConnection.CreateConnection(const aURL: string; const aLocalBaseDir: string = ''): TGRResourceConnection;
 var
   i: Integer;
 begin
@@ -142,6 +144,7 @@ begin
   if i >= 0 then
   begin
     Result := TGRResourceConnectionClass(GResourceConnectionClasses.Items[i]).Create(aURL);
+    Result.FLocalBaseDir := aLocalBaseDir;
   end
   else
     Result := nil;
@@ -182,10 +185,11 @@ begin
       Add(ClassType);
 end;
 
-constructor TGRResourceConnection.Create(const aURL: string = '');
+constructor TGRResourceConnection.Create(const aURL: string = ''; const aLocalBaseDir: string = '');
 begin
   inherited Create;
   URL := aURL;
+  FLocalBaseDir := aLocalBaseDir;
 end;
 
 procedure TGRResourceConnection.SetURL(const aURL: string);
@@ -232,13 +236,14 @@ begin
     Result := rrNoSupports;
 end;
 
-class function TGRResourceConnection.GetResourceHeader(const aURL: string; const aInfo: TStrings): TGRResourceResult;
+class function TGRResourceConnection.GetResourceHeader(const aURL: string; const aInfo: TStrings; const aLocalBaseDir: string = ''): TGRResourceResult;
 var
   vConn: TGRResourceConnection;
 begin
   vConn := CreateConnection(aURL);
   if Assigned(vConn) then
   try
+    Result.LocalBaseDir := aLocalBaseDir;
     Result := vConn.GetResourceHeader(aInfo);
   finally
     vConn.Free;
@@ -247,13 +252,14 @@ begin
     Result := rrNoSuchProtocol;  
 end;
 
-class function TGRResourceConnection.GetResource(const aURL: string; const aStream: TStream): TGRResourceResult;
+class function TGRResourceConnection.GetResource(const aURL: string; const aStream: TStream; const aLocalBaseDir: string = ''): TGRResourceResult;
 var
   vConn: TGRResourceConnection;
 begin
   vConn := CreateConnection(aURL);
   if Assigned(vConn) then
   try
+    Result.LocalBaseDir := aLocalBaseDir;
     Result := vConn.GetResource(aStream);
   finally
     vConn.Free;
@@ -262,13 +268,14 @@ begin
     Result := rrNoSuchProtocol;  
 end;
 
-class function TGRResourceConnection.PutResource(const aURL: string; const aStream: TStream): TGRResourceResult;
+class function TGRResourceConnection.PutResource(const aURL: string; const aStream: TStream; const aLocalBaseDir: string = ''): TGRResourceResult;
 var
   vConn: TGRResourceConnection;
 begin
   vConn := CreateConnection(aURL);
   if Assigned(vConn) then
   try
+    Result.LocalBaseDir := aLocalBaseDir;
     Result := vConn.PutResource(aStream);
   finally
     vConn.Free;
@@ -277,13 +284,14 @@ begin
     Result := rrNoSuchProtocol;  
 end;
 
-class function TGRResourceConnection.DeleteResource(const aURL: string): TGRResourceResult;
+class function TGRResourceConnection.DeleteResource(const aURL: string; const aLocalBaseDir: string = ''): TGRResourceResult;
 var
   vConn: TGRResourceConnection;
 begin
   vConn := CreateConnection(aURL);
   if Assigned(vConn) then
   try
+    Result.LocalBaseDir := aLocalBaseDir;
     Result := vConn.DeleteResource();
   finally
     vConn.Free;
