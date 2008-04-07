@@ -75,6 +75,7 @@ type
     property Items[Index: Integer]: TGRAnimationFrame read GetItem write SetItem; default;
   end;
 
+  TGRAniDisplayFrameEvent = procedure(Sender: TObject; aFrame: TGRAnimationFrame) of object;
   TGRAnimationDirection = (adForward, adRewind);
   TGRAniLoopEvent = procedure(Sender: TObject; var Continued: Boolean) of object;
   TGRAnimationClass = class of TGRAnimation;
@@ -90,6 +91,7 @@ type
     FCurrentIndex: Integer;
     FDirection: TGRAnimationDirection;
     FOnLoop: TGRAniLoopEvent;
+    FOnDisplayFrame: TGRAniDisplayFrameEvent;
     procedure SetFrames(const Value: TGRAnimationFrames);
     function GetOwner: TPersistent;override;
     function GetInterval(const FrameIndex: Integer): Integer; virtual;
@@ -108,11 +110,34 @@ type
     procedure Assign(Source: TPersistent);override;
     constructor Create(aOwner: TPersistent);virtual;
     destructor Destroy; override;
+
+    property Enabled: Boolean read FEnabled write FEnabled;
     property Frames: TGRAnimationFrames read FFrames write SetFrames;
+    property IsRunning: Boolean read FRunning;
     property Owner: TPersistent read FOwner;
     property Speed: TGRSpeed read FSpeed write SetSpeed;
     property Looped: Boolean read FLooped write FLooped;
     property OnLoop: TGRAniLoopEvent read FOnLoop write FOnLoop;
+    property OnDisplayFrame: TGRAniDisplayFrameEvent read FOnDisplayFrame write FOnDisplayFrame;
+  end;
+
+  TGRAnimationThread = class(TThread)
+  protected
+    FInterval: LongWord;
+    FAni: TGRAnimation;
+    FStop: THandle;
+    FEnabled: Boolean;
+
+    procedure SetEnabled(const Value: Boolean);
+    procedure SetInterval(const Value: LongWord);
+
+    procedure Execute; override;
+  public
+    constructor Create(const aAnimation: TGRAnimation);
+    destructor Destroy; override;
+
+    property Enabled: Boolean read FEnabled write SetEnabled;
+    property Interval: LongWord read FInterval write SetInterval;
   end;
   
 type
@@ -347,8 +372,13 @@ end;
 function TGRAnimation.DisplayFrame(const FrameIndex: Integer): Boolean;
 begin
   Result := FEnabled and IndexIsValid(FrameIndex);
-  if Result and (Frames.Count > 1) then
-    GetNextIndex(FCurrentIndex, FLooped);
+  if Result then
+  begin
+    if Assigned(FOnDisplayFrame) then
+      FOnDisplayFrame(Self, FFrames[FrameIndex]);
+    if Frames.Count > 1 then
+      GetNextIndex(FCurrentIndex, FLooped);
+  end;
 end;
 
 procedure TGRAnimation.DoLoop(var aContinued: Boolean);
@@ -456,6 +486,69 @@ begin
    begin
      FSpeed := Value;
    end;
+end;
+
+{ TGRAnimationThread }
+
+constructor TGRAnimationThread.Create(const aAnimation: TGRAnimation);
+begin
+  inherited Create(true);
+  FStop := CreateEvent(nil, False, False, nil);
+  FAni := aAnimation;
+  Enabled := false;
+  FreeOnTerminate:= false;
+  FInterval := G32DefaultDelay;
+end;
+
+destructor TGRAnimationThread.Destroy;
+begin
+  Enabled := false;
+  CloseHandle(FStop);
+  Terminate;
+  inherited Destroy;
+end;
+
+procedure TGRAnimationThread.SetEnabled(const Value: Boolean);
+begin
+  if (Value <> FEnabled) and (not Terminated) then
+  begin
+    FEnabled := Value;
+    if FEnabled and (FInterval > 0) then
+      Resume
+    else
+      Suspend;
+  end;
+end;
+
+procedure TGRAnimationThread.SetInterval(const Value: LongWord);
+var
+  WasEnabled: Boolean;
+begin
+  if (Value <> FInterval) and (not Terminated) then
+  begin
+    WasEnabled := FEnabled;
+    FInterval := Value;
+    Enabled := WasEnabled and (FInterval > 0);
+  end;
+end;     
+
+procedure TGRAnimationThread.Execute;
+begin
+  repeat
+    if (WaitForSingleObject(FStop, FInterval) = WAIT_TIMEOUT) and (not Terminated) then
+    begin
+      if FAni.Enabled then
+      begin
+        DisplayFrame(FAni.FCurrentIndex);
+        FAni.FRunning := FAni.GetNextIndex(FAni.FCurrentIndex, FAni.FLooped);
+        if FAni.IsRunning then
+        begin
+          Interval := FAni.GetInterval(FAni.FCurrentIndex);
+        end;
+        Enabled := FAni.IsRunning;
+      end;
+    end;
+  until Terminated;
 end;
 
 end.
