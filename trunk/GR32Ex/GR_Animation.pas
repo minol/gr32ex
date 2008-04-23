@@ -51,6 +51,8 @@ type
   TGRAnimationFrameClass = class of TGRAnimationFrame;
   TGRAnimationFrame = class(TCollectionItem)
   protected
+    //for transparent
+    FBackgroundColor: TColor;
     FBitmap: TBitmap32;
     FDelayTime: LongWord;
     procedure SetBitmap(const aBitmap: TBitmap32);
@@ -58,6 +60,7 @@ type
     constructor Create(Collection: TCollection); override;
     destructor Destroy; override;
   published
+    property BackgroundColor: TColor read FBackgroundColor write FBackgroundColor;
     property Bitmap: TBitmap32 read FBitmap write SetBitmap;
     property DelayTime: LongWord read FDelayTime write FDelayTime;
   end;
@@ -88,19 +91,25 @@ type
     FLooped: Boolean;
     FRunning: Boolean;
     FEnabled: Boolean;
+    FFlipAlpha: Boolean;
     FCurrentIndex: Integer;
     FDirection: TGRAnimationDirection;
+    FBackgroundColor: TColor;
     FOnLoop: TGRAniLoopEvent;
     FOnDisplayFrame: TGRAniDisplayFrameEvent;
     procedure SetFrames(const Value: TGRAnimationFrames);
     function GetOwner: TPersistent;override;
     function GetInterval(const FrameIndex: Integer): Integer; virtual;
     procedure SetSpeed(const Value: TGRSpeed);
-    function GetFrameDelay(const FrameIndex: Integer; const SafeMode: Boolean=True): Integer;
+    function GetFrameDelay(const FrameIndex: Integer; const SafeMode: Boolean=True): Integer;virtual;
     function GetNextIndex(var aIndex: Integer; const CanLoop: Boolean): Boolean;
     function IndexIsValid(const aIndex: Integer): Boolean;
     procedure DoLoop(var aContinued: Boolean);
+
+    procedure DoFlipAlphaChannel(BMP32: TBitmap32);
+    procedure DoFlipAlphaChannels;
   public
+    procedure RequestFlipAlphaChannel;
     function DisplayFirstFrame(): Boolean;
     function DisplayFrame(const FrameIndex: Integer): Boolean;
     procedure LoadFromFile(const Filename: string);
@@ -111,8 +120,10 @@ type
     constructor Create(aOwner: TPersistent);virtual;
     destructor Destroy; override;
 
+    property BackgroundColor: TColor read FBackgroundColor write FBackgroundColor;
     property Enabled: Boolean read FEnabled write FEnabled;
     property Frames: TGRAnimationFrames read FFrames write SetFrames;
+    property FlipAlphaChannel: Boolean read FFlipAlpha write FFlipAlpha;
     property IsRunning: Boolean read FRunning;
     property Owner: TPersistent read FOwner;
     property Speed: TGRSpeed read FSpeed write SetSpeed;
@@ -463,6 +474,33 @@ begin
   end;
 end;
 
+procedure TGRAnimation.DoFlipAlphaChannel(BMP32: TBitmap32);
+var
+ X: Integer;
+ P: PColor32;
+begin
+ P := @(BMP32).Bits[0];
+ for X := 0 to BMP32.Width * BMP32.Height -1 do
+  begin
+   P^ := P^ XOR $FF000000;
+   inc(P);
+  end;
+end;
+
+procedure TGRAnimation.DoFlipAlphaChannels;
+var
+  I: Integer;
+begin
+  for I := 0 to FFrames.Count -1 do
+    DoFlipAlphaChannel( FFrames.Items[I].Bitmap );
+end;
+
+procedure TGRAnimation.RequestFlipAlphaChannel;
+begin
+  if FFlipAlpha then
+    DoFlipAlphaChannels;
+end;
+
 procedure TGRAnimation.SaveToFile(const Filename: string);
 var
   Stream: TStream;
@@ -539,7 +577,7 @@ begin
     begin
       if FAni.Enabled then
       begin
-        DisplayFrame(FAni.FCurrentIndex);
+        FAni.DisplayFrame(FAni.FCurrentIndex);
         FAni.FRunning := FAni.GetNextIndex(FAni.FCurrentIndex, FAni.FLooped);
         if FAni.IsRunning then
         begin
