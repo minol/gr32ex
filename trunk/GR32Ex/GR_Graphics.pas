@@ -617,7 +617,7 @@ begin
       begin
         if CurChar = BreakStr[1] then
         begin
-          ExistingBreak := StrLComp(Pointer(BreakStr), Pointer(@Line[Pos]), BreakLen) = 0;
+          ExistingBreak := StrLComp(PChar(BreakStr), Pointer(@Line[Pos]), BreakLen) = 0;
           if ExistingBreak then
           begin
             Inc(Pos, BreakLen-1);
@@ -639,7 +639,8 @@ begin
     begin
       Col := 1;
       Result := Result + Copy(Line, LinePos, BreakPos - LinePos + 1);
-      if not (CurChar in QuoteChars) then
+      //writeln('re=',Copy(Line, LinePos, BreakPos - LinePos + 1), ' BreakPos=', BreakPos, ' LinePos=', LinePos, ' eb=', ExistingBreak);
+      if not (CurChar in QuoteChars) and not ExistingBreak then
       begin
         while Pos <= LineLen do
         begin
@@ -650,9 +651,10 @@ begin
           end
           else
           begin
-            ExistingBreak := StrLComp(Pointer(@Line[Pos]), sLineBreak, Length(sLineBreak)) = 0;
+            ExistingBreak := StrLComp(PChar(BreakStr), Pointer(@Line[Pos]), BreakLen) = 0;
+            //writeln(pos, '=',ExistingBreak);
             if ExistingBreak then
-              Inc(Pos, Length(sLineBreak))
+              Inc(Pos, BreakLen)
             else
               Break;
           end;
@@ -3010,6 +3012,8 @@ begin
   if DT_WORDBREAK and aFormat = DT_WORDBREAK then
   begin
     Text := WrapTextEx(Text, (aRect.Right - aRect.Left) div vCharSize.cx);
+    //writeln(Format('WordWrap.Col=%d', [(aRect.Right - aRect.Left) div vCharSize.cx]));
+    //writeln(Format('WordWrap.T=%s', [Text]));
     {$ifdef debug}
     //SendDebug(Format('WordWrap.Col=%d', [(aRect.Right - aRect.Left) div vCharSize.cx]));
     //SendDebug(Format('WordWrap.T=%s', [Text]));
@@ -3041,12 +3045,14 @@ begin
     try
       aStrs.Text := Text;
       CurrentY := aRect.Top;
+      //writeln('cc=',aStrs.count);
       for i := 0 to aStrs.Count -1 do
       begin
         CurrentX := aRect.Left;
         {$ifdef debug}
         //SendDebug(Format(aStrs[i]+'.X=%d;Y=%d', [CurrentX, CurrentY]));
         {$endif}
+          //writeln(Format(aStrs[i]+'.X=%d;Y=%d', [CurrentX, CurrentY]));
         DrawLine(CurrentX, CurrentY, aStrs[i]);
         if CurrentX> MaxRight then
           MaxRight := CurrentX;
