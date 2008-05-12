@@ -846,7 +846,8 @@ begin
   begin
 {$IFDEF Designtime_Supports}
     vAllowed := True;
-    vAllowed := IndexOfLayers(LayerCollection, Value) < 0;
+    if Assigned(LayerCollection) then
+      vAllowed := IndexOfLayers(LayerCollection, Value) < 0;
     if Assigned(FOnSetName) then FOnSetName(Self, vAllowed);
     if vAllowed then
 {$ENDIF}
