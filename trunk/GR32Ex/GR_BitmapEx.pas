@@ -48,6 +48,10 @@ type
 
   TBitmap32Ex = class(TBitmap32)
   protected
+    //For BMP
+    FTransparent: Boolean;
+    FTransparentColor: TColor;
+
     function GetFont: TFont32;
     procedure SetFont(Value: TFont32);
     function GetResamplerClassName: TGRResamplerClassName;
@@ -63,6 +67,8 @@ type
 
     property Font: TFont32 read GetFont write SetFont;
   published
+    property Transparent: Boolean read FTransparent write FTransparent;
+    property TransparentColor: TColor read FTransparentColor write FTransparentColor;
     property ResamplerClassName: TGRResamplerClassName read GetResamplerClassName write SetResamplerClassName;
   end;
   
@@ -115,10 +121,11 @@ begin
   P := TPicture.Create;
   try
     P.LoadFromFile(FileName);
-    if P.Graphic is TBitmap then
+    if FTransparent and (P.Graphic is TBitmap) then
       with P.Graphic as TBitmap do
       begin
         Transparent := True;
+        TransparentColor := Self.FTransparentColor;
       end;
     Assign(P);
   finally
