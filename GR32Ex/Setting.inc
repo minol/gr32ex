@@ -23,7 +23,7 @@
     {$ENDIF}
 *)
 {$Define GR32_1_8_Above}
-{.$Define Designtime_Supports}
+{x$Define Designtime_Supports}
 
 // use the PNGImage
 {$Define PNG_Supports}
@@ -46,7 +46,7 @@
 {$DEFINE OPTIMIZE_CALLFUNCTIONS}           {very very litle}
 {$DEFINE OPTIMIZE_GLYPHPOLYGONE_STORAGE}   {2% in Filling mode- 20% without filling mode}
 
-{-------------
+{-------------}
 
 {------------------------------------------------------------------------------}
 { Common compiler defines                                                      }

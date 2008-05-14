@@ -132,6 +132,7 @@ type
     property OnDisplayFrame: TGRAniDisplayFrameEvent read FOnDisplayFrame write FOnDisplayFrame;
   end;
 
+  //to play the TGRAnimation frames.
   TGRAnimationThread = class(TThread)
   protected
     FInterval: LongWord;
