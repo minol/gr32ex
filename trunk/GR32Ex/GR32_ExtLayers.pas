@@ -884,7 +884,9 @@ begin
     with Source as TGRPositionLayer do
     begin
       Changing;
+  {$IFDEF Designtime_Supports}
       Self.GridLayer := GridLayer;
+  {$ENDIF}
       Self.FPosition := FPosition;
       Self.FScaled := FScaled;
 
@@ -949,6 +951,7 @@ var
   TempRect: TRect;
   //ImageRect: TRect;
 begin
+  {$IFDEF Designtime_Supports}
   with GetAdjustedPosition(FPosition) do
   begin
     DstRect.Left := Trunc(X - cPositionLayerWdith);
@@ -965,6 +968,7 @@ begin
     Buffer.LineAS(Left, Top, Right, Bottom, clBlack32);
     Buffer.LineAS(Right, Top, Left, Bottom, clBlack32);
   end;
+  {$ENDIF}
 end;
 
 procedure TGRPositionLayer.SetGridLayer(const Value: TGRGridLayer);
@@ -1008,6 +1012,7 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 { TGRTransformationLayer }
+{$IFDEF Designtime_Supports}
 class function TGRTransformationLayer.RubberbandOptions: TGRRubberBandOptions;
 begin
   Result := [rboAllowCornerResize,
@@ -1018,6 +1023,7 @@ begin
     rboShowHandles
   ];
 end;
+{$ENDIF}
 
 constructor TGRTransformationLayer.Create(ALayerCollection: TLayerCollection);
 
@@ -1770,8 +1776,10 @@ end;
 function TGRRubberBandLayer.GetOptions: TGRRubberBandOptions;
 begin
   Result := FOptions;
+  {$IFDEF Designtime_Supports}
   if Assigned(FChildLayer) then
     Result := Result * FChildLayer.RubberbandOptions;
+  {$ENDIF}
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -2505,6 +2513,7 @@ begin
       end;
     end;
 
+  {$IFDEF Designtime_Supports}
     if FDragState = rdsMoveLayer then
     begin
       // Snap movements to grid. Resizing is not yet covered here.
@@ -2518,6 +2527,7 @@ begin
             Cursor := crGrArrow;
       end;
     end;
+    {$ENDIF}
 
     // Invalidate image data only for real changes.
     if (Abs(LastPosition.X - FPosition.X + LastPosition.Y - FPosition.Y) > Epsilon) or 
@@ -2806,7 +2816,9 @@ var
   begin
     POld := Transformation.ReverseTransform(Point);
     PNew := POld;
+  {$IFDEF Designtime_Supports}
     Result := FGridLayer.Snap(PNew);
+  {$ENDIF}
     dX := PNew.X - POld.X;
     dY := PNew.Y - POld.Y;
     if Result and ((Abs(dX) > Epsilon) or (Abs(dY) > Epsilon)) then
