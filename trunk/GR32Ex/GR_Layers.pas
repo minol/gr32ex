@@ -269,7 +269,7 @@ type
     property OnFrame: TGRAniFrameEvent read FOnFrame write FOnFrame;
   end;
 
-  TGRLayerAnimator_Line = class(TSDPlayingLayerAnimator)
+  TGRLayerAnimator_Line = class(TGRLayerAnimator)
   protected
     FBeginX, FBeginY: Integer;
     FEndX, FEndY: Integer;
@@ -277,6 +277,19 @@ type
     function DrawFrame(const aCurrDuration: Longword): Boolean; override;
   public
     constructor Create(const aLayer: TGRLayer; const aDuration: Longword; const aEndX, aEndY: Integer);
+  end;
+
+  TDynaPoints = array of TPoint;
+  TGRLayerAnimator_LineEx = class(TGRLayerAnimator)
+  protected
+    FIndex: Integer;
+    FEndPoints: TDynaPoints;
+    FBeginX, FBeginY: Integer;
+    FEndX, FEndY: Integer;
+    FMaxStep: Integer;
+    function DrawFrame(aCurrDuration: Longword): Boolean; override;
+  public
+    constructor Create(const aLayer: TGRLayer; const aDuration: Longword; const aEndPoints: TDynaPoints);
   end;
 
   TGRLayerAnimator_Sample = class(TGRLayerAnimator)
@@ -1239,6 +1252,75 @@ begin
       else
       begin
         FLayer.Top := FBeginY - Trunc((aCurrDuration / FDuration) * (FBeginY - FEndY));
+        if FLayer.Top < FEndY then FLayer.Top := FEndY;
+      end;
+    finally
+      FLayer.EndUpdate;
+    end;
+    FLayer.Changed;
+  end;
+end;
+
+{ TGRLayerAnimator_LineEx }
+constructor TGRLayerAnimator_LineEx.Create(const aLayer: TGRLayer; const aDuration: Longword; const aEndPoints: TDynaPoints);
+begin
+  Inherited Create(aLayer, aDuration);
+  Assert(Length(aEndPoints)>0, 'EndPoints is empty');
+  FEndPoints := aEndPoints;
+  FBeginX := aLayer.Left;
+  FBeginY := aLayer.Top;
+  FIndex := 0;
+  FEndX := FEndPoints[0].X;
+  FEndY := FEndPoints[0].Y;
+  Assert(FDuration <> 0);
+  FDuration := FDuration div Length(aEndPoints);
+  FAdjustedDuration := FAdjustedDuration + 120;
+end;
+
+function TGRLayerAnimator_LineEx.DrawFrame(aCurrDuration: Longword): Boolean;
+begin
+  Result := (FDuration=0) or (aCurrDuration > FAdjustedDuration);
+  if not Result then
+  begin
+    if (FLayer.Left = FEndX) and (FLayer.Top = FEndY) then
+    begin
+      Inc(FIndex);
+      Result := FIndex >= Length(FEndPoints); 
+      if not Result then
+      begin
+        FBeginX := FEndX;
+        FBeginY := FEndY;
+        FEndX := FEndPoints[FIndex].X;
+        FEndY := FEndPoints[FIndex].Y;
+      end
+    end;
+  end;
+
+  if not Result then
+  begin
+    aCurrDuration := aCurrDuration - FDuration * FIndex;
+    FLayer.BeginUpdate;
+    FLayer.Changing;
+    try
+      if FBeginX < FEndX then
+      begin
+        FLayer.Left := FBeginX + Round((aCurrDuration / FDuration) * (FEndX - FBeginX));
+        if FLayer.Left > FEndX then FLayer.Left := FEndX;
+      end
+      else
+      begin
+        FLayer.Left := FBeginX - Round((aCurrDuration / FDuration) * (FBeginX - FEndX));
+        if FLayer.Left < FEndX then FLayer.Left := FEndX;
+      end;
+
+      if FBeginY < FEndY then
+      begin
+        FLayer.Top := FBeginY + Round((aCurrDuration / FDuration) * (FEndY - FBeginY));
+        if FLayer.Top > FEndY then FLayer.Top := FEndY;
+      end
+      else
+      begin
+        FLayer.Top := FBeginY - Round((aCurrDuration / FDuration) * (FBeginY - FEndY));
         if FLayer.Top < FEndY then FLayer.Top := FEndY;
       end;
     finally
