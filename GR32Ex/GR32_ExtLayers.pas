@@ -277,6 +277,7 @@ type
     property Scaling: TFloatPoint read FScaling write SetScaling;
     property Skew: TFloatPoint read FSkew write SetSkew;
     property Size: TSize read GetNativeSize write SetSize;
+    property Transformation: TAffineTransformation read FTransformation;
   end;
 
   // The grid elements determine what will be painted of the grid layer.
