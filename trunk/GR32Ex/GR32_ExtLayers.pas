@@ -200,13 +200,14 @@ type
   TGRPositionLayer = class(TGRCustomLayer)
   protected
     FPosition: TFloatPoint;
+    FParentScaled: Boolean;
     FScaled: Boolean;
     {$IFDEF Designtime_Supports}
     FGridLayer: TGRGridLayer;                      // Used to snap/align coordinates.
     {$ENDIF}
 
     procedure SetPosition(const Value: TFloatPoint);
-    procedure SetScaled(const Value: Boolean);
+    procedure SetScaled(const Value: Boolean);virtual;
     {$IFDEF Designtime_Supports}
     procedure SetGridLayer(const Value: TGRGridLayer);
     procedure Paint(Buffer: TBitmap32); override;
@@ -214,10 +215,12 @@ type
     {$ENDIF}
 
   protected
+    procedure NotifyParentScaledChanged(const aScaled: Boolean);
     function GetNativeSize: TSize; virtual;
     procedure Notification(ALayer: TCustomLayer); override;
     function GetAdjustedPosition(const P: TFloatPoint): TFloatPoint;
   public
+    constructor Create(aLayerCollection: TLayerCollection); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent);override;
     {$IFDEF Designtime_Supports}
@@ -228,6 +231,7 @@ type
     property GridLayer: TGRGridLayer read FGridLayer write SetGridLayer;
     {$ENDIF}
     property Position: TFloatPoint read FPosition write SetPosition;
+    property ParentScaled: Boolean read FParentScaled write FParentScaled default true;
     property Scaled: Boolean read FScaled write SetScaled; //Scaled with the viewport of a possible owner ImgView32.
   end;
 
@@ -540,6 +544,34 @@ function GLayerClasses: TThreadList;
 function ComponentToStr(const Component: TComponent): string;
 procedure SaveStrToFile(const aFileName, s: string);
 procedure ComponentToTextFile(const Component: TComponent; const aFileName: string);
+{
+write the Persistent properties to DFM stream.
+
+procedure TXXX.ReadMyPersistentData(aReader: TReader);
+begin
+  ReadPersistentData(FMyPersistent, aReader);
+end;
+
+procedure TXXX.WriteMyPersistentData(aWriter: TWriter);
+begin
+  WritePersistentData(FMyPersistent, aWriter);
+end;
+
+procedure TXXX.DefineProperties(Filer: TFiler);
+  function DoWrite: Boolean;
+  begin
+    if Filer.Ancestor <> nil then
+      Result := not (Filer.Ancestor is TXXX)
+    else
+      Result := True;
+  end;
+begin
+  inherited;
+  Filer.DefineProperty('MyPersistent', ReadMyPersistentData, WriteMyPersistentData, DoWrite);
+end;
+}
+procedure WritePersistentData(const aPersistent: TPersistent; const aWriter: TWriter);
+procedure ReadPersistentData(const aPersistent: TPersistent; const aReader: TReader);
 
 procedure LayersRemoveClasses(const aLayers: TLayerCollection; const aClasses: array of TClass);
 
@@ -660,6 +692,34 @@ begin
     FLayerClasses := TThreadList.Create;
   end;
   Result := FLayerClasses;
+end;
+
+type
+  TReaderAccess = class(TReader);
+  TWriterAccess = class(TWriter);
+procedure ReadPersistentData(const aPersistent: TPersistent; const aReader: TReader);
+begin
+  with TReaderAccess(aReader) do
+  begin
+    Assert(NextValue = vaCollection, 'NOT Persistent Flag');
+    ReadValue; //skip vaCollection flag
+    ReadListBegin;
+    while not EndOfList do ReadProperty(aPersistent);
+    ReadListEnd;
+    ReadListEnd;
+  end;
+end;
+
+procedure WritePersistentData(const aPersistent: TPersistent; const aWriter: TWriter);
+begin
+  with TWriterAccess(aWriter) do
+  begin
+    WriteValue(vaCollection);
+    WriteListBegin;
+    WriteProperties(aPersistent);
+    WriteListEnd;
+    WriteListEnd;
+  end;
 end;
 
 procedure ComponentToTextFile(const Component: TComponent; const aFileName: string);
@@ -868,6 +928,12 @@ end;
 {$ENDIF}
 
 { TGRPositionLayer }
+constructor TGRPositionLayer.Create(aLayerCollection: TLayerCollection);
+begin
+  inherited;
+  FParentScaled := False;
+end;
+
 destructor TGRPositionLayer.Destroy;
 begin
   {$IFDEF Designtime_Supports}
@@ -889,6 +955,7 @@ begin
   {$ENDIF}
       Self.FPosition := FPosition;
       Self.FScaled := FScaled;
+      Self.FParentScaled := FParentScaled;
 
       Changed; // Layer collection.
       //DoChange; // Layer only.
@@ -930,6 +997,16 @@ begin
   if ALayer = FGridLayer then
     FGridLayer := nil;
   {$ENDIF}
+end;
+
+procedure TGRPositionLayer.NotifyParentScaledChanged(const aScaled: Boolean);
+begin
+  if FParentScaled then
+  begin
+    Changing;
+    FScaled := aScaled;
+    Changed;
+  end;
 end;
 
 {$IFDEF Designtime_Supports}

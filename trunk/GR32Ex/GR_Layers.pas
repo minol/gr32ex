@@ -245,19 +245,22 @@ type
     property Animation: TGRAnimation read FAnimation write SetAnimation;
   end;
 
-  TGRAniFrameEvent = procedure(const Sender: TGRLayer; const MoveCount: Longword; var Done: Boolean) of object;
+  TGRAniFrameEvent = procedure(const Sender: TGRLayer; const aCurrDuration: Longword; var Done: Boolean) of object;
   TGRLayerAnimator = class(TThread)
   protected
     //the Duration is ms
     //means the play-time of the animation .
     //0 means for-ever, but some animator do not allow this!!
     FDuration: Longword;
+    //the adjstedDuration for delay.
+    FAdjustedDuration: Longword;
     FIsPaused: Boolean;
-    FLastTick: Longword;
+    FLastFrameTick: Longword;  //last Frame Tick
+    FStartTick: Longword;
     FLayer: TGRLayer;
     FOnFrame: TGRAniFrameEvent;
     //return true means DrawFrame is done. the animation is over.
-    function DrawFrame(const MoveCount: Longword): Boolean; virtual;
+    function DrawFrame(const aCurrDuration: Longword): Boolean; virtual;
     procedure Execute; override;
   public
     constructor Create(const aLayer: TGRLayer; const aDuration: Longword);
@@ -271,7 +274,7 @@ type
     FBeginX, FBeginY: Integer;
     FEndX, FEndY: Integer;
     FMaxStep: Integer;
-    function DrawFrame(const MoveCount: Longword): Boolean; override;
+    function DrawFrame(const aCurrDuration: Longword): Boolean; override;
   public
     constructor Create(const aLayer: TGRLayer; const aDuration: Longword; const aEndX, aEndY: Integer);
   end;
@@ -281,7 +284,7 @@ type
     FCurStep: Integer;
     FOldTop: Integer;
     FMaxStep: Integer;
-    function DrawFrame(const MoveCount: Longword): Boolean; override;
+    function DrawFrame(const aCurrDuration: Longword): Boolean; override;
   public
     constructor Create(const aLayer: TGRLayer; const aMaxStep: Integer);
   end;
@@ -1161,12 +1164,13 @@ begin
   Inherited Create(True);
   FLayer := aLayer;  
   FDuration := aDuration;
+  FAdjustedDuration := aDuration;
 end;
 
-function TGRLayerAnimator.DrawFrame(const MoveCount: Longword): Boolean; 
+function TGRLayerAnimator.DrawFrame(const aCurrDuration: Longword): Boolean; 
 begin
-  Result := Assigned(FOnFrame) and ((FDuration=0) or (MoveCount <= FDuration));
-  if Result then FOnFrame(FLayer, MoveCount, Result);
+  Result := Assigned(FOnFrame) and ((FDuration=0) or (aCurrDuration > FDuration));
+  if Result then FOnFrame(FLayer, aCurrDuration, Result);
 end;
 
 procedure TGRLayerAnimator.Execute; 
@@ -1176,8 +1180,8 @@ begin
   
   while not Terminated do
   begin
-    vDone := DrawFrame(GetTickCount - FLastTick);
-    FLastTick := GetTickCount;
+    vDone := DrawFrame(GetTickCount - FStartTick);
+    FLastFrameTick := GetTickCount;
     if vDone then break;
     Sleep(cAniIntervalCount);
     if FIsPaused then Suspend;
@@ -1186,7 +1190,8 @@ end;
 
 procedure TGRLayerAnimator.Start;
 begin
-  FLastTick := GetTickCount();
+  FLastFrameTick := GetTickCount();
+  FStartTick := FLastFrameTick;
   FIsPaused := False;
   Resume;
 end;
@@ -1200,14 +1205,15 @@ begin
   FBeginX := aLayer.Left;
   FBeginY := aLayer.Top;
   Assert(FDuration <> 0);
+  FAdjustedDuration := FAdjustedDuration + 120;
 end;
 
-function TGRLayerAnimator_Line.DrawFrame(const MoveCount: Longword): Boolean;
+function TGRLayerAnimator_Line.DrawFrame(const aCurrDuration: Longword): Boolean;
 var
   vP: TFloatPoint;
 begin
-  //Result := (FDuration=0) or (MoveCount <= FDuration);
-  Result := (FBeginX = FEndX) and (FBeginY = FEndY);
+  //Result := (FDuration=0) or (aCurrDuration > FAdjustedDuration);
+  Result := ((FLayer.Left = FEndX) and (FLayer.Top = FEndY)) or (aCurrDuration > FAdjustedDuration);
 
   if not Result then
   begin
@@ -1216,23 +1222,23 @@ begin
     try
       if FBeginX < FEndX then
       begin
-        FLayer.Left := FBeginX + Trunc((MoveCount / FDuration) * (FEndX - FBeginX));
+        FLayer.Left := FBeginX + Trunc((aCurrDuration / FDuration) * (FEndX - FBeginX));
         if FLayer.Left > FEndX then FLayer.Left := FEndX;
       end
       else
       begin
-        FLayer.Left := FBeginX - Trunc((MoveCount / FDuration) * (FBeginX - FEndX));
+        FLayer.Left := FBeginX - Trunc((aCurrDuration / FDuration) * (FBeginX - FEndX));
         if FLayer.Left < FEndX then FLayer.Left := FEndX;
       end;
 
       if FBeginY < FEndY then
       begin
-        FLayer.Top := FBeginY + Trunc((MoveCount / FDuration) * (FEndY - FBeginY));
+        FLayer.Top := FBeginY + Trunc((aCurrDuration / FDuration) * (FEndY - FBeginY));
         if FLayer.Top > FEndY then FLayer.Top := FEndY;
       end
       else
       begin
-        FLayer.Top := FBeginY - Trunc((MoveCount / FDuration) * (FBeginY - FEndY));
+        FLayer.Top := FBeginY - Trunc((aCurrDuration / FDuration) * (FBeginY - FEndY));
         if FLayer.Top < FEndY then FLayer.Top := FEndY;
       end;
     finally
@@ -1249,7 +1255,7 @@ begin
   FMaxStep := aMaxStep;
 end;
 
-function TGRLayerAnimator_Sample.DrawFrame(const MoveCount: Longword): Boolean; 
+function TGRLayerAnimator_Sample.DrawFrame(const aCurrDuration: Longword): Boolean; 
 begin
   Result := FCurStep < (FMaxStep * 2);
   if Result then
