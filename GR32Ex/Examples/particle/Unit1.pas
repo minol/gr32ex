@@ -7,6 +7,7 @@ uses
   Dialogs, StdCtrls, ExtCtrls
   , Jpeg
   , GR32, GR32_Resamplers, GR32_Image, GR32_System
+  , GR32_ExtLayers
   , GR32_Png
   , GR_AniEffects
   , GR_Sprites
@@ -50,6 +51,8 @@ implementation
 constructor TForm1.Create(aOwner: TComponent);
 var
   LPic: TPicture;
+  vLayerContainer: TGRLayerContainer;
+  vLayer, vLayer2: TGRBitmapLayer;
 begin
   inherited;
   OpenPlay.Visible := False;
@@ -57,6 +60,42 @@ begin
   CallBack.Visible := False;
   //Image.Color := clGray;
   Image.Bitmap.LoadFromFile('res\sky.jpg');
+  vLayerContainer := TGRLayerContainer.Create(Image.Layers);
+  vLayerContainer.DrawMode := dmBlend;
+  vLayerContainer.Width := 100;
+  vLayerContainer.Height := 100;
+  
+  vLayer := TGRBitmapLayer.Create(vLayerContainer.Layers);
+  vLayer.Bitmap.LoadFromFile('res\stars\sc-bluestars1.png');
+  with vLayer.Scaling do
+  begin
+    X := 0.3;
+    Y := 0.3;
+  end;
+  with vLayer.Position do
+  begin
+    x := 0;
+    y:= 0;
+  end;
+
+  vLayer2 := TGRBitmapLayer.Create(Image.Layers);
+  vLayer2.Bitmap.Assign(vLayer.Bitmap);
+  with vLayer2.Position do
+  begin
+    x := 50;
+  end;
+
+  vLayer := TGRBitmapLayer.Create(vLayerContainer.Layers);
+  vLayer.Bitmap.Assign(vLayer2.Bitmap);
+  with vLayer.Scaling do
+  begin
+    X := 0.2;
+    Y := 0.2;
+  end;
+
+  
+  
+  
   //Image.Visible := False;
   //Image.DoubleBuffered :=True;
   //FBitmap := TBitmap.Create;
