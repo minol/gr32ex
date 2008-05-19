@@ -3293,6 +3293,7 @@ end;
 procedure TGRLayerContainer.LayerCollectionChangeHandler(Sender: TObject);
 begin
   Changed;
+  Invalidate; //todo: not optimal!
 end;
 
 procedure TGRLayerContainer.LayerCollectionGDIUpdateHandler(Sender: TObject);
@@ -3425,6 +3426,7 @@ begin
   FBuffer.BeginUpdate;
   with GetViewportRect do
     FBuffer.SetSize(Right - Left, Bottom - Top);
+  FBuffer.Clear(0);
   if FInvalidRects.Count = 0 then
   begin
     FBuffer.ClipRect := GetViewportRect;
