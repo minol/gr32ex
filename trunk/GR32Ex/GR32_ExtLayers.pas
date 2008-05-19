@@ -488,6 +488,7 @@ type
     FForceFullRepaint: Boolean;
     FRepaintOptimizer: TCustomRepaintOptimizer;
     FRepaintMode: TRepaintMode;
+    FDrawMode: TDrawMode;
 
     FLayers: TGRLayerCollection;
 
@@ -502,6 +503,7 @@ type
     CacheValid: Boolean;
     OldSzX, OldSzY: Integer;
 
+    procedure SetDrawMode(Value: TDrawMode);
     procedure SetRepaintMode(const Value: TRepaintMode); virtual;
     function GetBitmapRect: TRect;
 
@@ -534,6 +536,8 @@ type
     property Height: Integer read FHeight write FHeight;
     property Buffer: TBitmap32 read FBuffer;
     property RepaintMode: TRepaintMode read FRepaintMode write SetRepaintMode default rmFull;
+    property DrawMode: TDrawMode read FDrawMode write SetDrawMode default dmOpaque;
+    property Layers: TGRLayerCollection read FLayers;
   end;
   TVariantDynArray = array of Variant;
 
@@ -3223,6 +3227,7 @@ begin
   if not TAffineTransformationAccess(FTransformation).TransformValid then
     TAffineTransformationAccess(FTransformation).PrepareTransform;
   Transform(Buffer, FBitmap, FTransformation);
+  //OutputDebugString(PChar('paint bitmap:'+ IntToStr(Integer(FBitmap))));
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -3395,7 +3400,6 @@ begin
     FBuffer.Unlock;
   end;
 
-  
   if FRepaintOptimizer.Enabled then
     FRepaintOptimizer.EndPaint;
   ResetInvalidRects;
@@ -3418,28 +3422,31 @@ begin
   UpdateCache;
 
 
-  Buffer.BeginUpdate;
+  FBuffer.BeginUpdate;
+  with GetViewportRect do
+    FBuffer.SetSize(Right - Left, Bottom - Top);
   if FInvalidRects.Count = 0 then
   begin
-    Buffer.ClipRect := GetViewportRect;
+    FBuffer.ClipRect := GetViewportRect;
 
     for I := 0 to FLayers.Count - 1 do
       if (FLayers.Items[I].LayerOptions and LOB_VISIBLE) <> 0 then
-        TLayerAccess(FLayers.Items[I]).DoPaint(Buffer);
+        TLayerAccess(FLayers.Items[I]).DoPaint(FBuffer);
   end
   else
   begin
     for J := 0 to FInvalidRects.Count - 1 do
     begin
-      Buffer.ClipRect := FInvalidRects[J]^;
+      FBuffer.ClipRect := FInvalidRects[J]^;
       for I := 0 to FLayers.Count - 1 do
         if (FLayers.Items[I].LayerOptions and LOB_VISIBLE) <> 0 then
-          TLayerAccess(FLayers.Items[I]).DoPaint(Buffer);
+          TLayerAccess(FLayers.Items[I]).DoPaint(FBuffer);
     end;
 
-    Buffer.ClipRect := GetViewportRect;
+    //FBuffer.RaiseRectTS(GetViewportRect, 80);
+    FBuffer.ClipRect := GetViewportRect;
   end;
-  Buffer.EndUpdate;
+  FBuffer.EndUpdate;
 
   if FRepaintOptimizer.Enabled then
     FRepaintOptimizer.EndPaintBuffer;
@@ -3458,6 +3465,16 @@ begin
     Top := 0;
     Right := Width;
     Bottom := Height;
+  end;
+end;
+
+procedure TGRLayerContainer.SetDrawMode(Value: TDrawMode);
+begin
+  if FDrawMode <> Value then
+  begin
+    FDrawMode := Value;
+    FBuffer.DrawMode := FDrawMode;
+    Changed;
   end;
 end;
 
