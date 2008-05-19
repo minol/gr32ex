@@ -34,11 +34,13 @@ type
     FEffEngine: TGRAnimationEffects;
     FStarSprites: TGRSprites;  
     FSnowSprites: TGRSprites;  
-
+    FTimer: TTimer;
+    vLayer, vLayer2: TGRBitmapLayer;
   public
     { Déclarations publiques }
     constructor Create(aOwner: TComponent);override;
     destructor Destroy;override;
+    procedure DoTimer(Sender: TObject);
   end;
 
 var
@@ -48,11 +50,18 @@ implementation
 
 {$R *.dfm}
 
+procedure TForm1.DoTimer(Sender: TObject);
+begin
+  vLayer.Angle:= (vLayer.Angle + 1.0);
+  if vLayer.Angle > 360 then
+    vLayer.Angle := 0;
+end;
+
 constructor TForm1.Create(aOwner: TComponent);
 var
   LPic: TPicture;
   vLayerContainer: TGRLayerContainer;
-  vLayer, vLayer2: TGRBitmapLayer;
+  //vLayer, vLayer2: TGRBitmapLayer;
 begin
   inherited;
   OpenPlay.Visible := False;
@@ -93,7 +102,10 @@ begin
     Y := 0.2;
   end;
 
-  
+  FTimer := TTimer.Create(Self);
+  FTimer.Interval := 30;
+  FTimer.OnTimer:= DoTimer;
+  FTimer.Enabled := True;
   
   
   //Image.Visible := False;
@@ -171,7 +183,7 @@ begin
 
   FEffEngine.Control := Image;
   //FEffEngine.Control := Self;
-  FEffEngine.Enabled := True;
+  //FEffEngine.Enabled := True;
 
 end;
 
