@@ -73,6 +73,11 @@ begin
   vLayerContainer.DrawMode := dmBlend;
   vLayerContainer.Width := 100;
   vLayerContainer.Height := 100;
+  with vLayerContainer.Scaling do
+  begin
+    x := 2;
+    y := 2;
+  end;
   
   vLayer := TGRBitmapLayer.Create(vLayerContainer.Layers);
   vLayer.Bitmap.LoadFromFile('res\stars\sc-bluestars1.png');
