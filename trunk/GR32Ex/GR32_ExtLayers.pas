@@ -261,11 +261,13 @@ type
     function GetWidth: Integer;
     function GetHeight: Integer;
   protected
+    function IsClearTransformation: Boolean;
     {$IFDEF Designtime_Supports}
     procedure Paint(Buffer: TBitmap32); override;
     function DoHitTest(aX, aY: Integer): Boolean; override;
     {$ENDIF}
     function GetNativeSize: TSize;override;
+    procedure Changed; overload; override;
     procedure iResetTransformation; virtual;
 
   public
@@ -1189,6 +1191,12 @@ begin
   inherited Assign(Source);
 end;
 
+procedure TGRTransformationLayer.Changed;
+begin
+  inherited;
+  UpdateTransformation;
+end;
+
 //----------------------------------------------------------------------------------------------------------------------
 procedure TGRTransformationLayer.SetAngle(Value: Single);
 
@@ -1355,7 +1363,7 @@ var
   end;
 
 begin
-  UpdateTransformation;
+  //UpdateTransformation;
   with GetNativeSize do CalculateContour(0, 0, cx, cy);
   DrawContour;
 {  DstRect := MakeRect(GetTransformedTargetRect);
@@ -1396,7 +1404,7 @@ function TGRTransformationLayer.GetTransformedTargetRect: TFloatRect;
 var
   vSize: TSize;
 begin
-  UpdateTransformation;
+  //UpdateTransformation;
 
   vSize := GetNativeSize;
   with FPosition do
@@ -1428,7 +1436,7 @@ begin
   //Changing;
   FTransformation.Clear;
   FSkew := FloatPoint(0, 0);
-  FPosition := FloatPoint(0, 0);
+  FPivotPoint := FloatPoint(0, 0);
   FScaling := FloatPoint(1, 1);
   FAngle := 0;
   //Changed;
@@ -1438,25 +1446,36 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
+function TGRTransformationLayer.IsClearTransformation: Boolean;
+begin
+  Result := (FSkew.x = 0) and (FSkew.y = 0) and (FPivotPoint.x = 0)  and (FPivotPoint.y = 0)
+    and (FScaling.x = 1) and (FScaling.y = 1) and (FAngle = 0);
+    //OutputDebugString(PChar('x='+FloatToStr(FScaling.x)+ ' Result='+IntToStr(Integer(Result))));
+end;
+
 procedure TGRTransformationLayer.UpdateTransformation;
 var
   ShiftX, ShiftY, ScaleX, ScaleY: Single;
 begin
   FTransformation.Clear;
-
-  FTransformation.Translate(-FPivotPoint.X, -FPivotPoint.Y);
-  FTransformation.Scale(FScaling.X, FScaling.Y);
-  FTransformation.Skew(FSkew.X, FSkew.Y);
-  FTransFormation.Rotate(0, 0, FAngle);
-  FTransformation.Translate(FPosition.X + FPivotPoint.X, FPosition.Y + FPivotPoint.Y);
-
-  // Scale to viewport if activated.
-  if FScaled and Assigned(LayerCollection) then
+  if not IsClearTransformation then
   begin
-    LayerCollection.GetViewportScale(ScaleX, ScaleY);
-    FTransformation.Scale(ScaleX, ScaleY);
-    LayerCollection.GetViewportShift(ShiftX, ShiftY);
-    FTransformation.Translate(ShiftX, ShiftY);
+    FTransformation.Translate(-FPivotPoint.X, -FPivotPoint.Y);
+    FTransformation.Scale(FScaling.X, FScaling.Y);
+    FTransformation.Skew(FSkew.X, FSkew.Y);
+    FTransFormation.Rotate(0, 0, FAngle);
+    FTransformation.Translate(FPosition.X + FPivotPoint.X, FPosition.Y + FPivotPoint.Y);
+  
+    // Scale to viewport if activated.
+    if FScaled and Assigned(LayerCollection) then
+    begin
+      LayerCollection.GetViewportScale(ScaleX, ScaleY);
+      FTransformation.Scale(ScaleX, ScaleY);
+      LayerCollection.GetViewportShift(ShiftX, ShiftY);
+      FTransformation.Translate(ShiftX, ShiftY);
+    end;
+    if not TAffineTransformationAccess(FTransformation).TransformValid then
+      TAffineTransformationAccess(FTransformation).PrepareTransform;
   end;
 
 end;
@@ -3266,8 +3285,9 @@ begin
     exit;
   end;
   {$ENDIF}
-  
-  B := FTransformation.ReverseTransform(Point(X, Y));
+  B := Point(X, Y);
+  if TAffineTransformationAccess(FTransformation).TransformValid then
+    B := FTransformation.ReverseTransform(B);
 
   Result := PtInRect(Rect(0, 0, Bitmap.Width, Bitmap.Height), B);
   if Result and AlphaHit and (Bitmap.PixelS[B.X, B.Y] and $FF000000 = 0) then
@@ -3292,6 +3312,8 @@ end;
 //----------------------------------------------------------------------------------------------------------------------
 
 procedure TGRBitmapLayer.Paint(Buffer: TBitmap32);
+var
+  vRect: TRect;
 begin 
   {$IFDEF Designtime_Supports}
   if FBitmap.Empty then
@@ -3300,11 +3322,43 @@ begin
     exit;
   end;
   {$ENDIF}
-  UpdateTransformation;
-  // TODO: cropping
-  if not TAffineTransformationAccess(FTransformation).TransformValid then
-    TAffineTransformationAccess(FTransformation).PrepareTransform;
-  Transform(Buffer, FBitmap, FTransformation);
+  //UpdateTransformation;
+  //if not TAffineTransformationAccess(FTransformation).TransformValid then
+    //TAffineTransformationAccess(FTransformation).PrepareTransform;
+
+  if TAffineTransformationAccess(FTransformation).TransformValid then
+  begin
+    if FCropped then
+    begin
+      //vRect := MakeRect(GetTransformedTargetRect);
+      with GetAdjustedPosition(FPosition), GetNativeSize do
+      begin
+        vRect.Left := Round(x);
+        vRect.Top  := Round(y);
+        vRect.Right := Round(x + cx);
+        vRect.Bottom := Round(y + cy);
+      end;
+      Transform(Buffer, FBitmap, FTransformation, vRect);
+    end
+    else
+      Transform(Buffer, FBitmap, FTransformation);
+  end
+  else
+  begin
+    with GetAdjustedPosition(FPosition), GetNativeSize do
+    begin
+        vRect.Left := Round(x);
+        vRect.Top  := Round(y);
+        vRect.Right := Round(x + cx);
+        vRect.Bottom := Round(y + cy);
+    end;
+    if FCropped then
+    begin
+      BlockTransfer(Buffer, vRect.Left, vRect.Top, Buffer.ClipRect, FBitmap, vRect, FBitmap.DrawMode, FBitmap.OnPixelCombine);
+    end
+    else
+      BlockTransfer(Buffer, vRect.Left, vRect.Top, Buffer.ClipRect, FBitmap, FBitmap.ClipRect, FBitmap.DrawMode, FBitmap.OnPixelCombine);
+  end;
   //OutputDebugString(PChar('paint bitmap:'+ IntToStr(Integer(FBitmap))));
 end;
 
@@ -3464,22 +3518,30 @@ begin
   //   }
   FBuffer.Lock;
   try
-    {if FInvalidRects.Count > 0 then
-      for i := 0 to FInvalidRects.Count - 1 do
+    I := Integer(TAffineTransformationAccess(FTransformation).TransformValid);
+    if not Boolean(I) and (FInvalidRects.Count > 0) then
+      for I := 0 to FInvalidRects.Count - 1 do
       begin
-        vRect := FInvalidRects[i]^;
+        vRect := FInvalidRects[I]^;
         with vRect do
           BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
       end
-    else //}
+    else
     begin
-      vRect := GetViewportRect;
-      UpdateTransformation; //todo: need to optimalize to only call after changed, not in paint!
+      {UpdateTransformation; //todo: need to optimalize to only call after changed, not in paint!
       if not TAffineTransformationAccess(FTransformation).TransformValid then
-        TAffineTransformationAccess(FTransformation).PrepareTransform;
-      Transform(aBuffer, FBuffer, FTransformation, vRect);
-      {with vRect do
-        BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
+        TAffineTransformationAccess(FTransformation).PrepareTransform; //}
+
+      vRect := MakeRect(GetTransformedTargetRect);
+      if Boolean(I) then
+      begin
+        Transform(aBuffer, FBuffer, FTransformation, vRect);
+      end
+      else
+      begin
+        with vRect do
+          BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
+      end;
       //}
     end;
   finally
@@ -3530,9 +3592,9 @@ begin
           TLayerAccess(FLayers.Items[I]).DoPaint(FBuffer);
     end;
 
-    //FBuffer.RaiseRectTS(GetViewportRect, 80);
     FBuffer.ClipRect := GetViewportRect;
   end;
+  //FBuffer.RaiseRectTS(GetViewportRect, 80);
   FBuffer.EndUpdate;
 
   if FRepaintOptimizer.Enabled then
