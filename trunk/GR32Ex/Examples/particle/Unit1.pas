@@ -37,11 +37,13 @@ type
     FSnowSprites: TGRSprites;  
     vLayer, vLayer2: TGRBitmapLayer;
     vLayerContainer: TGRLayerContainer;
+    FGB: TGroupBox;
   public
     { Déclarations publiques }
     constructor Create(aOwner: TComponent);override;
     destructor Destroy;override;
     procedure DoTimer(Sender: TObject);
+    procedure DoBtnClick(Sender: TObject);
   end;
 
 var
@@ -79,21 +81,46 @@ begin
   end;
 end;
 
+procedure TForm1.DoBtnClick(Sender: TObject);
+begin
+  {FGB.PaintTo(vLayer.Bitmap.Canvas, 0, 0);
+  vLayer.Bitmap.ResetAlpha;
+  vLayer.Changed;
+  {
+  OpenPlay.visible := True;
+  OpenPlay.PaintTo(vLayer.Bitmap.Canvas, 0, 0);
+  //vLayer.Bitmap.ResetAlpha;
+  vLayer.Changed;
+  OpenPlay.visible := False;
+  }
+end;
+
 constructor TForm1.Create(aOwner: TComponent);
 var
   LPic: TPicture;
   //vLayer, vLayer2: TGRBitmapLayer;
 begin
   inherited;
+  {
+  FGB := TGroupBox.Create(nil);
+  with FGB do
+  begin
+    Parent := Self;
+    Visible := False;
+    Caption := 'VBHello';
+    Width := 200;
+    Height := 200;
+  end; //}
   OpenPlay.Visible := False;
-  Snapshot.Visible := False;
+  //Snapshot.Visible := False;
   CallBack.Visible := False;
+  Snapshot.OnClick := DoBtnClick;
   //Image.Color := clGray;
   Image.Bitmap.LoadFromFile('res\sky.jpg');
   vLayerContainer := TGRLayerContainer.Create(Image.Layers);
   vLayerContainer.DrawMode := dmBlend;
-  vLayerContainer.Left := 50;
-  vLayerContainer.Top := 50;
+  vLayerContainer.Left := 0;
+  vLayerContainer.Top := 0;
   vLayerContainer.Width := 100;
   vLayerContainer.Height := 100;
   with vLayerContainer.PivotPoint do
@@ -119,6 +146,7 @@ begin
     x := 0;
     y:= 0;
   end;
+  
   vLayer.Changed;
 
   vLayer2 := TGRBitmapLayer.Create(Image.Layers);
@@ -127,6 +155,7 @@ begin
   begin
     x := 50;
   end;
+
   vLayer2.Changed;
 
   vLayer := TGRBitmapLayer.Create(vLayerContainer.Layers);
