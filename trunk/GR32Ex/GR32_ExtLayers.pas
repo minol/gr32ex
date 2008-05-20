@@ -207,6 +207,10 @@ type
     {$ENDIF}
 
     procedure SetPosition(const Value: TFloatPoint);
+    procedure SetLeft(const Value: Integer);
+    procedure SetTop(const Value: Integer);
+    function GetLeft: Integer;
+    function GetTop: Integer;
     procedure SetScaled(const Value: Boolean);virtual;
     {$IFDEF Designtime_Supports}
     procedure SetGridLayer(const Value: TGRGridLayer);
@@ -231,6 +235,8 @@ type
     property GridLayer: TGRGridLayer read FGridLayer write SetGridLayer;
     {$ENDIF}
     property Position: TFloatPoint read FPosition write SetPosition;
+    property Left: Integer read GetLeft write SetLeft;
+    property Top: Integer read GetTop write SetTop;
     property ParentScaled: Boolean read FParentScaled write FParentScaled default true;
     property Scaled: Boolean read FScaled write SetScaled; //Scaled with the viewport of a possible owner ImgView32.
   end;
@@ -250,6 +256,10 @@ type
     procedure SetScaling(const Value: TFloatPoint);
     procedure SetSkew(const Value: TFloatPoint);
     procedure SetSize(const Value: TSize);
+    procedure SetHeight(const Value: Integer);
+    procedure SetWidth(const Value: Integer);
+    function GetWidth: Integer;
+    function GetHeight: Integer;
   protected
     {$IFDEF Designtime_Supports}
     procedure Paint(Buffer: TBitmap32); override;
@@ -277,6 +287,8 @@ type
     property Scaling: TFloatPoint read FScaling write SetScaling;
     property Skew: TFloatPoint read FSkew write SetSkew;
     property Size: TSize read GetNativeSize write SetSize;
+    property Width: Integer read GetWidth write SetWidth;
+    property Height: Integer read GetHeight write SetHeight;
     property Transformation: TAffineTransformation read FTransformation;
   end;
 
@@ -476,12 +488,12 @@ type
   TGRLayerCollection = class(TLayerCollection)
   end;
 
-  TGRLayerContainer = class(TGRCustomLayer)
+  TGRLayerContainer = class(TGRPropertyLayer)
   protected
-    FLeft: Integer;
-    FTop: Integer;
-    FWidth: Integer;
-    FHeight: Integer;
+    //FLeft: Integer;
+    //FTop: Integer;
+    //FWidth: Integer;
+    //FHeight: Integer;
     FBuffer: TBitmap32;
     FBufferOversize: Integer;
     FBufferValid: Boolean;
@@ -530,10 +542,10 @@ type
     destructor Destroy;override;
     function  GetViewportRect: TRect; virtual;
 
-    property Left: Integer read FLeft write FLeft;
-    property Top: Integer read FTop write FTop;
-    property Width: Integer read FWidth write FWidth;
-    property Height: Integer read FHeight write FHeight;
+    //property Left: Integer read FLeft write FLeft;
+    //property Top: Integer read FTop write FTop;
+    //property Width: Integer read FWidth write FWidth;
+    //property Height: Integer read FHeight write FHeight;
     property Buffer: TBitmap32 read FBuffer;
     property RepaintMode: TRepaintMode read FRepaintMode write SetRepaintMode default rmFull;
     property DrawMode: TDrawMode read FDrawMode write SetDrawMode default dmOpaque;
@@ -1081,6 +1093,36 @@ begin
   //DoChange;
 end;
 
+procedure TGRPositionLayer.SetLeft(const Value: Integer);
+begin
+  if Left <> value then
+  begin
+    Changing;
+    FPosition.X := Value;
+    Changed;
+  end;
+end;
+
+procedure TGRPositionLayer.SetTop(const Value: Integer);
+begin
+  if Top <> value then
+  begin
+    Changing;
+    FPosition.Y := Value;
+    Changed;
+  end;
+end;
+
+function TGRPositionLayer.GetLeft: Integer;
+begin
+  Result := Round(FPosition.X);
+end;
+
+function TGRPositionLayer.GetTop: Integer;
+begin
+  Result := Round(FPosition.Y);
+end;
+
 procedure TGRPositionLayer.SetScaled(const Value: Boolean);
 begin
   if Value <> FScaled then
@@ -1186,6 +1228,8 @@ procedure TGRTransformationLayer.SetSize(const Value: TSize);
 begin
   Changing;
   FSize := Value;
+  with Value do
+    FTransformation.SrcRect := FloatRect(0, 0, cx - 1, cy - 1);
   Changed;
 
   //DoChange;
@@ -1198,6 +1242,40 @@ begin
   Changed;
 
   //DoChange;
+end;
+
+procedure TGRTransformationLayer.SetHeight(const Value: Integer);
+begin
+  if FSize.cy <> value then
+  begin
+    Changing;
+    FSize.cy := Value;
+    with FSize do
+      FTransformation.SrcRect := FloatRect(0, 0, cx - 1, cy - 1);
+    Changed;
+  end;
+end;
+
+procedure TGRTransformationLayer.SetWidth(const Value: Integer);
+begin
+  if FSize.cx <> value then
+  begin
+    Changing;
+    FSize.cx := Value;
+    with FSize do
+      FTransformation.SrcRect := FloatRect(0, 0, cx - 1, cy - 1);
+    Changed;
+  end;
+end;
+
+function TGRTransformationLayer.GetWidth: Integer;
+begin
+  Result := FSize.cx;
+end;
+
+function TGRTransformationLayer.GetHeight: Integer;
+begin
+  Result := FSize.cy;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -3383,19 +3461,26 @@ begin
 {$ENDIF}
   end;
 
+  //   }
   FBuffer.Lock;
   try
-    if FInvalidRects.Count > 0 then
+    {if FInvalidRects.Count > 0 then
       for i := 0 to FInvalidRects.Count - 1 do
       begin
         vRect := FInvalidRects[i]^;
         with vRect do
           BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
       end
-    else begin
+    else //}
+    begin
       vRect := GetViewportRect;
-      with vRect do
+      UpdateTransformation; //todo: need to optimalize to only call after changed, not in paint!
+      if not TAffineTransformationAccess(FTransformation).TransformValid then
+        TAffineTransformationAccess(FTransformation).PrepareTransform;
+      Transform(aBuffer, FBuffer, FTransformation, vRect);
+      {with vRect do
         BlockTransfer(aBuffer, Left, Top, aBuffer.ClipRect, FBuffer, vRect, FBuffer.DrawMode, FBuffer.OnPixelCombine);
+      //}
     end;
   finally
     FBuffer.Unlock;
@@ -3424,8 +3509,8 @@ begin
 
 
   FBuffer.BeginUpdate;
-  with GetViewportRect do
-    FBuffer.SetSize(Right - Left, Bottom - Top);
+  with FSize do
+    FBuffer.SetSize(cx, cy);
   FBuffer.Clear(0);
   if FInvalidRects.Count = 0 then
   begin
@@ -3465,8 +3550,8 @@ begin
     // by default, the whole control is buffered
     Left := 0;
     Top := 0;
-    Right := Width;
-    Bottom := Height;
+    Right := FSize.cx;
+    Bottom := FSIze.cy;
   end;
 end;
 
