@@ -31,11 +31,12 @@ type
     //FBitmap: TBitmap;
     //FBitmap32: TBitmap32;
     //FLastTick: Integer;
+    FTimer: TTimer;
     FEffEngine: TGRAnimationEffects;
     FStarSprites: TGRSprites;  
     FSnowSprites: TGRSprites;  
-    FTimer: TTimer;
     vLayer, vLayer2: TGRBitmapLayer;
+    vLayerContainer: TGRLayerContainer;
   public
     { Déclarations publiques }
     constructor Create(aOwner: TComponent);override;
@@ -52,15 +53,35 @@ implementation
 
 procedure TForm1.DoTimer(Sender: TObject);
 begin
-  vLayer.Angle:= (vLayer.Angle + 1.0);
-  if vLayer.Angle > 360 then
-    vLayer.Angle := 0;
+  vLayerContainer.BeginUpdate;
+  try
+    {vLayer.Angle:= (vLayer.Angle + 1.0);
+    if vLayer.Angle > 360 then
+      vLayer.Angle := 0;
+    {vLayerContainer.Angle:= (vLayerContainer.Angle + 1.0);
+    if vLayerContainer.Angle > 360 then
+      vLayerContainer.Angle := 0;
+    {with vLayer.Scaling do
+    begin
+      if x >= 0.3 then 
+        x := x - 0.01
+      else
+        x := x + 0.01;
+      if y >= 0.3 then 
+        y := y - 0.01
+      else
+        y := y + 0.01;
+    end; //}
+    vLayerContainer.Changed;
+  finally
+  vLayerContainer.EndUpdate;
+  vLayerContainer.Changed;
+  end;
 end;
 
 constructor TForm1.Create(aOwner: TComponent);
 var
   LPic: TPicture;
-  vLayerContainer: TGRLayerContainer;
   //vLayer, vLayer2: TGRBitmapLayer;
 begin
   inherited;
@@ -71,17 +92,24 @@ begin
   Image.Bitmap.LoadFromFile('res\sky.jpg');
   vLayerContainer := TGRLayerContainer.Create(Image.Layers);
   vLayerContainer.DrawMode := dmBlend;
+  vLayerContainer.Left := 50;
+  vLayerContainer.Top := 50;
   vLayerContainer.Width := 100;
   vLayerContainer.Height := 100;
-  with vLayerContainer.Scaling do
+  with vLayerContainer.PivotPoint do
+  begin
+    X := vLayerContainer.Width div 2;
+    Y := vLayerContainer.Height div 2 ;
+  end;
+  {with vLayerContainer.Scaling do
   begin
     x := 2;
     y := 2;
-  end;
+  end;}
   
   vLayer := TGRBitmapLayer.Create(vLayerContainer.Layers);
   vLayer.Bitmap.LoadFromFile('res\stars\sc-bluestars1.png');
-  with vLayer.Scaling do
+  with vLayer.Scaling do //this means visit the FScaling field directly!!
   begin
     X := 0.3;
     Y := 0.3;
@@ -91,6 +119,7 @@ begin
     x := 0;
     y:= 0;
   end;
+  vLayer.Changed;
 
   vLayer2 := TGRBitmapLayer.Create(Image.Layers);
   vLayer2.Bitmap.Assign(vLayer.Bitmap);
@@ -98,20 +127,33 @@ begin
   begin
     x := 50;
   end;
+  vLayer2.Changed;
 
   vLayer := TGRBitmapLayer.Create(vLayerContainer.Layers);
   vLayer.Bitmap.Assign(vLayer2.Bitmap);
+  with vLayer.Position do
+  begin
+    x := 20;
+    y:= 20;
+  end;
   with vLayer.Scaling do
   begin
     X := 0.2;
     Y := 0.2;
   end;
-
-  FTimer := TTimer.Create(Self);
-  FTimer.Interval := 30;
+  with vLayer.PivotPoint do
+  begin
+    X := vLayer.Width div 2;
+    Y := vLayer.Height div 2;
+  end;
+  vLayer.Changed; 
+  //}
+  vLayerContainer.BringToFront;
+  FTimer:= TTimer.Create(Self);
   FTimer.OnTimer:= DoTimer;
+  FTimer.Interval := 30;
   FTimer.Enabled := True;
-  
+
   
   //Image.Visible := False;
   //Image.DoubleBuffered :=True;
@@ -188,6 +230,8 @@ begin
 
   FEffEngine.Control := Image;
   //FEffEngine.Control := Self;
+  //FEffEngine.OnUpdating := DoTimer;
+
   //FEffEngine.Enabled := True;
 
 end;

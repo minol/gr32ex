@@ -267,8 +267,9 @@ begin
   begin
     if FControl is TCustomPaintBox32 then with FControl as TCustomPaintBox32 do
     begin
+      Buffer.Lock;
     	//if FControl is TCustomImage32 then TCustomImage32(FControl).BeginUpdate;
-    	//try
+    	try
     	if not Assigned(FBuffer) or FBuffer.Empty then 
     	begin
     	  if not Assigned(FBuffer) then FBuffer := TBitmap32.Create;
@@ -277,10 +278,11 @@ begin
     	else
     	  Buffer.Assign(FBuffer);
     	DoControlPaint(Buffer);
-    	Flush;
-    	//finally
+    	finally
     	  //if FControl is TCustomImage32 then TCustomImage32(FControl).EndUpdate;
-    	//end;
+    	  Buffer.Unlock;
+    	end;
+    	Flush;
    	end
    	else
    	begin
