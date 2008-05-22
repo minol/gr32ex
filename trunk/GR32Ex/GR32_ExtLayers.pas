@@ -241,6 +241,14 @@ type
     property Scaled: Boolean read FScaled write SetScaled; //Scaled with the viewport of a possible owner ImgView32.
   end;
 
+  { Summary:   The TGRTransformationLayer is the fundament of the other enhanced layers and provides the functionality to translate, rotate, sheer (skew) and scale layer. }
+  {
+Description
+It supports a pivot point, which is the center for rotations and proportional
+transformations. Because of the rotation and sheer feature this and derived
+layers are slower in handling than the current layers, but my primary goal
+was to provide as many of the features of Photoshop as I could implement.
+  }
   TGRTransformationLayer = class(TGRPositionLayer)
   protected
     FAngle: Single;                              // Given in degrees.
@@ -261,7 +269,7 @@ type
     function GetWidth: Integer;
     function GetHeight: Integer;
   protected
-    function IsClearTransformation: Boolean;
+    function IsClearTransformation: Boolean;virtual;
     {$IFDEF Designtime_Supports}
     procedure Paint(Buffer: TBitmap32); override;
     function DoHitTest(aX, aY: Integer): Boolean; override;
@@ -308,6 +316,12 @@ type
     soSnapGrid
   );
 
+  { Summary: The TGRGridLayer layer provides you with a customizable grid and support for guides. }
+  { Description
+It allows to snap coordinates to either guides, grid lines or the image
+borders (just like in Photoshop). All features are switchable. This grid
+cannot be rotated however and is always axis aligned.
+  }
   TGRGridLayer = class(TGRTransformationLayer)
   private
     FGridSize: Integer;
@@ -363,6 +377,20 @@ type
 
   TGRContour = array[0..3] of TFixedPoint;
 
+  { Summary : The TGRRubberBandLayer layer is a much enhanced reimplementation of the current rubberband. }
+  { Description
+It supports almost anything what Photoshop allows. This includes to
+visually rotate and scale images (negative scale values will mirror them).
+It supports grid snapping of the four corners and the center, regardless of
+the transformation state and correctly handles all the difficult cases for
+cursor and hit test managment. The shift and control keys are supported as
+well, to limit rotation to 45? multiples, to allow skewing the image and to
+make proportional scaling possible (width/height ration of the layer is
+constant). To make the support complete also the Alt key will be considered,
+with the same effect as in, you guess it, Photoshop (e.g. sizing is done to
+all four directions, with the pivot as center etc.).
+NOTE: the rubber band uses many of the cursors in the GR32_Types.pas unit!
+  }
   TGRRubberBandLayer = class(TGRTransformationLayer)
   protected
     FChildLayer: TGRPositionLayer;
@@ -395,6 +423,7 @@ type
     //procedure SetSize(const Value: TSize);
     function GetOptions: TGRRubberBandOptions;
   protected
+    function IsClearTransformation: Boolean;override;
     function DoHitTest(X, Y: Integer): Boolean; override;
     procedure FillOuter(Buffer: TBitmap32; OuterRect: TRect; Contour: TGRContour);
     function GetCursorDirection(X, Y: Integer; AxisTolerance: Integer; State: TRubberbandDragState): TGRCursorDirection;
@@ -438,6 +467,13 @@ type
     ldmMin
   );
 
+  { Summary: The TGRPropertyLayer layer is a generic ancestor for the following layers and only stores
+some properties, which might be used, e.g. when loading PSD files.
+
+Note: the DrawMode property is not directly implemented in the extended layer unit. Instead it can be used
+by the application to determine the draw mode (e.g. blend, subtract, add,
+multiply etc.) which should be applied to the layer's pixel.
+  }
   TGRPropertyLayer = class(TGRTransformationLayer)
   protected
     FLocked: Boolean;
@@ -450,6 +486,12 @@ type
     property Locked: Boolean read FLocked write FLocked;
   end;
 
+  { 
+TGRTextLayer
+This layer is not really implemented, but used as a placeholder. Once
+somebody decides to write a real text layer, this one can serve as the
+starting point.
+  }
   TGRTextLayer = class(TGRPropertyLayer)
   protected
     FText: WideString;
@@ -464,6 +506,13 @@ type
     property TextColor: TColor32 read FTextColor write SetTextColor default clBlack32;
   end;
 
+  {
+TGRBitmapLayer
+This is the last layer in the bundle and provides means to paint a
+TBitmap32 with all the transformations applied. Additionally, it has a
+PaintTo method, which allows to draw the content to other locations than the
+ImgView32 container.
+  }
   TGRBitmapLayer = class(TGRPropertyLayer)
   protected
     FBitmap: TBitmap32Ex;
@@ -531,6 +580,10 @@ type
     procedure DoPrepareInvalidRects; virtual;
     procedure ResetInvalidRects;
     procedure Paint(aBuffer: TBitmap32); override;
+    procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
+    procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+
 
     procedure LayerCollectionChangeHandler(Sender: TObject);
     procedure LayerCollectionGDIUpdateHandler(Sender: TObject);
@@ -608,6 +661,7 @@ uses
 type
   TAffineTransformationAccess = class(TAffineTransformation);
   TLayerAccess = class(TCustomLayer);
+  TLayerCollectionAccess = class(TLayerCollection);
 
 const
   cAniIntervalCount = 33; //ms
@@ -1404,7 +1458,7 @@ function TGRTransformationLayer.GetTransformedTargetRect: TFloatRect;
 var
   vSize: TSize;
 begin
-  //UpdateTransformation;
+  UpdateTransformation;
 
   vSize := GetNativeSize;
   with FPosition do
@@ -1961,6 +2015,10 @@ begin
   {$ENDIF}
 end;
 
+function TGRRubberBandLayer.IsClearTransformation: Boolean;
+begin
+  Result := False;
+end;
 //----------------------------------------------------------------------------------------------------------------------
 
 procedure TGRRubberBandLayer.SetChildLayer(const Value: TGRPositionLayer);
@@ -3615,6 +3673,48 @@ begin
     Right := FSize.cx;
     Bottom := FSIze.cy;
   end;
+end;
+
+procedure TGRLayerContainer.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  Layer: TCustomLayer;
+begin
+  //if TabStop and CanFocus then SetFocus;
+  
+  if Layers.MouseEvents then
+    Layer := TLayerCollectionAccess(Layers).MouseDown(Button, Shift, X, Y)
+  else
+    Layer := nil;
+
+  if not Assigned(Layers) then
+    inherited;
+end;
+
+procedure TGRLayerContainer.MouseMove(Shift: TShiftState; X, Y: Integer);
+var
+  Layer: TCustomLayer;
+begin
+  //if not FMouseInControl then MouseCapture := False;
+  if Layers.MouseEvents then
+    Layer := TLayerCollectionAccess(Layers).MouseMove(Shift, X, Y)
+  else
+    Layer := nil;
+
+  if not Assigned(Layers) then
+    inherited;
+end;
+
+procedure TGRLayerContainer.MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  Layer: TCustomLayer;
+begin
+  if Layers.MouseEvents then
+    Layer := TLayerCollectionAccess(Layers).MouseUp(Button, Shift, X, Y)
+  else
+    Layer := nil;
+
+  if not Assigned(Layers) then
+    inherited;
 end;
 
 procedure TGRLayerContainer.SetDrawMode(Value: TDrawMode);

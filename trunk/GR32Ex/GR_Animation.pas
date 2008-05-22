@@ -133,6 +133,7 @@ type
   end;
 
   //to play the TGRAnimation frames.
+  // abondon, use the New Animator-Effects Arch Framework.
   TGRAnimationThread = class(TThread)
   protected
     FInterval: LongWord;

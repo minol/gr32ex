@@ -7,8 +7,9 @@ uses
   Dialogs, StdCtrls, ExtCtrls
   , Jpeg
   , GR32, GR32_Resamplers, GR32_Image, GR32_System
-  , GR32_ExtLayers
+  //, GR32_ExtLayers
   , GR32_Png
+  , GR_Layers
   , GR_AniEffects
   , GR_Sprites
   , GR_AniGEffetcts
@@ -57,10 +58,17 @@ procedure TForm1.DoTimer(Sender: TObject);
 begin
   vLayerContainer.BeginUpdate;
   try
-    {vLayer.Angle:= (vLayer.Angle + 1.0);
+    with vLayer.Scaling do
+    Begin
+      if x >= 0.08 then 
+        x := x - 0.0005;
+      if y >= 0.08 then 
+        y := y - 0.0005;
+    end;
+    vLayer.Angle:= (vLayer.Angle + 1.0);
     if vLayer.Angle > 360 then
       vLayer.Angle := 0;
-    {vLayerContainer.Angle:= (vLayerContainer.Angle + 1.0);
+    vLayerContainer.Angle:= (vLayerContainer.Angle + 1.0);
     if vLayerContainer.Angle > 360 then
       vLayerContainer.Angle := 0;
     {with vLayer.Scaling do
@@ -112,7 +120,7 @@ begin
     Height := 200;
   end; //}
   OpenPlay.Visible := False;
-  //Snapshot.Visible := False;
+  Snapshot.Visible := False;
   CallBack.Visible := False;
   Snapshot.OnClick := DoBtnClick;
   //Image.Color := clGray;
