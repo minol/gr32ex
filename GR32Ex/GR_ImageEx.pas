@@ -55,8 +55,12 @@ type
     procedure Notify(Ptr: Pointer; Action: TListNotification); override;
   end;
 
+  //FlexSDK:http://www.fs2you.com/files/ed28dcc7-2e14-11dd-a6fc-00142218fc6e/
   TImage32Ex = class(TImage32)
-  private
+  protected
+    FCurrentFocusedLayer: TGRLayer;
+    //collects can focused layers(TabStop = true)
+    FFocusLayers: TList;
     FIsLoading: Boolean;
     FFixupReferences: TFixupReferences;
     FTransparent: Boolean;
@@ -65,6 +69,7 @@ type
     procedure SetTransparent(const Value: Boolean);
     procedure SetPopupMenu(const Value: TPopupMenu);
     procedure WMKillFocus(var Message: TMessage); message WM_KILLFOCUS;
+    procedure DoLayerChanged(Sender: TLayerCollection; Action: TLayerListNotification; Layer: TCustomLayer; Index: Integer);
 
     procedure ReadData(aReader: TReader);
     procedure WriteData(aWriter: TWriter);
@@ -124,20 +129,20 @@ type
   TImage32Editor = class(TImage32Ex)
   protected
     FRubberBand: TGRRubberBandLayer;
-    FSelection: TGRPositionLayer;
+    FSelection: TGRPropertyLayer;
     FPopupMenu: TPopupMenu;
     FOnSelectionChanged: TNotifyEvent;
 
-    procedure SetSelection(Value: TGRPositionLayer);
+    procedure SetSelection(Value: TGRPropertyLayer);
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer); reintroduce; overload;override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
   public
     procedure LoadFromStream(const aStream: TStream);override;
     procedure RemoveSelectedLayer();
-    function CreateLayer(const aClass: TGRLayerClass): TGRPositionLayer;
+    function CreateLayer(const aClass: TGRLayerClass): TGRPropertyLayer;
     procedure Clear;
 
-    property Selection: TGRPositionLayer read FSelection write SetSelection;
+    property Selection: TGRPropertyLayer read FSelection write SetSelection;
     property OnSelectionChanged: TNotifyEvent read FOnSelectionChanged write FOnSelectionChanged;
   end;
 
@@ -154,11 +159,12 @@ uses
   GR_LayerEditors;
 
 type
-  TLayerHack = class(TCustomLayer);
+  TLayerAccess = class(TCustomLayer);
   TLayerCollectionAccess = class(TLayerCollection);
   TExtRubberBandLayerAccess = class(TGRRubberBandLayer);
   TReaderAccess = class(TReader);
   TWriterAccess = class(TWriter);
+  TGRLayerAccess = class(TGRLayer);
 
   TMyShiftState  = (ssShift, ssAlt, ssCtrl, ssLeft, ssRight, ssMiddle, ssDouble);
   TMyShiftStates = set of TMyShiftState;
@@ -272,13 +278,14 @@ constructor TImage32Ex.Create(aOwner: TComponent);
 begin
   inherited;
   FTransparent := False;
-  FCardBitmap := nil;
+  FFocusLayers := TList.Create;
+  Layers.OnListNotify := DoLayerChanged;
 end;
 
 destructor TImage32Ex.Destroy;
 begin
-  FreeAndNil(FCardBitmap);
   FreeAndNil(FFixupReferences);
+  FreeAndNil(FFocusLayers);
   inherited;
 end;
 
@@ -335,6 +342,46 @@ begin
   finally
     FIsLoading := False;
     EndUpdate;
+  end;
+end;
+
+function SortTabOrder(Item1, Item2: TGRLayerAccess): Integer;
+begin
+  Result := Item2.TabOrder - Item1.TabOrder;
+end;
+ 
+procedure TImage32Ex.DoLayerChanged(Sender: TLayerCollection; Action: TLayerListNotification; Layer: TCustomLayer; Index: Integer)
+var
+  i: integer;
+begin
+  if Layer is TGRLayer then
+  begin
+    case Action of
+      lnTabStopChanged:
+      begin
+        i := FFocusLayers.IndexOf(Layer);
+        if TGRLayerAccess(Layer).TabStop then
+        begin
+          if i < 0 then FFocusLayers.Add(Layer);
+        end
+        else
+          if i >= 0 then FFocusLayers.Delete(i);
+      end;
+      lnTabOrderChanged:
+      begin
+        i := FFocusLayers.IndexOf(Layer);
+        if i >=0 then
+        begin
+          FFocusLayers.Sort(@SortTabOrder);
+        end;
+      end;
+      lnLayerDeleted:
+      begin
+        i := FFocusLayers.IndexOf(Layer);
+        if i >= 0 then FFocusLayers.Delete(i);
+      end;
+      lnCleared:
+        FFocusLayers.Clear;
   end;
 end;
 
@@ -665,7 +712,7 @@ procedure TImage32Ex.MouseEnter;
 {$ENDIF}
 begin
   if (Layers.MouseEvents) and (Layers.MouseListener <> nil) and not Layers.MouseListener.MouseInControl then
-    TLayerHack(Layers.MouseListener).MouseEnter;
+    TLayerAccess(Layers.MouseListener).MouseEnter;
   inherited;
 end;
 
@@ -676,7 +723,7 @@ procedure TImage32Ex.MouseLeave;
 {$ENDIF}
 begin
   if (Layers.MouseEvents) and (Layers.MouseListener <> nil) and Layers.MouseListener.MouseInControl then
-    TLayerHack(Layers.MouseListener).MouseLeave;
+    TLayerAccess(Layers.MouseListener).MouseLeave;
   inherited;
 end;
 
@@ -737,7 +784,7 @@ procedure TImage32Ex.KeyDown(var Key: Word; Shift: TShiftState);
 begin
   If (Layers.MouseListener <> nil) and Layers.KeyEvents Then
   Begin
-    TLayerHack(Layers.MouseListener).KeyDown(Key, Shift);
+    TLayerAccess(Layers.MouseListener).KeyDown(Key, Shift);
   End; // If
   inherited;
 end;
@@ -746,7 +793,7 @@ procedure TImage32Ex.KeyPress(var Key: Char);
 begin
   If (Layers.MouseListener <> nil) and Layers.KeyEvents Then
   Begin
-    TLayerHack(Layers.MouseListener).KeyPress(Key);
+    TLayerAccess(Layers.MouseListener).KeyPress(Key);
   End; // If
   inherited;
 end;
@@ -755,7 +802,7 @@ procedure TImage32Ex.KeyUp(var Key: Word; Shift: TShiftState);
 begin
   If (Layers.MouseListener <> nil) and Layers.KeyEvents Then
   Begin
-    TLayerHack(Layers).KeyUp(Key, Shift);
+    TLayerAccess(Layers).KeyUp(Key, Shift);
   End; // If
   inherited;
 end;
@@ -776,26 +823,26 @@ begin
   inherited;
   If (Layers.MouseListener <> nil) and Layers.MessageEvents Then
   Begin
-    TLayerHack(Layers.MouseListener).WndProc(Message);
+    TLayerAccess(Layers.MouseListener).WndProc(Message);
   End; // If
 end;
 
 { TImage32Editor }
 
-function TImage32Editor.CreateLayer(const aClass: TGRLayerClass): TGRPositionLayer;
+function TImage32Editor.CreateLayer(const aClass: TGRLayerClass): TGRPropertyLayer;
 var
   P: TPoint;
 begin
   with GetViewportRect do
     P := ControlToBitmap(Point((Right + Left) div 2, (Top + Bottom) div 2));
   Result := aClass.Create(Layers);
-  if Result is TGRLayer then with TGRLayer(Result) do
+  if Result is TGRPropertyLayer then with TGRPropertyLayer(Result) do
   begin
     Left := P.X;
     Top := P.Y;
-    if TGRLayerEditor.Execute(TGRLayer(Result)) then
+    if TGRLayerEditor.Execute(TGRPropertyLayer(Result)) then
     begin
-      Selection := TGRLayer(Result);
+      Selection := TGRPropertyLayer(Result);
       Result.Name := CreateUniqueDefaultName(Layers);
     end
     else
@@ -857,7 +904,7 @@ begin
   end;
 end;
 
-procedure TImage32Editor.SetSelection(Value: TGRPositionLayer);
+procedure TImage32Editor.SetSelection(Value: TGRPropertyLayer);
 begin
   if Value is TGRRubberBandLayer then exit;
   if Value <> FSelection then
@@ -896,10 +943,10 @@ begin
 end;
 
 initialization
-  if vReadPropValueInjector.InjectProcedure(@TReader.ReadPropValue, @TGRReader.ReadPropValue) then
-    @FOldReadPropValueProc := vReadPropValueInjector.OriginalProc
+  //if vReadPropValueInjector.InjectProcedure(@TReader.ReadPropValue, @TGRReader.ReadPropValue) then
+    //@FOldReadPropValueProc := vReadPropValueInjector.OriginalProc
 
 finalization
-  vReadPropValueInjector.Enabled := False;
+  //vReadPropValueInjector.Enabled := False;
 end.
 

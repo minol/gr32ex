@@ -1,4 +1,4 @@
-{ Summary the extented layers class }
+{ Summary the base GRLayer classes }
 {
 It contains a reimplementation of the layers used currently in Graphics32. The implementation starts from
 TCustomLayer and defines the following new:
@@ -9,7 +9,6 @@ TCustomLayer and defines the following new:
 - TGRGridLayer (derived from TGRTransformationLayer)
 - TGRRubberBandLayer (derived from TGRTransformationLayer)
 - TGRCustomPropertyLayer (derived from TGRTransformationLayer)
-- TGRTextLayer (derived from TGRCustomPropertyLayer)
 - TGRBitmapLayer (derived from TGRCustomPropertyLayer)
 - TGRLayerContainer (derived from TGRCustomPropertyLayer)
 
@@ -40,6 +39,7 @@ history by riceball
  * The Original Code is GR_Layers
  *
  * The Initial Developer of the Original Code is Riceball LEE
+ * Portions created by public@lischke-online.de are Copyright (C) 2002
  * Portions created by Riceball LEE are Copyright (C) 2008
  * All Rights Reserved.
  *
@@ -79,10 +79,19 @@ type
     rboShowFrame,
     rboShowHandles
   );
+  TGRGroupOption = (
+    grpFollowMove,
+    grpFollowScale,
+    grpFollowSkew,
+    grpFolllowSize,
+    grpFolllowPivot
+  );
+  TGRGroupOptions = set of TGRGroupOption;
 
 const
   DefaultRubberbandOptions = [rboAllowCornerResize, rboAllowEdgeResize, rboAllowMove,
     rboShowFrame, rboShowHandles];
+  cDefaultGroupOptions = [grpFollowMove, grpFollowScale, grpFollowSkew, grpFolllowSize, grpFolllowPivot];
   cUnNamed = 'Unnamed';
 
 type
@@ -212,7 +221,9 @@ was to provide as many of the features of Photoshop as I could implement.
     procedure WriteScalingData(aWriter: TStream);
 
   protected
-    function IsClearTransformation: Boolean;
+    //whether has nay transformation?  true means no transformation.
+    //IsClearTransformation rename to HasTransformation and return false means no transformation. now(Be careful here)
+    function HasTransformation: Boolean;
     {$IFDEF Designtime_Supports}
     procedure Paint(Buffer: TBitmap32); override;
     function DoHitTest(aX, aY: Integer): Boolean; override;
@@ -456,12 +467,20 @@ multiply etc.) which should be applied to the layer's pixel.
     property Name;
   end;
 
+  //GR32_Layers patch: 
+  //TLayerListNotification = (lnLayerAdded, lnLayerInserted, lnLayerDeleted, lnCleared, lnTabStopChanged, lnTabOrderChanged); //#added lnTabStopChanged, lnTabOrderChanged by Riceball
+  TTabOrder = -1..32767;
   {: the abstract Visible Layer class.}
   TGRLayer = class(TGRPropertyLayer)
     //the behaviors: the last string MUST be 'Behavior' [行为的命名规范]
     function ScriptBehavior(const Sender: TObject; const aScript: string; const aEvent: string = ''; const aParams: string = ''): Longint;
   private
   protected
+    FTabStop: Boolean;
+    FTapOrder: TTabOrder;
+
+    FAlphaBlend: Boolean;
+    FAlphaBlendValue: Byte;
     //the script or method name.
     //the script is between "<" ">"
     FOnClickStr: TGRNotifyEventStr;
@@ -472,11 +491,18 @@ multiply etc.) which should be applied to the layer's pixel.
     FOnMouseEnterStr: TGRNotifyEventStr;
     FOnMouseLeaveStr: TGRNotifyEventStr;
 
+    procedure SetTabOrder(const Value: TTabOrder);
+    procedure SetTabStop(const Value: Boolean);
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseEnter; override;
     procedure MouseLeave; override;
     procedure RunScriptBehavior(const aScript: TGRNotifyEventStr; const aEvent: string = ''; aParams: string = '');
+    procedure DoAlphaBlendChanged; virtual;
 
+    property AlphaBlend: Boolean read FAlphaBlend write SetAlphaBlend;
+    property AlphaBlendValue: Byte read FAlphaBlendValue write SetAlphaBlendValue default 255;
+    property TabOrder: TTabOrder read FTabOrder write SetTabOrder;
+    property TabStop: Boolean read FTabStop write SetTabStop;
   public
   {$IFDEF Designtime_Supports}
     class function RubberbandOptions: TGRRubberBandOptions; override;
@@ -503,56 +529,18 @@ multiply etc.) which should be applied to the layer's pixel.
     property Width;
     property Height;
   end;
-
-
-  { 
-TGRTextLayer
-This layer is not really implemented, but used as a placeholder. Once
-somebody decides to write a real text layer, this one can serve as the
-starting point.
-  }
-  TGRTextLayer = class(TGRLayer)
+  
+  //group some layers
+  TGRGroupLayer = class(TGRPropertyLayer)
   protected
-    FText: WideString;
-    FTextColor: TColor32;
-    procedure SetText(const Value: WideString);
-    procedure SetTextColor(const Value: TColor32);
-  public
-    constructor Create(ALayerCollection: TLayerCollection); override;
-    procedure Assign(Source: TPersistent);override;
-
-    property Text: WideString read FText write SetText;
-    property TextColor: TColor32 read FTextColor write SetTextColor default clBlack32;
-  end;
-
-  {
-TGRBitmapLayer
-This is the last layer in the bundle and provides means to paint a
-TBitmap32 with all the transformations applied. Additionally, it has a
-PaintTo method, which allows to draw the content to other locations than the
-ImgView32 container.
-  }
-  TGRBitmapLayer = class(TGRLayer)
-  protected
-    FBitmap: TBitmap32Ex;
-    FCropped: Boolean;
-    procedure SetCropped(Value: Boolean);
-    procedure SetBitmap(Value: TBitmap32Ex);
-  protected
-    function DoHitTest(X, Y: Integer): Boolean; override;
-    function GetNativeSize: TSize; override;
-    procedure Paint(Buffer: TBitmap32); override;
-
-    procedure BitmapChanged(Sender: TObject);virtual;
+    //the layers in the group.
+    FLayers: TList;
+    FGroupOptions: TGRGroupOptions;
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
-    procedure Assign(Source: TPersistent);override;
-
-    procedure PaintTo(Buffer: TBitmap32; const R: TRect);
-
-    property Bitmap: TBitmap32Ex read FBitmap write SetBitmap;
-    property Cropped: Boolean read FCropped write SetCropped;
+  public 
+    property GroupOptions: TGRGroupOptions read FGroupOptions write FGroupOptions default cDefaultGroupOptions;
   end;
 
   TGRLayerCollection = class(TLayerCollection)
@@ -570,7 +558,7 @@ ImgView32 container.
     FForceFullRepaint: Boolean;
     FRepaintOptimizer: TCustomRepaintOptimizer;
     FRepaintMode: TRepaintMode;
-    FDrawMode: TDrawMode;
+    //FDrawMode: TDrawMode;
 
     FLayers: TGRLayerCollection;
 
@@ -585,7 +573,8 @@ ImgView32 container.
     CacheValid: Boolean;
     OldSzX, OldSzY: Integer;
 
-    procedure SetDrawMode(Value: TDrawMode);
+    procedure SetAlphaBlend(const Value: Boolean);
+    procedure SetAlphaBlendValue(const Value: Byte);
     procedure SetRepaintMode(const Value: TRepaintMode); virtual;
     function GetBitmapRect: TRect;
 
@@ -602,6 +591,7 @@ ImgView32 container.
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
+    procedure DoAlphaBlendChanged; override;
 
 
     procedure LayerCollectionChangeHandler(Sender: TObject);
@@ -616,13 +606,15 @@ ImgView32 container.
     destructor Destroy;override;
     function  GetViewportRect: TRect; virtual;
 
+    property AlphaBlend;
+    property AlphaBlendValue;
     //property Left: Integer read FLeft write FLeft;
     //property Top: Integer read FTop write FTop;
     //property Width: Integer read FWidth write FWidth;
     //property Height: Integer read FHeight write FHeight;
     property Buffer: TBitmap32 read FBuffer;
     property RepaintMode: TRepaintMode read FRepaintMode write SetRepaintMode default rmFull;
-    property DrawMode: TDrawMode read FDrawMode write SetDrawMode default dmOpaque;
+    //property DrawMode: TDrawMode read FDrawMode write SetDrawMode default dmOpaque;
     property Layers: TGRLayerCollection read FLayers;
   end;
   TVariantDynArray = array of Variant;
@@ -1580,10 +1572,10 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
-function TGRTransformationLayer.IsClearTransformation: Boolean;
+function TGRTransformationLayer.HasTransformation: Boolean;
 begin
-  Result := (FSkew.x = 0) and (FSkew.y = 0) and (FPivotPoint.x = 0)  and (FPivotPoint.y = 0)
-    and (FScaling.x = 1) and (FScaling.y = 1) and (FAngle = 0);
+  Result := (FSkew.x <> 0) or (FSkew.y <> 0) or (FPivotPoint.x <> 0) or (FPivotPoint.y <> 0)
+    or (FScaling.x <> 1) or (FScaling.y <> 1) or (FAngle <> 0);
     //OutputDebugString(PChar('x='+FloatToStr(FScaling.x)+ ' Result='+IntToStr(Integer(Result))));
 end;
 
@@ -1592,7 +1584,7 @@ var
   ShiftX, ShiftY, ScaleX, ScaleY: Single;
 begin
   FTransformation.Clear;
-  if not IsClearTransformation then
+  if HasTransformation then
   begin
     FTransformation.Translate(-FPivotPoint.X, -FPivotPoint.Y);
     FTransformation.Scale(FScaling.X, FScaling.Y);
@@ -3340,6 +3332,7 @@ constructor TGRLayer.Create(ALayerCollection: TLayerCollection);
 begin
   inherited;
   FCanStored := True;
+  FAlphaBlendValue := 255;
 end;
 
 {$IFDEF Designtime_Supports}
@@ -3449,6 +3442,10 @@ begin
   inherited Assign(Source);
 end;
 
+procedure TGRLayer.DoAlphaBlendChanged;
+begin
+end;
+
 procedure TGRLayer.RunScriptBehavior(const aScript: TGRNotifyEventStr; const aEvent: string; aParams: string);
 var
   vEvent: TGRNotifyEvent;
@@ -3512,6 +3509,24 @@ begin
   Result := 0;
 end;
 
+procedure TGRLayer.SetTabOrder(const Value: TTabOrder);
+begin
+  if FTabOrder <> Value then
+  begin
+    FTabOrder := Value;
+    TLayerCollectionAccess(LayerCollection).Notify(lnTabOrderChanged, Self, Index);
+  end;
+end;
+
+procedure TGRLayer.SetTabStop(const Value: Boolean);
+begin
+  if FTabStop <> Value then
+  begin
+    FTabStop := Value;
+    TLayerCollectionAccess(LayerCollection).Notify(lnTabStopChanged, Self, Index);
+  end;
+end;
+
 procedure TGRLayer.MouseEnter;
 begin
   inherited;
@@ -3556,229 +3571,38 @@ begin
   end; //case
 end;
 
-//----------------- TGRTextLayer -----------------------------------------------------------------------------------------
-
-constructor TGRTextLayer.Create(ALayerCollection: TLayerCollection);
-
+procedure TGRLayer.SetAlphaBlend(const Value: Boolean);
 begin
-  inherited;
-
-  FTextColor := clBlack32;
-end;
-
-procedure TGRTextLayer.Assign(Source: TPersistent);
-begin
-  if Source is TGRTextLayer then
-    with Source as TGRTextLayer do
-    begin
-      Changing;
-      Self.FText := FText;
-      Self.FTextColor := FTextColor;
-      Changed;
-    end;
-  inherited Assign(Source);
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TGRTextLayer.SetText(const Value: WideString);
-
-begin
-  if FText <> Value then
+  if FAlphaBlend <> Value then
   begin
-    Changing;
-    FText := Value;
-    Changed;
+    FAlphaBlend := Value;
+    DoAlphaBlendChanged;
   end;
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TGRTextLayer.SetTextColor(const Value: TColor32);
-
+procedure TGRLayer.SetAlphaBlendValue(const Value: Byte);
 begin
-  if FTextColor <> Value then
+  if FAlphaBlendValue <> Value then
   begin
-    Changing;
-    FTextColor := Value;
-    Changed;
+    FAlphaBlendValue := Value;
+    DoAlphaBlendChanged;
   end;
 end;
 
-//----------------- TGRBitmapLayer ------------------------------------------------------------------------------------
-
-constructor TGRBitmapLayer.Create(ALayerCollection: TLayerCollection);
+{ TGRGroupLayer }
+constructor TGRGroupLayer.Create(ALayerCollection: TLayerCollection);
 begin
   inherited;
-
-  FBitmap := TBitmap32Ex.Create;
-  FBitmap.DrawMode := dmBlend;
-  FBitmap.OnChange := BitmapChanged;
+  FLayers := TList.Create;
+  FGroupOptions := cDefaultGroupOptions;
 end;
 
-//----------------------------------------------------------------------------------------------------------------------
-
-destructor TGRBitmapLayer.Destroy;
+destructor TGRGroupLayer.Destroy;
 begin
-  FBitmap.Free;
-
+  FreeAndNil(FLayers);
   inherited;
 end;
 
-procedure TGRBitmapLayer.Assign(Source: TPersistent);
-begin
-  if Source is TGRBitmapLayer then
-    with Source as TGRBitmapLayer do
-    begin
-      Changing;
-      Self.FBitmap.Assign(FBitmap);
-      Self.FCropped := FCropped;
-      Changed;
-    end;
-  inherited Assign(Source);
-end;
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TGRBitmapLayer.BitmapChanged(Sender: TObject);
-begin
-  Changing;
-  with GetNativeSize do
-    FTransformation.SrcRect := FloatRect(0, 0, cx - 1, cy - 1);
-  Changed;
-  //DoChange;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TGRBitmapLayer.SetBitmap(Value: TBitmap32Ex);
-begin
-  Changing;
-  FBitmap.Assign(Value);
-  Changed;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TGRBitmapLayer.SetCropped(Value: Boolean);
-begin
-  if Value <> FCropped then
-  begin
-    Changing;
-    FCropped := Value;
-    Changed;
-  end;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-function TGRBitmapLayer.DoHitTest(X, Y: Integer): Boolean;
-
-var
-  B: TPoint;
-begin
-  {$IFDEF Designtime_Supports}
-  if FBitmap.Empty then
-  begin
-    Result := inherited DoHitTest(X, Y);
-    exit;
-  end;
-  {$ENDIF}
-  B := Point(X, Y);
-  if TAffineTransformationAccess(FTransformation).TransformValid then
-    B := FTransformation.ReverseTransform(B);
-
-  Result := PtInRect(Rect(0, 0, Bitmap.Width, Bitmap.Height), B);
-  if Result and AlphaHit and (Bitmap.PixelS[B.X, B.Y] and $FF000000 = 0) then
-    Result := False;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-function TGRBitmapLayer.GetNativeSize: TSize;
-begin
-  {$IFDEF Designtime_Supports}
-  if FBitmap.Empty then
-  begin
-    Result := inherited GetNativeSize;
-    exit;
-  end;
-  {$ENDIF}
-  Result.cx := FBitmap.Width;
-  Result.cy := FBitmap.Height;
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TGRBitmapLayer.Paint(Buffer: TBitmap32);
-var
-  vRect: TRect;
-begin 
-  {$IFDEF Designtime_Supports}
-  if FBitmap.Empty then
-  begin
-    inherited Paint(Buffer);
-    exit;
-  end;
-  {$ENDIF}
-  //UpdateTransformation;
-  //if not TAffineTransformationAccess(FTransformation).TransformValid then
-    //TAffineTransformationAccess(FTransformation).PrepareTransform;
-
-  if TAffineTransformationAccess(FTransformation).TransformValid then
-  begin
-    if FCropped then
-    begin
-      //vRect := MakeRect(GetTransformedTargetRect);
-      with GetAdjustedPosition(FPosition), GetNativeSize do
-      begin
-        vRect.Left := Round(x);
-        vRect.Top  := Round(y);
-        vRect.Right := Round(x + cx);
-        vRect.Bottom := Round(y + cy);
-      end;
-      Transform(Buffer, FBitmap, FTransformation, vRect);
-    end
-    else
-      Transform(Buffer, FBitmap, FTransformation);
-  end
-  else
-  begin
-    with GetAdjustedPosition(FPosition), GetNativeSize do
-    begin
-        vRect.Left := Round(x);
-        vRect.Top  := Round(y);
-        vRect.Right := Round(x + cx);
-        vRect.Bottom := Round(y + cy);
-    end;
-    if FCropped then
-    begin
-      BlockTransfer(Buffer, vRect.Left, vRect.Top, Buffer.ClipRect, FBitmap, vRect, FBitmap.DrawMode, FBitmap.OnPixelCombine);
-    end
-    else
-      BlockTransfer(Buffer, vRect.Left, vRect.Top, Buffer.ClipRect, FBitmap, FBitmap.ClipRect, FBitmap.DrawMode, FBitmap.OnPixelCombine);
-  end;
-  //OutputDebugString(PChar('paint bitmap:'+ IntToStr(Integer(FBitmap))));
-end;
-
-//----------------------------------------------------------------------------------------------------------------------
-
-procedure TGRBitmapLayer.PaintTo(Buffer: TBitmap32; const R: TRect);
-// Paints the bitmap to the given buffer using the position and size/location given in R.
-var
-  Transformation: TAffineTransformation;
-begin
-  Transformation := nil;
-  try
-    GetLayerTransformation(Transformation);
-    Transformation.SrcRect := FloatRect(0, 0, Bitmap.Width - 1, Bitmap.Height - 1);
-    TAffineTransformationAccess(FTransformation).PrepareTransform;
-    Transformation.Scale((R.Right - R.Left) / Bitmap.Width, (R.Bottom - R.Top) / Bitmap.Height);
-    Transformation.Translate(R.Left, R.Top);
-    Transform(Buffer, FBitmap, Transformation);
-  finally
-    Transformation.Free;
-  end;
-end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -3818,6 +3642,17 @@ begin
   FInvalidRects.Free;
   FBuffer.Free;
   inherited;
+end;
+
+procedure TGRLayerContainer.DoAlphaBlendChanged;
+begin
+  Changing;
+    if FAlphaBlend then 
+      FBuffer.DrawMode := dmBlend
+    else
+      FBuffer.DrawMode := dmOpaque;
+    FBuffer.MasterAlpha := FAlphaBlendValue;
+  Changed;
 end;
 
 procedure TGRLayerContainer.LayerCollectionChangeHandler(Sender: TObject);
@@ -4055,16 +3890,6 @@ begin
 
   if not Assigned(Layers) then
     inherited;
-end;
-
-procedure TGRLayerContainer.SetDrawMode(Value: TDrawMode);
-begin
-  if FDrawMode <> Value then
-  begin
-    FDrawMode := Value;
-    FBuffer.DrawMode := FDrawMode;
-    Changed;
-  end;
 end;
 
 procedure TGRLayerContainer.SetRepaintMode(const Value: TRepaintMode);

@@ -1,6 +1,14 @@
 unit MainForm;
 
+{$I Setting.inc}
+
+{$IFNDEF Designtime_Supports}
+{$Message Fatal 'pls define Designtime_Supports first'}
+{$ENDIF}
+
 interface
+
+{.$DEFINE SynEdit_Supports}
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
@@ -20,6 +28,11 @@ uses
   GR32_ExtLayers,
   GR_Layers, 
   GR_ImageEx,
+  { SynEdit }
+  {$IFDEF SynEdit_Supports}
+  SynEdit, SynEditTypes, SynHighlighterPas,
+  SynEditRegexSearch, SynEditSearch, SynEditMiscClasses, SynEditHighlighter, SynHighlighterDfm,
+  {$ENDIF}
   { gettext }
   gnugettext;
 
@@ -28,7 +41,7 @@ type
     ilMain: TImageList;
     dockTop: TSpTBXDock;
     dockLeft: TSpTBXMultiDock;
-    SpTBXMultiDock2: TSpTBXMultiDock;
+    dockRight: TSpTBXMultiDock;
     dockBottom: TSpTBXDock;
     tbStandard: TSpTBXToolbar;
     tbMenuBar: TSpTBXToolbar;
@@ -123,18 +136,23 @@ type
     tbiDesign: TSpTBXTabItem;
     tbsDesign: TSpTBXTabSheet;
     actDel: TTntAction;
-    pnlOptions: TSpTBXDockablePanel;
+    pnlInspector: TSpTBXDockablePanel;
     dlgOpen: TOpenDialog;
     dlgSave: TSaveDialog;
     pmLayer: TSpTBXPopupMenu;
-    TBGroupItem1: TTBGroupItem;
-    SpTBXSeparatorItem2: TSpTBXSeparatorItem;
-    SpTBXItem1: TSpTBXItem;
-    SpTBXItem2: TSpTBXItem;
     Button1: TButton;
     Button2: TButton;
     tbiSource: TSpTBXTabItem;
     tbsSource: TSpTBXTabSheet;
+    tbiScript: TSpTBXTabItem;
+    tbsScript: TSpTBXTabSheet;
+    tbTest: TSpTBXToolbar;
+    actRun: TTntAction;
+    SpTBXItem3: TSpTBXItem;
+    actBringToFront: TTntAction;
+    actSendToBack: TTntAction;
+    SpTBXItem1: TSpTBXItem;
+    SpTBXItem2: TSpTBXItem;
     procedure FormShow(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure tLayoutSaveClick(Sender: TObject);
@@ -157,12 +175,21 @@ type
     procedure Button2Click(Sender: TObject);
     procedure tabMainActiveTabChanging(Sender: TObject; TabIndex,
       NewTabIndex: Integer; var Allow: Boolean);
+    procedure actRunExecute(Sender: TObject);
+    procedure actBringToFrontExecute(Sender: TObject);
+    procedure actSendToBackExecute(Sender: TObject);
+    procedure ActionListUpdate(Action: TBasicAction; var Handled: Boolean);
   private
     { Private declarations }
+    FOldLayerListNotification: TLayerListNotifyEvent;
     procedure NotifyList(Sender: TLayerCollection; Action: TLayerListNotification; Layer: TCustomLayer; Index: Integer);
   protected
     FImageEditor: TImage32Editor;
-    mmoSource: TMemo;
+    mmoSource: {$IFDEF SynEdit_Supports}TSynEdit{$ELSE}TMemo{$ENDIF};
+    mmoScript: {$IFDEF SynEdit_Supports}TSynEdit{$ELSE}TMemo{$ENDIF};
+    {$IFDEF SynEdit_Supports}
+    FSynDfm: TSynDfmSyn;
+    {$ENDIF}
     FClipObj: TGRLayer;
     FIsSourceChanged: Boolean;
     FAppPath: string;
@@ -174,6 +201,7 @@ type
     { Public declarations }
     procedure FillLayoutList(CurrentLayout: string = '');
     constructor Create(aComponent: TComponent);override;
+    destructor Destroy; override;
     
     property ClipObj: TGRLayer read FClipObj write SetClipObj;
   end;
@@ -184,7 +212,9 @@ var
 implementation
 
 uses
-  TntSystem, TntForms, GR_LayerEditors, GR_LayerInspector;
+  TntSystem, TntForms, GR_LayerEditors, GR_LayerInspector
+  , TestForm
+  ;
 
 {$R *.dfm}
 
@@ -362,12 +392,15 @@ constructor TfrmMain.Create(aComponent: TComponent);
 var
   i: integer;
   vItem: TTBItem;
+  vBmp: TBitmap;
 begin
   inherited;
   FImageEditor := TImage32Editor.Create(Self);
   FImageEditor.Parent := tbsDesign;
   FImageEditor.Align := alClient;
+  FOldLayerListNotification := TLayerCollectionAccess(FImageEditor.Layers).OnListNotify;
   TLayerCollectionAccess(FImageEditor.Layers).OnListNotify := NotifyList;
+  FImageEditor.PopupMenu := pmLayer;
   with GLayerInspector do
   begin
     Parent := pnlOptions;
@@ -381,13 +414,32 @@ begin
 
   with GLayerClasses.LockList do
   try
-  //tbComponentPallete.
+    //##tbComponentPallete.
     for i := 0 to count -1 do
+    if TGRLayerClass(Items[i]).IsVisibleInEditor then
     begin
-      vItem := TTBItem.Create(Self);
+      vItem := TSpTBXItem.Create(Self);
       vItem.ParentComponent := tbComponentPallete;
-      //vItem.Action := aCustomize;
-      vItem.Caption := TGRLayerClass(Items[i]).ClassName;
+
+      //vRes := FindResource(HInstance, PChar(TGRLayerClass(Items[i]).ClassName), RT_BITMAP);
+      //if vRes <> 0 then
+      begin
+        vBmp := TBitmap.Create;
+        try
+         try
+          vBmp.LoadFromResourceName(HInstance, TGRLayerClass(Items[i]).ClassName);
+          if not vBmp.Empty then
+          begin
+            vItem.Images := ilMain;
+            vItem.ImageIndex := ilMain.Add(vBmp, nil);
+          end;
+         except
+         end;
+        finally
+          vBmp.Free;
+        end;
+      end;
+      vItem.Caption := TSDPlayingLayerClass(Items[i]).ClassName;
       vItem.Tag := Integer(Items[i]);
       vItem.OnClick := DoCreateLayer;
       tbComponentPallete.Items.Add(vitem);
@@ -395,10 +447,30 @@ begin
   finally
     GLayerClasses.UnlockList;
   end;
-  mmoSource := TMemo.Create(Self);
-  mmoSource.Parent := tbsSource;
-  mmoSource.Align := alClient;
-  mmoSource.OnChange := DoObjSourceChanged;
+ {$IFDEF SynEdit_Supports}
+  FSynDfm := TSynDfmSyn.Create(Self);
+ {$ENDIF}
+  mmoSource := {$IFDEF SynEdit_Supports}TSynEdit{$ELSE}TMemo{$ENDIF}.Create(Self);
+  with mmoSource do
+  begin
+    Parent := tbsSource;
+    Align := alClient;
+    OnChange := DoObjSourceChanged;
+    {$IFDEF SynEdit_Supports}
+    Highlighter := FSynDfm;
+    {$ENDIF}
+  end;
+  mmoScript := {$IFDEF SynEdit_Supports}TSynEdit{$ELSE}TMemo{$ENDIF}.Create(Self);
+  with mmoScript do
+  begin
+    Parent := tbsScript;
+    Align := alClient;
+  end;
+end;
+destructor TfrmMain.Destroy;
+begin
+  TLayerCollectionAccess(FImageEditor.Layers).OnListNotify := FOldLayerListNotification;
+  inherited;
 end;
 
 procedure TfrmMain.actSelectPointerExecute(Sender: TObject);
@@ -408,30 +480,14 @@ end;
 
 procedure TfrmMain.DoCreateLayer(Sender: TObject);
 var
-  vLayer: TGRPositionLayer;
-  P: TPoint;
+  vLayer: TGRPropertyLayer;
 begin
   if (Sender is TTBItem) then
     with Sender as TTBItem do
     begin
       if (tag <> 0) then
       begin
-        with FImageEditor.GetViewportRect do
-         P := FImageEditor.ControlToBitmap(Point((Right + Left) div 2, (Top + Bottom) div 2));
-        vLayer := TGRLayerClass(tag).Create(FImageEditor.Layers);
-        with vLayer.Position do
-        begin
-          X := P.X;
-          Y := P.Y;
-        end;
-        FImageEditor.Selection := vLayer;
-        {if TGRLayerEditor.Execute(vLayer) then
-        begin
-          FImageEditor.Selection := vLayer;
-        end
-        else
-          vLayer.Free;
-          //}
+        vLayer := FImageEditor.CreateLayer(TGRLayerClass(tag))
       end;
     end;
 end;
@@ -460,6 +516,8 @@ procedure TfrmMain.NotifyList(Sender: TLayerCollection; Action: TLayerListNotifi
 begin
   if (Action = lnCleared) or ((Action = lnLayerDeleted) and (FClipObj = Layer)) then
     FClipObj := nil;
+  if Assigned(FOldLayerListNotification) then
+    FOldLayerListNotification(Sender, Action, Layer, Index);
 end;
 
 procedure TfrmMain.SetClipObj(const Value: TGRLayer);
@@ -559,6 +617,32 @@ begin
   FIsSourceChanged := True;
 end;
 
+procedure TfrmMain.actRunExecute(Sender: TObject);
+begin
+  frmTest.PlayingDesktop.Assign(FImageEditor);
+  LayersRemoveClasses(frmTest.Image.layers, [TGRRubberBandLayer, TGRGridLayer]);
+  frmTest.Show;
+end;
+
+procedure TfrmMain.actBringToFrontExecute(Sender: TObject);
+begin
+  if Assigned(FImageEditor.Selection) then
+    FImageEditor.Selection.BringToFront;
+end;
+
+procedure TfrmMain.actSendToBackExecute(Sender: TObject);
+begin
+  if Assigned(FImageEditor.Selection) then
+    FImageEditor.Selection.SendToBack;
+end;
+
+procedure TfrmMain.ActionListUpdate(Action: TBasicAction;
+  var Handled: Boolean);
+begin
+  actBringToFront.Enabled := Assigned(FImageEditor.Selection);
+  actSendToBack.Enabled := Assigned(FImageEditor.Selection);
+end;
+
 initialization
-  RegisterLayer(TGRLayer);
+  //RegisterLayer(TGRLayer);
 end.
