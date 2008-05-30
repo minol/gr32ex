@@ -559,7 +559,7 @@ type
 
   TGRDefaultEffectOptions = record
     Enabled: Boolean;
-    //Animation: TTeAdvancedAnimation;
+    //Animation: TAdvancedAnimation;
   end;
 
 function DrawParentBackground(const aControl: TControl; const DC: HDC): Boolean;
