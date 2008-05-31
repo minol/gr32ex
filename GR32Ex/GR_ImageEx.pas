@@ -55,7 +55,6 @@ type
     procedure Notify(Ptr: Pointer; Action: TListNotification); override;
   end;
 
-  //FlexSDK:http://www.fs2you.com/files/ed28dcc7-2e14-11dd-a6fc-00142218fc6e/
   TImage32Ex = class(TImage32)
   protected
     FCurrentFocusedLayer: TGRLayer;
