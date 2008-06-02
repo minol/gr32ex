@@ -83,7 +83,14 @@ starting point.
   protected
     FText: string;
     FFont: TFont32;
+    FAlignment: TAlignment;
+    FLayout: TTextLayout;
+    FWordWrap: Boolean;
+
+    procedure SetAlignment(const Value: TAlignment);
+    procedure SetLayout(const Value: TTextLayout);
     procedure SetText(const Value: string);
+    procedure SetWordWrap(const Value: Boolean);
     procedure DoChanged(Sender: TObject);
 
     procedure Paint(Buffer: TBitmap32); override;
@@ -94,6 +101,10 @@ starting point.
 
     property Text: string read FText write SetText;
     property Font: TFont32 read FFont;
+    property Alignment: TAlignment read FAlignment write SetAlignment default
+      taCenter;
+    property Layout: TTextLayout read FLayout write SetLayout default tlTop;
+    property WordWrap: Boolean read FWordWrap write SetWordWrap;
   end;
 
   {
@@ -140,6 +151,7 @@ constructor TGRTextLayer.Create(ALayerCollection: TLayerCollection);
 
 begin
   inherited;
+  FAlignment := taCenter;
   FFont := TFont32.Create;
   FFont.OnChange := DoChanged;
 end;
@@ -158,6 +170,8 @@ begin
       Changing;
       Self.FText := FText;
       Self.FFont.Assign(FFont);
+      Self.FAlignment := FAlignment;
+      Self.FLayout := FLayout;
       Changed;
     end;
   inherited Assign(Source);
@@ -169,18 +183,63 @@ begin
 end;
 
 procedure TGRTextLayer.Paint(Buffer: TBitmap32);
+const
+  Alignments: array[TAlignment] of Word = (DT_LEFT, DT_RIGHT, DT_CENTER);
+  WordWraps: array[Boolean] of Word = (0, DT_WORDBREAK);
+var
+  Rect, CalcRect: TRect;
+  DrawStyle: Longint;
 begin
   if FText <> '' then
+  begin
+    Rect := MakeRect(GetTransformedTargetRect);
+    //CalcRect := Buffer.ClipRect;
+    //IntersectRect(Rect, Rect, CalcRect);
+    //if not IsRectEmpty(TempRect) then
+    begin
+      DrawStyle := DT_EXPANDTABS or WordWraps[FWordWrap] or Alignments[FAlignment];
+      FFont.DrawText(Buffer, FText, Rect, DrawStyle);
+    end;
+  end;
   
 end;
 
-procedure TGRTextLayer.SetText(const Value: string);
+procedure TGRTextLayer.SetAlignment(const Value: TAlignment);
+begin
+  if Value <> FAlignment then
+  begin
+    Changing;
+    FAlignment := Value;
+    Changed;
+  end;
+end;
 
+procedure TGRTextLayer.SetLayout(const Value: TTextLayout);
+begin
+  if Value <> FLayout then
+  begin
+    Changing;
+    FLayout := Value;
+    Changed;
+  end;
+end;
+
+procedure TGRTextLayer.SetText(const Value: string);
 begin
   if FText <> Value then
   begin
     Changing;
     FText := Value;
+    Changed;
+  end;
+end;
+
+procedure TGRTextLayer.SetWordWrap(const Value: Boolean);
+begin
+  if FWordWrap <> Value then
+  begin
+    Changing;
+    FWordWrap := Value;
     Changed;
   end;
 end;

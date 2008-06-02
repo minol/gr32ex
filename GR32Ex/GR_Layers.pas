@@ -498,6 +498,7 @@ multiply etc.) which should be applied to the layer's pixel.
     procedure MouseLeave; override;
     procedure RunScriptBehavior(const aScript: TGRNotifyEventStr; const aEvent: string = ''; aParams: string = '');
     procedure DoAlphaBlendChanged; virtual;
+    function UseRightToLeftAlignment: Boolean; dynamic;
 
     property AlphaBlend: Boolean read FAlphaBlend write SetAlphaBlend;
     property AlphaBlendValue: Byte read FAlphaBlendValue write SetAlphaBlendValue default 255;
@@ -536,11 +537,12 @@ multiply etc.) which should be applied to the layer's pixel.
     //the layers in the group.
     FLayers: TList;
     FGroupOptions: TGRGroupOptions;
+
+    property GroupOptions: TGRGroupOptions read FGroupOptions write FGroupOptions default cDefaultGroupOptions;
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
   public 
-    property GroupOptions: TGRGroupOptions read FGroupOptions write FGroupOptions default cDefaultGroupOptions;
   end;
 
   TGRLayerCollection = class(TLayerCollection)
@@ -3587,6 +3589,11 @@ begin
     FAlphaBlendValue := Value;
     DoAlphaBlendChanged;
   end;
+end;
+
+function TGRLayer.UseRightToLeftAlignment: Boolean;
+begin
+  Result := Assigned(LayerCollection) and (LayerCollection.Owner is TControl) and TControl(LayerCollection.Owner).UseRightToLeftAlignment;
 end;
 
 { TGRGroupLayer }
