@@ -34,6 +34,7 @@ uses
   Windows,
   SysUtils, Classes
   , Graphics
+  , Contnrs
   , GR32
   , GR32_Layers
   , GR32_Transforms
@@ -46,12 +47,21 @@ uses
   ;
 
 type
-  TGRAnimator = class
+  TGRAnimator = class;
+  TGRAnimatorInstance = class;
+  TGRAnimatorInstanceClass = class of TGRAnimatorInstance;
 
   TGRCustomAnimator = class
   protected
     FDuration: Integer;
+    FSuspendBackgroundProcessing;
+    FStartDelay: Integer;
+    FRepeatDelay: Integer;
+    FRepeatCount: Integer;
 
+    function GetPlayheadTime: Integer;
+    function GetTarget: TObject; virtual; abstract;
+    procedure SetTarget(const Value: TObject); virtual; abstract;
     {
      *  Plays the effect instance on the target.
      *  Call the <code>startEffect()</code> method instead
@@ -68,7 +78,7 @@ type
     {
      *  Pauses the effect until you call the <code>resume()</code> method.
      }
-    procedure Pause();
+    procedure Pause();virtual; abstract;
     
     {
      *  Stops the effect, leaving the target in its current state.
@@ -80,19 +90,19 @@ type
      *  <p>The effect instance dispatches an <code>OnAniEnd</code> event
      *  when you call this method as part of ending the effect.</p>
      }
-    procedure Stop();
+    procedure Stop();virtual; abstract;
 
     {
      *  Resumes the effect after it has been paused 
      *  by a call to the <code>pause()</code> method. 
      }
-    procedure Resume();
+    procedure Resume();virtual; abstract;
     
     {
      *  Plays the effect in reverse, starting from
      *  the current position of the effect.
      }
-    procedure Reverse();
+    procedure Reverse();virtual; abstract;
 
     {
      *  Interrupts an effect instance that is currently playing,
@@ -112,7 +122,7 @@ type
      *  from the end of your override, after your logic.</p>
      *
      }
-    procedure GotoEnd();
+    procedure GotoEnd();virtual; abstract;
 
     {
        *  Duration of the animation in milliseconds. 
@@ -146,7 +156,7 @@ type
      *  
      *  @default false
      }
-    property SuspendBackgroundProcessing: Boolean;
+    property SuspendBackgroundProcessing: Boolean read FSuspendBackgroundProcessing;
 
     {
        Current position in time of the animation.
@@ -162,7 +172,7 @@ type
        @default 1
        @see mx.effects.Effect#repeatCount
      }
-    property RepeatCount: Integer read FRepeatCount write SetRepeatCount;
+    property RepeatCount: Integer read FRepeatCount write FRepeatCount default 1;
     {
      *  Amount of time, in milliseconds,
      *  to wait before repeating the animation.
@@ -170,7 +180,7 @@ type
      *  @default 0
      *  @see TGRAnimators.RepeatDelay
      }
-    property RepeatDelay: Integer;
+    property RepeatDelay: Integer read FFRepeatDelay write FFRepeatDelay;
     {
      *  Amount of time, in milliseconds,
      *  to wait before starting the animation.
@@ -181,19 +191,10 @@ type
      *
      *  @default 0
      }
-    property StartDelay: Integer;
+    property StartDelay: Integer read FFStartDelay write FFStartDelay;
 
-    {
-     *  The Trigger, if any, which triggered the playing of the animation.
-     *  This property is useful when an animation is assigned to 
-     *  multiple triggers.
-     * 
-     *  <p>If the animation was played programmatically by a call to the 
-     *  <code>play()</code> method, rather than being triggered by an event,
-     *  this property is <code>null</code>.</p>
-     *  if it is the AnimatorInstance then Trigger only one if any.
-     }
-    property Trigger: TStrings;
+  public
+    constructor Create; virtual;
   end;
 
   { Summary: the abstract animator. one target one Animator. }
@@ -215,7 +216,9 @@ type
   }
   TGRAnimatorInstance = class(TGRCustomAnimator)
   protected
-//    FTrigger: string;
+    FTrigger: string;
+    FTarget: TObject;
+    FOwner: TGRAnimator;
     {
      *  This method is called if the effect was triggered by the EffectManager. 
      *  This base class version saves the event that triggered the effect
@@ -227,7 +230,7 @@ type
      *  For example, if the trigger was a mouseDownEffect, the event
      *  would be a MouseEvent with type equal to MouseEvent.MOUSEDOWN. 
      }
-    procedure Init(aTrigger: string);
+    procedure Init(aTrigger: string);virtual; abstract;
     {
      *  Plays the animation instance on the target after the
      *  <code>startDelay</code> period has elapsed.
@@ -235,7 +238,7 @@ type
      *  Use this function instead of the <code>play()</code> method
      *  when starting an TGRAnimatorInstance.
      }
-    procedure Start;
+    procedure Start;virtual; abstract;
 
     
     {*
@@ -250,7 +253,7 @@ type
      *
      *  @see mx.events.EffectEvent
      *}
-    procedure Finish();
+    procedure Finish();virtual; abstract;
     
     {*
      *  Called after each iteration of a repeated effect finishes playing.
@@ -258,8 +261,21 @@ type
      *  <p>You do not have to override this method in a subclass.
      *  You do not need to call this method when using animators.</p>
      *}
-    function FinishRepeat();
+    function FinishRepeat();virtual; abstract;
+
+    {
+     *  The Trigger, if any, which triggered the playing of the animation.
+     *  This property is useful when an animation is assigned to 
+     *  multiple triggers.
+     * 
+     *  <p>If the animation was played programmatically by a call to the 
+     *  <code>play()</code> method, rather than being triggered by an event,
+     *  this property is <code>null</code>.</p>
+     *  if it is the AnimatorInstance then Trigger only one if any.
+     }
+    property Trigger: string;
   public
+    constructor Create(const aTarget: TObject);override; reintroduce;
     {
         The TGRAnimator object that created this AnimatorInstance object.
      }
@@ -275,8 +291,26 @@ type
   }
   TGRAnimator = class(TGRCustomAnimator)
   protected
-    FTargets: TObjectList;
+    FTargets: TList;
+    FInstances: TObjectList;
+    FIsPaused: Boolean;
+
+    function GetIsPlaying: Boolean;
+    procedure InitInstance(const aInstance: TGRAnimatorInstance);
+    function GetTarget: TObject; override;
+    procedure SetTarget(const Value: TObject); override;
+    procedure SetTargets(const Value: TList);
   public
+    {
+     *  An object of type Class that specifies the effect
+     *  instance class class for this effect class. 
+     *  
+     *  <p>All subclasses of the Effect class must override this</p>
+     *}
+    class fucntion InstanceClass: TGRAnimatorInstanceClass; virtual; abstract;
+
+    constructor Create; override;
+    destructor Destroy; override;
     {*
      *  Takes an Array of target objects and invokes the 
      *  <code>createInstance()</code> method on each target. 
@@ -338,10 +372,22 @@ type
     procedure Play(const aPlayReversedFromEnd:Boolean = false): override; overload;
     procedure Play(const aTargets: TGRDynTargets; const aPlayReversedFromEnd:Boolean = false); overload;
 
-    property IsPlaying: Boolean;
+    property IsPlaying: Boolean read GetIsPlaying;
     //return the first object in the Targets if any.
     property Target;
-    property Targets: TObjectList;
+    property Targets: TList read FTargets write SetTargets;
+    {
+     *  The Trigger, if any, which triggered the playing of the animation.
+     *  This property is useful when an animation is assigned to 
+     *  multiple triggers.
+     * 
+     *  <p>If the animation was played programmatically by a call to the 
+     *  <code>play()</code> method, rather than being triggered by an event,
+     *  this property is <code>null</code>.</p>
+     *  if it is the AnimatorInstance then Trigger only one if any.
+     }
+    property Trigger: TStrings;
+
     property OnAniStart: TNotifyEvent;
     property OnAniEnd: TNotifyEvent;
   end;
@@ -355,5 +401,85 @@ const
   G32DefaultDelay: ShortInt = 100; // Time in ms.
   G32MinimumDelay: ShortInt = 10;  // Time in ms.
 
+
+{ TGRCustomAnimator }
+constructor TGRCustomAnimator.Create;
+begin
+  inherited;
+  FRepeatCount := 1;
+end;
+function TGRCustomAnimator.GetPlayheadTime: Integer;
+begin
+  Result := FStartDelay + FRepeatCount * FRepeatDelay;
+emd;
+
+{ TGRAnimatorInstance }
+constructor TGRAnimatorInstance.Create(const aTarget: TObject);
+begin
+  inherited;
+  FTarget := aTarget;
+end;
+
+{ TGRAnimator }
+constructor TGRAnimator.Create;
+begin
+  inherited;
+  FTargets := TList.Create;
+  FInstances := TObjectList.Create;
+end;
+
+destructor TGRAnimator.Destroy;
+begin
+  FreeAndNil(FTargets);
+  FreeAndNil(FInstances);
+  inherited;
+end;
+
+function TGRAnimator.CreateInstance(const aTarget: TObject = nil): TGRAnimatorInstance;
+begin
+  
+end;
+
+procedure TGRAnimator.CreateInstances(const aTargets: TGRDynTargets);
+begin
+  
+end;
+
+function TGRAnimator.GetIsPlaying: Boolean;
+begin
+  Result := FInstances.Count > 0;
+end;
+
+function TGRAnimator.GetTarget: TObject; 
+begin
+  if FTargets.Count > 0 then
+    Result := FTargets.Items[0]
+  else
+    Result := nil;
+end;
+
+procedure TGRAnimator.InitInstance(const aInstance: TGRAnimatorInstance);
+begin
+  aInstance.FDuration := FDuration;
+  aInstance.FOwner := Self;
+  aInstance.FRepeatDelay := FRepeatDelay;
+  aInstance.FRepeatCount := FRepeatCount;
+  aInstance.FStartDelay := FStartDelay;
+  aInstance.FSuspendBackgroundProcessing := FSuspendBackgroundProcessing;
+end;
+
+procedure TGRAnimator.SetTarget(const Value: TObject); 
+begin
+  if Assigned(Value) then
+  begin
+    FTargets.Clear
+    FTargets.Add(Value);
+  end;
+end;
+
+procedure TGRAnimator.SetTargets(const Value: TList);
+begin
+  FTargets.Assign(Value); 
+end;
 
 end.
