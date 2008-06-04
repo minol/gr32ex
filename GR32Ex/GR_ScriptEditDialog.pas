@@ -24,7 +24,8 @@
  * ***** END LICENSE BLOCK ***** *)
 unit GR_ScriptEditDialog;
 
-{$DEFINE SynEdit_Supports}
+{$I Setting.inc}
+{.$DEFINE SynEdit_Supports}
 
 interface
 

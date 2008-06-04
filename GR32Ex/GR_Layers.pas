@@ -202,6 +202,11 @@ was to provide as many of the features of Photoshop as I could implement.
     FScaling: TFloatPoint;
     FPivotPoint: TFloatPoint;                    // Center of rotation and proportional scaling.
     FSize: TSize;
+    {$IFDEF Designtime_Supports}
+    {if true the rubber band will modify the Size property instead of scaling when drage to resize.}
+    {the default is false. }
+    FIsResizeSupport: Boolean;
+    {$ENDIF}
 
     procedure SetAngle(Value: Single);
     procedure SetPivot(const Value: TFloatPoint);
@@ -367,6 +372,7 @@ NOTE: the rubber band uses many of the cursors in the GR32_Types.pas unit!
     FOldPivot: TFloatPoint;
     FOldSkew: TFloatPoint;
     FOldAngle: Single;
+    FOldSize: TSize;
     FDragPos: TPoint;
 
     procedure SetChildLayer(const Value: TGRPositionLayer);
@@ -477,7 +483,7 @@ multiply etc.) which should be applied to the layer's pixel.
   private
   protected
     FTabStop: Boolean;
-    FTapOrder: TTabOrder;
+    FTabOrder: TTabOrder;
 
     FAlphaBlend: Boolean;
     FAlphaBlendValue: Byte;
@@ -491,6 +497,8 @@ multiply etc.) which should be applied to the layer's pixel.
     FOnMouseEnterStr: TGRNotifyEventStr;
     FOnMouseLeaveStr: TGRNotifyEventStr;
 
+    procedure SetAlphaBlend(const Value: Boolean);
+    procedure SetAlphaBlendValue(const Value: Byte);
     procedure SetTabOrder(const Value: TTabOrder);
     procedure SetTabStop(const Value: Boolean);
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
@@ -575,8 +583,6 @@ multiply etc.) which should be applied to the layer's pixel.
     CacheValid: Boolean;
     OldSzX, OldSzY: Integer;
 
-    procedure SetAlphaBlend(const Value: Boolean);
-    procedure SetAlphaBlendValue(const Value: Byte);
     procedure SetRepaintMode(const Value: TRepaintMode); virtual;
     function GetBitmapRect: TRect;
 
@@ -2104,6 +2110,10 @@ begin
   begin
     //Changing;
     FSize := Value.GetNativeSize;
+    {$IFDEF Designtime_Supports}
+    if Value is TGRTransformationLayer then
+      FIsResizeSupport := TGRTransformationLayer(Value).FIsResizeSupport;
+    {$ENDIF}
     FScaled := Value.FScaled;
     FPosition := Value.Position;
     if Value is TGRTransformationLayer then
@@ -2115,10 +2125,11 @@ begin
       Self.FSkew := Skew;
     end;
 
-    FChildLayer.AddNotification(Self);
-    FChildLayer.AddChangeNotification(Self);
+    Value.AddNotification(Self);
+    Value.AddChangeNotification(Self);
     //Changed;
     //Self.AddNotification(FChildLayer);
+    LayerOptions := LayerOptions or LOB_NO_UPDATE
   end
   else
   begin
@@ -2130,14 +2141,10 @@ begin
     FScaled := False;
     FScaling := FloatPoint(1, 1);
     FSkew := FloatPoint(0, 0);
+    LayerOptions := LayerOptions and not LOB_NO_UPDATE;
   end;
   //fixed bug: can not drag here (rb)
   UpdateTransformation;
-
-  if FChildLayer <> nil then
-    LayerOptions := LayerOptions or LOB_NO_UPDATE
-  else
-    LayerOptions := LayerOptions and not LOB_NO_UPDATE;
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -2552,6 +2559,7 @@ begin
     FOldSkew := FSkew;
     FOldAngle := FAngle;
     FDragPos := Point(X, Y);
+    FOldSize := FSize;
   end;
   inherited;
 end;
@@ -2676,6 +2684,7 @@ begin
       // Scale values for local coordinates determined by the ratio between top/left border to pivot position
       // (which is the center when the image gets scaled). Note: the pivot point is local to the image, so the
       // image's position doesn't matter.
+
       ScaleRatioX := FOldPivot.X / FSize.cx;
       ScaleRatioY := FOldPivot.Y / FSize.cy;
 
@@ -2788,6 +2797,27 @@ begin
 
     if FDragState in [rdsResizeN..rdsResizeNW] then
     begin
+      {$IFDEF Designtime_Supports}
+      if FIsResizeSupport then
+      begin
+        if (ssShift in Shift) and (FDragState in [rdsResizeNE, rdsResizeSE, rdsResizeSW, rdsResizeNW]) then
+        begin
+        	if dx > dy then
+        	begin
+        	  T := FSize.cy / FSize.cx;
+      	    dy := dx * T;
+      	  end
+      	  else begin
+        	  T := FSize.cx / FSize.cy;
+      	    dx := dy * T;
+      	  end;
+        end;
+      	FSize.cx := FSize.cx + Round(dx);
+      	FSize.cy := FSize.cy + Round(dy);
+     	end
+     	else
+     	begin
+      {$ENDIF}
       // Recalculate transformed coordinates if the user requests a constant ratio.
       if (ssShift in Shift) and (FDragState in [rdsResizeNE, rdsResizeSE, rdsResizeSW, rdsResizeNW]) then
       begin
@@ -2818,6 +2848,10 @@ begin
         if ScaleRatioY < 1 then
           FScaling.Y := FOldScaling.Y + DirY * TransY / FSize.cy / (1 - ScaleRatioY);
       end;
+      {$IFDEF Designtime_Supports}
+      end;
+      {$ENDIF}
+
     end;
 
   {$IFDEF Designtime_Supports}
@@ -3225,8 +3259,14 @@ begin
       end;
   
       if Different(Skew, Self.Skew) then Skew := Self.Skew;
-//      if Different(FSize, Self.FSize) then FSize := Self.FSize;
-      if Different(Scaling, Self.Scaling) then Scaling := Self.Scaling;
+      {$IFDEF Designtime_Supports}
+      if FIsResizeSupport then
+      begin
+        if Different(FSize, Self.FSize) then FSize := Self.FSize;
+      end
+      else
+      {$ENDIF}
+        if Different(Scaling, Self.Scaling) then Scaling := Self.Scaling;
       if Different(PivotPoint, Self.PivotPoint) then PivotPoint := Self.PivotPoint;
     end;
 
@@ -3250,10 +3290,16 @@ begin
     FIsDragging := False;
 
     FPosition := FOldPosition;
+    {$IFDEF Designtime_Supports}
+    if FIsResizeSupport then
+      FSize := FOldSize
+    else
+    {$ENDIF}
     FScaling := FOldScaling;
     FPivotPoint := FOldPivot;
     FSkew := FOldSkew;
     FAngle := FOldAngle;
+    
 
     UpdateChildLayer;
     Changed;
@@ -3446,6 +3492,7 @@ end;
 
 procedure TGRLayer.DoAlphaBlendChanged;
 begin
+	Changed;
 end;
 
 procedure TGRLayer.RunScriptBehavior(const aScript: TGRNotifyEventStr; const aEvent: string; aParams: string);

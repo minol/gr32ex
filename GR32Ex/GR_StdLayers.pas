@@ -6,7 +6,7 @@ It contains a reimplementation of the layers used currently in Graphics32. The i
 TCustomLayer and defines the following new:
 
 - TGRTextLayer (derived from TGRCustomPropertyLayer)
-- TGRBitmapLayer (derived from TGRCustomPropertyLayer)
+- TGRCustomBitmapLayer (derived from TGRCustomPropertyLayer)
 
 3D programmer here!
 
@@ -73,13 +73,56 @@ uses
 
 type
   TTextLayout = (tlTop, tlCenter, tlBottom);
+
+  {
+TGRCustomBitmapLayer
+This is the last layer in the bundle and provides means to paint a
+TBitmap32 with all the transformations applied. Additionally, it has a
+PaintTo method, which allows to draw the content to other locations than the
+ImgView32 container.
+  }
+  TGRCustomBitmapLayer = class(TGRLayer)
+  protected
+    FBitmap: TBitmap32Ex;
+    FCropped: Boolean;
+    procedure SetCropped(Value: Boolean);
+    procedure SetBitmap(Value: TBitmap32Ex);
+  protected
+    function DoHitTest(X, Y: Integer): Boolean; override;
+    function GetNativeSize: TSize; override;
+    procedure Paint(Buffer: TBitmap32); override;
+    procedure DoAlphaBlendChanged; override;
+
+    procedure BitmapChanged(Sender: TObject);virtual;
+
+    property Bitmap: TBitmap32Ex read FBitmap write SetBitmap;
+    property Cropped: Boolean read FCropped write SetCropped;
+  public
+    constructor Create(ALayerCollection: TLayerCollection); override;
+    destructor Destroy; override;
+    procedure Assign(Source: TPersistent);override;
+
+    procedure PaintTo(Buffer: TBitmap32; const R: TRect);
+
+    property AlphaBlend;
+    property AlphaBlendValue;
+  end;
+
+  TGRBitmapLayer = class(TGRCustomBitmapLayer)
+  public
+    procedure Assign(Source: TPersistent);override;
+
+    property Bitmap;
+    property Cropped;
+  end;
+
   { 
 TGRTextLayer
 This layer is not really implemented, but used as a placeholder. Once
 somebody decides to write a real text layer, this one can serve as the
 starting point.
   }
-  TGRTextLayer = class(TGRLayer)
+  TGRTextLayer = class(TGRCustomBitmapLayer)
   protected
     FText: string;
     FFont: TFont32;
@@ -91,9 +134,8 @@ starting point.
     procedure SetLayout(const Value: TTextLayout);
     procedure SetText(const Value: string);
     procedure SetWordWrap(const Value: Boolean);
-    procedure DoChanged(Sender: TObject);
+    procedure DoTextChanged(Sender: TObject);
 
-    procedure Paint(Buffer: TBitmap32); override;
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
@@ -107,53 +149,21 @@ starting point.
     property WordWrap: Boolean read FWordWrap write SetWordWrap;
   end;
 
-  {
-TGRBitmapLayer
-This is the last layer in the bundle and provides means to paint a
-TBitmap32 with all the transformations applied. Additionally, it has a
-PaintTo method, which allows to draw the content to other locations than the
-ImgView32 container.
-  }
-  TGRBitmapLayer = class(TGRLayer)
-  protected
-    FBitmap: TBitmap32Ex;
-    FCropped: Boolean;
-    procedure SetCropped(Value: Boolean);
-    procedure SetBitmap(Value: TBitmap32Ex);
-  protected
-    function DoHitTest(X, Y: Integer): Boolean; override;
-    function GetNativeSize: TSize; override;
-    procedure Paint(Buffer: TBitmap32); override;
-    procedure DoAlphaBlendChanged; override;
-
-    procedure BitmapChanged(Sender: TObject);virtual;
-  public
-    constructor Create(ALayerCollection: TLayerCollection); override;
-    destructor Destroy; override;
-    procedure Assign(Source: TPersistent);override;
-
-    procedure PaintTo(Buffer: TBitmap32; const R: TRect);
-
-    property AlphaBlend;
-    property AlphaBlendValue;
-    property Bitmap: TBitmap32Ex read FBitmap write SetBitmap;
-    property Cropped: Boolean read FCropped write SetCropped;
-  end;
-
-
 implementation
 
 uses
   Math, StrUtils, TypInfo, uMeTypInfo, GR32_Polygons, GR32_MicroTiles;
 
+type
+  TAffineTransformationAccess = class(TAffineTransformation);
+
 { TGRTextLayer }
 constructor TGRTextLayer.Create(ALayerCollection: TLayerCollection);
-
 begin
   inherited;
   FAlignment := taCenter;
   FFont := TFont32.Create;
-  FFont.OnChange := DoChanged;
+  FFont.OnChange := DoTextChanged;
 end;
 
 destructor TGRTextLayer.Destroy;
@@ -172,45 +182,39 @@ begin
       Self.FFont.Assign(FFont);
       Self.FAlignment := FAlignment;
       Self.FLayout := FLayout;
-      Changed;
+      DoTextChanged(nil);
     end;
   inherited Assign(Source);
 end;
 
-procedure TGRTextLayer.DoChanged(Sender: TObject);
-begin
-  Changed;
-end;
-
-procedure TGRTextLayer.Paint(Buffer: TBitmap32);
+procedure TGRTextLayer.DoTextChanged(Sender: TObject);
 const
   Alignments: array[TAlignment] of Word = (DT_LEFT, DT_RIGHT, DT_CENTER);
   WordWraps: array[Boolean] of Word = (0, DT_WORDBREAK);
 var
-  Rect, CalcRect: TRect;
-  DrawStyle: Longint;
+  vRect: TRect;
+  vDrawStyle: Longint;
 begin
-  if FText <> '' then
-  begin
-    Rect := MakeRect(GetTransformedTargetRect);
-    //CalcRect := Buffer.ClipRect;
-    //IntersectRect(Rect, Rect, CalcRect);
-    //if not IsRectEmpty(TempRect) then
-    begin
-      DrawStyle := DT_EXPANDTABS or WordWraps[FWordWrap] or Alignments[FAlignment];
-      FFont.DrawText(Buffer, FText, Rect, DrawStyle);
-    end;
-  end;
-  
+	FBitmap.BeginUpdate;
+	try
+	  with FSize do FBitmap.SetSize(cx, cy);
+	  FBitmap.Clear;
+    vDrawStyle := DT_EXPANDTABS or WordWraps[FWordWrap] or Alignments[FAlignment];
+    vRect := FBitmap.ClipRect;
+    FFont.DrawText(FBitmap, FText, vRect, vDrawStyle);
+	finally
+	  FBitmap.EndUpdate;
+	  FBitmap.Changed; //this will notify the bitmap onChange event.
+	end;
+  //Changed;
 end;
 
 procedure TGRTextLayer.SetAlignment(const Value: TAlignment);
 begin
   if Value <> FAlignment then
   begin
-    Changing;
     FAlignment := Value;
-    Changed;
+    DoTextChanged(nil);
   end;
 end;
 
@@ -218,9 +222,8 @@ procedure TGRTextLayer.SetLayout(const Value: TTextLayout);
 begin
   if Value <> FLayout then
   begin
-    Changing;
     FLayout := Value;
-    Changed;
+    DoTextChanged(nil);
   end;
 end;
 
@@ -228,9 +231,8 @@ procedure TGRTextLayer.SetText(const Value: string);
 begin
   if FText <> Value then
   begin
-    Changing;
     FText := Value;
-    Changed;
+    DoTextChanged(nil);
   end;
 end;
 
@@ -238,14 +240,13 @@ procedure TGRTextLayer.SetWordWrap(const Value: Boolean);
 begin
   if FWordWrap <> Value then
   begin
-    Changing;
     FWordWrap := Value;
-    Changed;
+    DoTextChanged(nil);
   end;
 end;
 
-{ TGRBitmapLayer }
-constructor TGRBitmapLayer.Create(ALayerCollection: TLayerCollection);
+{ TGRCustomBitmapLayer }
+constructor TGRCustomBitmapLayer.Create(ALayerCollection: TLayerCollection);
 begin
   inherited;
 
@@ -254,27 +255,26 @@ begin
   FBitmap.OnChange := BitmapChanged;
 end;
 
-destructor TGRBitmapLayer.Destroy;
+destructor TGRCustomBitmapLayer.Destroy;
 begin
   FBitmap.Free;
 
   inherited;
 end;
 
-procedure TGRBitmapLayer.Assign(Source: TPersistent);
+procedure TGRCustomBitmapLayer.Assign(Source: TPersistent);
 begin
-  if Source is TGRBitmapLayer then
-    with Source as TGRBitmapLayer do
+  if Source is TGRCustomBitmapLayer then
+    with Source as TGRCustomBitmapLayer do
     begin
       Changing;
-      Self.FBitmap.Assign(FBitmap);
       Self.FCropped := FCropped;
       Changed;
     end;
   inherited Assign(Source);
 end;
 
-procedure TGRBitmapLayer.BitmapChanged(Sender: TObject);
+procedure TGRCustomBitmapLayer.BitmapChanged(Sender: TObject);
 begin
   Changing;
   with GetNativeSize do
@@ -283,14 +283,14 @@ begin
   //DoChange;
 end;
 
-procedure TGRBitmapLayer.SetBitmap(Value: TBitmap32Ex);
+procedure TGRCustomBitmapLayer.SetBitmap(Value: TBitmap32Ex);
 begin
   Changing;
   FBitmap.Assign(Value);
   Changed;
 end;
 
-procedure TGRBitmapLayer.SetCropped(Value: Boolean);
+procedure TGRCustomBitmapLayer.SetCropped(Value: Boolean);
 begin
   if Value <> FCropped then
   begin
@@ -300,7 +300,7 @@ begin
   end;
 end;
 
-procedure TGRBitmapLayer.DoAlphaBlendChanged;
+procedure TGRCustomBitmapLayer.DoAlphaBlendChanged;
 begin
   Changing;
     if FAlphaBlend then 
@@ -311,7 +311,7 @@ begin
   Changed;
 end;
 
-function TGRBitmapLayer.DoHitTest(X, Y: Integer): Boolean;
+function TGRCustomBitmapLayer.DoHitTest(X, Y: Integer): Boolean;
 
 var
   B: TPoint;
@@ -332,7 +332,7 @@ begin
     Result := False;
 end;
 
-function TGRBitmapLayer.GetNativeSize: TSize;
+function TGRCustomBitmapLayer.GetNativeSize: TSize;
 begin
   {$IFDEF Designtime_Supports}
   if FBitmap.Empty then
@@ -345,7 +345,7 @@ begin
   Result.cy := FBitmap.Height;
 end;
 
-procedure TGRBitmapLayer.Paint(Buffer: TBitmap32);
+procedure TGRCustomBitmapLayer.Paint(Buffer: TBitmap32);
 var
   vRect: TRect;
 begin 
@@ -396,7 +396,7 @@ begin
   //OutputDebugString(PChar('paint bitmap:'+ IntToStr(Integer(FBitmap))));
 end;
 
-procedure TGRBitmapLayer.PaintTo(Buffer: TBitmap32; const R: TRect);
+procedure TGRCustomBitmapLayer.PaintTo(Buffer: TBitmap32; const R: TRect);
 // Paints the bitmap to the given buffer using the position and size/location given in R.
 var
   Transformation: TAffineTransformation;
@@ -412,6 +412,19 @@ begin
   finally
     Transformation.Free;
   end;
+end;
+
+{ TGRBitmapLayer }
+procedure TGRBitmapLayer.Assign(Source: TPersistent);
+begin
+  if Source is TGRCustomBitmapLayer then
+    with Source as TGRCustomBitmapLayer do
+    begin
+      Changing;
+      Self.FBitmap.Assign(FBitmap);
+      Changed;
+    end;
+  inherited Assign(Source);
 end;
 
 initialization
