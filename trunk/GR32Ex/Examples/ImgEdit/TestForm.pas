@@ -49,8 +49,8 @@ implementation
 constructor TfrmTest.Create(aOwner: TComponent);
 begin
   inherited;
-  Image := TImage32Ex.Create(Self);
-  with Image do
+  FImage := TImage32Ex.Create(Self);
+  with FImage do
   begin
     Parent := Self;
     Align := alClient;
