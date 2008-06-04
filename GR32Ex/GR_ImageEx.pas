@@ -30,6 +30,9 @@ interface
 {$I GR32.inc}
 
 uses
+  {$IFDEF Debug}
+  CnDebug,
+  {$ENDIF}
 {$IFDEF CLX}
   Qt, Types, QControls, QGraphics, QForms, QConsts,
   {$IFDEF LINUX}Libc,{$ENDIF}
@@ -914,7 +917,7 @@ begin
   end;
   inherited MouseDown(Button, Shift, X, Y, Layer);
  {$IFDEF Debug}
-  if Assigned(Layer) then sendDebug('Image32Ex.MouseDown Layer=' + Layer.ClassName);
+  //if Assigned(Layer) then sendDebug('Image32Ex.MouseDown Layer=' + Layer.ClassName);
  {$ENDIF}
 end;
 

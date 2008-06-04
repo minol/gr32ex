@@ -55,6 +55,9 @@ unit GR_Layers;
 interface
 
 uses
+  {$IFDEF Debug}
+  CnDebug,
+  {$ENDIF}
   Windows, Messages,
   SysUtils, Classes, Types, Graphics, Controls, Forms
   , GR32
@@ -160,13 +163,17 @@ type
     procedure SetGridLayer(const Value: TGRGridLayer);
     procedure Paint(Buffer: TBitmap32); override;
     function DoHitTest(aX, aY: Integer): Boolean; override;
+    function HitTestRect(const aX, aY, aWidth, aHeight: Integer): Boolean;
     {$ENDIF}
 
   protected
     procedure NotifyParentScaledChanged(const aScaled: Boolean);
     function GetNativeSize: TSize; virtual;
     procedure Notification(ALayer: TCustomLayer); override;
+    //convert the control(layer) coordinates to screen coordinates.
     function GetAdjustedPosition(const P: TFloatPoint): TFloatPoint;
+    //convert the screen coordinates.to control(layer) coordinates 
+    function GetLayerPosition(const aScreenPoint: TFloatPoint): TFloatPoint;
   public
     constructor Create(aLayerCollection: TLayerCollection); override;
     destructor Destroy; override;
@@ -234,9 +241,9 @@ was to provide as many of the features of Photoshop as I could implement.
     function DoHitTest(aX, aY: Integer): Boolean; override;
     {$ENDIF}
     function GetNativeSize: TSize;override;
-    procedure Changed; overload; override;
     procedure iResetTransformation; virtual;
     procedure DefineProperties(Filer: TFiler); override;
+    procedure iUpdateTransformation;
 
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
@@ -245,6 +252,7 @@ was to provide as many of the features of Photoshop as I could implement.
     {$IFDEF Designtime_Supports}
     class function RubberbandOptions: TGRRubberBandOptions; override;
     {$ENDIF}
+    procedure Changed; overload; override;
 
     procedure GetLayerTransformation(var Transformation: TAffineTransformation);
     function GetTransformedTargetRect: TFloatRect;
@@ -401,6 +409,7 @@ NOTE: the rubber band uses many of the cursors in the GR32_Types.pas unit!
   public
     constructor Create(LayerCollection: TLayerCollection); override;
     destructor Destroy; override;
+    procedure UpdateTransformation; override;
 
     procedure Cancel;
 
@@ -457,7 +466,6 @@ multiply etc.) which should be applied to the layer's pixel.
   {$IFDEF Designtime_Supports}
     procedure SetName(const Value: string);override;
     procedure UpdateScriptsAfterNameChanged(const aOldName, aNewName: string);
-    class function IsVisibleInEditor: Boolean; virtual;
   {$ENDIF}
     { 
     when set some layer property by the layer name, not found in the layers
@@ -466,6 +474,9 @@ multiply etc.) which should be applied to the layer's pixel.
     }
     procedure DoFixupReference(const aName: string; const aObj: TObject);virtual;
   public
+  {$IFDEF Designtime_Supports}
+    class function IsVisibleInEditor: Boolean; virtual;
+  {$ENDIF}
     property CanStored: Boolean read FCanStored write FCanStored;
   published
     property Left;
@@ -1075,6 +1086,27 @@ begin
     Result := P;
 end;
 
+function TGRPositionLayer.GetLayerPosition(const aScreenPoint: TFloatPoint): TFloatPoint;
+var
+  ScaleX, ScaleY, ShiftX, ShiftY: Single;
+begin
+  if Scaled and Assigned(FLayerCollection) then
+  begin
+    FLayerCollection.GetViewportShift(ShiftX, ShiftY);
+    FLayerCollection.GetViewportScale(ScaleX, ScaleY);
+
+    with Result do
+    begin
+      X := aScreenPoint.X / ScaleX - ShiftX;
+      Y := aScreenPoint.Y / ScaleY - ShiftY;
+    end;
+  end
+  else
+    Result := aScreenPoint;
+  Result.X := aScreenPoint.X - FPosition.X;
+  Result.Y := aScreenPoint.Y - FPosition.Y;
+end;
+	
 // Returns the untransformed size of the content. Must be overriden by descentants.
 function TGRPositionLayer.GetNativeSize: TSize;
 begin
@@ -1109,8 +1141,13 @@ const
   
 function TGRPositionLayer.DoHitTest(aX, aY: Integer): Boolean;
 begin
+	Result := HitTestRect(aX, aY, cPositionLayerWdith, cPositionLayerHeight);
+end;
+
+function TGRPositionLayer.HitTestRect(const aX, aY, aWidth, aHeight: Integer): Boolean;
+begin
   with GetAdjustedPosition(FPosition) do
-    Result := (aX >= X - cPositionLayerWdith) and (aX < X + cPositionLayerWdith) and (aY >= Y - cPositionLayerHeight) and (aY < Y + cPositionLayerHeight);
+    Result := (aX >= X - aWidth) and (aX < X + aWidth) and (aY >= Y - aHeight) and (aY < Y + aHeight);
 end;
 
 procedure TGRPositionLayer.Paint(Buffer: TBitmap32);
@@ -1496,30 +1533,37 @@ var
     end;
   end;
 
+var
+  DstRect: TRect;
 begin
-  //UpdateTransformation;
+  {UpdateTransformation;
   with GetNativeSize do CalculateContour(0, 0, cx, cy);
-  DrawContour;
-{  DstRect := MakeRect(GetTransformedTargetRect);
-  ClipRect := Buffer.ClipRect;
-  IntersectRect(TempRect, ClipRect, DstRect);
-  if IsRectEmpty(TempRect) then Exit;
+  DrawContour; // -- this must use transformations!}
+  DstRect := MakeRect(GetTransformedTargetRect);
   Buffer.RaiseRectTS(DstRect, -80);
-}
+//}
 end;
 
 function TGRTransformationLayer.DoHitTest(aX, aY: Integer): Boolean;
 var
   Local: TPoint;
 begin
-    if not TAffineTransformationAccess(FTransformation).TransformValid then
-      TAffineTransformationAccess(FTransformation).PrepareTransform;
-    with FTransformation do
-      Local := ReverseTransform(Point(aX, aY));
-
-
-    with GetNativeSize do
-      Result := PtInRect(Rect(0, 0, cx, cy), Local);
+    if TAffineTransformationAccess(FTransformation).TransformValid then
+    begin
+    	{$IFDEF DEBUG}
+    	//SendDebug(ClassName+' DoHitTest: TransformValid');
+    	{$ENDIF}
+      with FTransformation do
+        Local := ReverseTransform(Point(aX, aY));
+      with GetNativeSize do
+        Result := PtInRect(Rect(0, 0, cx, cy), Local);
+    end
+    else begin
+      with GetNativeSize do Result := HitTestRect(aX, aY, cx, cy);
+    	{$IFDEF DEBUG}
+    	//SendDebug(className+' DoHitTest: Not TransformValid');
+    	{$ENDIF}
+    end;
 end;
 {$ENDIF Designtime_Supports}
 
@@ -1584,16 +1628,14 @@ function TGRTransformationLayer.HasTransformation: Boolean;
 begin
   Result := (FSkew.x <> 0) or (FSkew.y <> 0) or (FPivotPoint.x <> 0) or (FPivotPoint.y <> 0)
     or (FScaling.x <> 1) or (FScaling.y <> 1) or (FAngle <> 0);
-    //OutputDebugString(PChar('x='+FloatToStr(FScaling.x)+ ' Result='+IntToStr(Integer(Result))));
+    //SendDebug(('x='+FloatToStr(FScaling.x)+ ' Result='+IntToStr(Integer(Result))));
+	//Result := True;
 end;
 
-procedure TGRTransformationLayer.UpdateTransformation;
+procedure TGRTransformationLayer.iUpdateTransformation;
 var
   ShiftX, ShiftY, ScaleX, ScaleY: Single;
 begin
-  FTransformation.Clear;
-  if HasTransformation then
-  begin
     FTransformation.Translate(-FPivotPoint.X, -FPivotPoint.Y);
     FTransformation.Scale(FScaling.X, FScaling.Y);
     FTransformation.Skew(FSkew.X, FSkew.Y);
@@ -1610,6 +1652,14 @@ begin
     end;
     if not TAffineTransformationAccess(FTransformation).TransformValid then
       TAffineTransformationAccess(FTransformation).PrepareTransform;
+end;
+	
+procedure TGRTransformationLayer.UpdateTransformation;
+begin
+  FTransformation.Clear;
+  if HasTransformation then
+  begin
+  	iUpdateTransformation;
   end;
 
 end;
@@ -2145,6 +2195,12 @@ begin
   end;
   //fixed bug: can not drag here (rb)
   UpdateTransformation;
+
+  {if FChildLayer <> nil then
+    LayerOptions := LayerOptions or LOB_NO_UPDATE
+  else
+    LayerOptions := LayerOptions and not LOB_NO_UPDATE;
+    //}
 end;
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -2228,6 +2284,7 @@ begin
   //Result := Visible and inherited DoHitTest(X, Y);
  {$IFDEF Debug}
   //SendDebug('DoHitTest='+IntToStr(Integer(Result))+' X='+IntToStr(X)+' Y='+IntToStr(Y));
+  //SendDebug('DoHitTest='+IntToStr(Integer(Result))+' X='+FloatToStr(FPosition.X)+' Y='+FloatToStr(FPosition.Y));
  {$ENDIF}
 
   //if Result and not (rboAllowRotation in Options) then
@@ -2245,7 +2302,7 @@ begin
     Result := PtInRect(Rect(-FThreshold, -FThreshold, FSize.cx + FThreshold, FSize.cy + FThreshold), Local);
 
    {$IFDEF Debug}
-    //sendDebug('DoHitTest.PtInRect='+IntToStr(Integer(Result)));
+    //SendDebug('DoHitTest.PtInRect='+IntToStr(Integer(Result)));
    {$ENDIF}
   end;
 end;
@@ -2545,13 +2602,13 @@ begin
     FIsDragging := (FDragState <> rdsNone);
   end;
  {$IFDEF Debug}
-  sendDebug('MouseDown: IsDrag='+IntTOStr(Integer(FIsDragging)));
-  sendDebug('X='+IntToStr(X)+' Y='+IntToStr(Y));
+  SendDebug('MouseDown: IsDrag='+IntTOStr(Integer(FIsDragging)));
+  SendDebug('X='+IntToStr(X)+' Y='+IntToStr(Y));
  {$ENDIF}
   if FIsDragging then
   begin
  {$IFDEF Debug}
-  sendDebug('...IsDrag');
+  //sendDebug('...IsDrag');
  {$ENDIF}
     FOldPosition := FPosition;
     FOldScaling := FScaling;
@@ -2628,6 +2685,7 @@ var
   LastPosition: TFloatPoint;
   LastRotation: Single;
   LastScaling: TFloatPoint;
+  LastSize: TSize;
   
 begin
   if not TAffineTransformationAccess(FTransformation).TransformValid then
@@ -2658,6 +2716,7 @@ begin
     LastPosition := FPosition;
     LastRotation := FAngle;
     LastScaling := FScaling;
+    LastSize := FSize;
 
     Changing;
 
@@ -2873,7 +2932,8 @@ begin
     // Invalidate image data only for real changes.
     if (Abs(LastPosition.X - FPosition.X + LastPosition.Y - FPosition.Y) > Epsilon) or 
       (Abs(LastRotation - FAngle) > Epsilon) or
-      (Abs(LastScaling.X - FScaling.X + LastScaling.Y - FScaling.Y) > Epsilon) then
+      (Abs(LastScaling.X - FScaling.X + LastScaling.Y - FScaling.Y) > Epsilon) or 
+      (Abs(LastSize.cx - FSize.cx + LastSize.cy - FSize.cy) > Epsilon) then
     begin
       Changing;
 
@@ -3214,6 +3274,12 @@ end;
 
 //----------------------------------------------------------------------------------------------------------------------
 
+procedure TGRRubberBandLayer.UpdateTransformation;
+begin
+  FTransformation.Clear;
+	iUpdateTransformation;
+end;
+
 procedure TGRRubberBandLayer.UpdateChildLayer;
 var
   SomethingChanged: Boolean;
@@ -3247,7 +3313,10 @@ begin
 
     SomethingChanged := False;
 
-    if Different(FChildLayer.Position, Position) then FChildLayer.Position := Position;
+    if Different(FChildLayer.Position, Position) then 
+    begin
+      FChildLayer.Position := Position;
+    end;
 
     if FChildLayer is TGRTransformationLayer then
     with TGRTransformationLayer(FChildLayer) do
@@ -3381,6 +3450,8 @@ begin
   inherited;
   FCanStored := True;
   FAlphaBlendValue := 255;
+  FSize.cx := 32;
+  FSize.cy := 32;
 end;
 
 {$IFDEF Designtime_Supports}
@@ -3472,8 +3543,6 @@ begin
 end;
 
 procedure TGRLayer.Assign(Source: TPersistent);
-var
-  vM: TMethod;
 begin
   if Source is TGRLayer then
     with Source as TGRLayer do
@@ -3905,15 +3974,17 @@ begin
 end;
 
 procedure TGRLayerContainer.MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
-var
-  Layer: TCustomLayer;
+//var
+  //Layer: TCustomLayer;
 begin
   //if TabStop and CanFocus then SetFocus;
   
   if Layers.MouseEvents then
-    Layer := TLayerCollectionAccess(Layers).MouseDown(Button, Shift, X, Y)
-  else
-    Layer := nil;
+    //Layer := 
+    TLayerCollectionAccess(Layers).MouseDown(Button, Shift, X, Y)
+  //else
+    //Layer := nil
+  ;
 
   if not Assigned(Layers) then
     inherited;

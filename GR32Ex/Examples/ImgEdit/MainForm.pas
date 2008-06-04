@@ -392,7 +392,7 @@ end;
 constructor TfrmMain.Create(aComponent: TComponent);
 var
   i: integer;
-  vItem: TTBItem;
+  vItem: TSpTBXItem;
   vBmp: TBitmap;
 begin
   inherited;
@@ -404,7 +404,7 @@ begin
   FImageEditor.PopupMenu := pmLayer;
   with GLayerInspector do
   begin
-    Parent := pnlOptions;
+    Parent := pnlInspector;
     BorderStyle := bsNone;
     Left:=0;
     Top:=0;
@@ -440,7 +440,7 @@ begin
           vBmp.Free;
         end;
       end;
-      vItem.Caption := TSDPlayingLayerClass(Items[i]).ClassName;
+      vItem.Caption := TGRLayerClass(Items[i]).ClassName;
       vItem.Tag := Integer(Items[i]);
       vItem.OnClick := DoCreateLayer;
       tbComponentPallete.Items.Add(vitem);
@@ -483,12 +483,13 @@ procedure TfrmMain.DoCreateLayer(Sender: TObject);
 var
   vLayer: TGRPropertyLayer;
 begin
-  if (Sender is TTBItem) then
-    with Sender as TTBItem do
+  if (Sender is TSpTBXItem) then
+    with Sender as TSpTBXItem do
     begin
       if (tag <> 0) then
       begin
-        vLayer := FImageEditor.CreateLayer(TGRLayerClass(tag))
+        vLayer := FImageEditor.CreateLayer(TGRLayerClass(tag));
+        Assert(vLayer <> nil);
       end;
     end;
 end;
@@ -572,7 +573,7 @@ begin
   if Assigned(FImageEditor.Selection) then
     //TGRLayer(FImageEditor.Selection).Top := 0;
     
-    with TGRLayerAnimator_Sample.Create(TGRLayer(FImageEditor.Selection), 100) do
+    {with TGRLayerAnimator_Sample.Create(TGRLayer(FImageEditor.Selection), 100) do
     begin
       FreeOnTerminate := True;
       Start;
@@ -596,7 +597,7 @@ procedure TfrmMain.tabMainActiveTabChanging(Sender: TObject; TabIndex,
 begin
   if NewTabIndex = tabMain.Items.IndexOf(tbiSource) then
   begin
-    mmoSource.Lines.Text := FImageEditor.ToString;
+    mmoSource.Lines.Text := FImageEditor.SaveToString;
     FIsSourceChanged := False;
   end
   else if NewTabIndex = tabMain.Items.IndexOf(tbiDesign) then
@@ -620,7 +621,7 @@ end;
 
 procedure TfrmMain.actRunExecute(Sender: TObject);
 begin
-  frmTest.PlayingDesktop.Assign(FImageEditor);
+  frmTest.Image.Assign(FImageEditor);
   LayersRemoveClasses(frmTest.Image.layers, [TGRRubberBandLayer, TGRGridLayer]);
   frmTest.Show;
 end;

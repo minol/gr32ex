@@ -44,12 +44,14 @@ type
   //when the LayerSelector changed then the editor should change the selection too.
   TGRLayerInspector = class(TForm)
   protected
+    FSelfSelectionChanged: Boolean;
     FOldLayerListNotify: TLayerListNotifyEvent;
     FLayerSelector: TComboBox;
     FInspector: TJvInspector;
     FInspectorBorlandPainter: TJvInspectorBorlandPainter;
     FInspectorDotNETPainter: TJvInspectorDotNETPainter;
     FEditor: TImage32Editor;
+    FInspCat: TJvInspectorCustomCategoryItem;
 
     procedure InspectorAfterItemCreate(Sender: TObject; Item: TJvCustomInspectorItem);
 		procedure InspectorDataValueChanged(Sender: TObject;
@@ -240,6 +242,7 @@ var
   vInspCat: TJvInspectorCustomCategoryItem;
 begin
   vInspCat := TJvInspectorCustomCategoryItem.Create(Parent, nil);
+  FInspCat := vInspCat;
   if aObj is TControl then
     vInspCat.DisplayName := TControl(aObj).Name + cNameClassSeperator
   else if aObj is TGRCustomLayer then
@@ -298,10 +301,13 @@ begin
     lnLayerAdded, lnLayerInserted:
       FLayerSelector.Items.AddObject(Layer.ClassName, Layer);
     lnCleared:
-      FInspector.Clear
+      begin
+        FInspector.Clear;
+        FLayerSelector.Items.Clear;
+      end;
   end;
 
-  RefreshLayerSelector;
+  if Action <> lnCleared then RefreshLayerSelector;
   if Assigned(FOldLayerListNotify) then
     FOldLayerListNotify(Sender, Action, Layer, Index);
 end;
@@ -313,7 +319,14 @@ begin
   FInspector.SaveValues;
   FInspector.Clear;
   if (FLayerSelector.ItemIndex >= 0) and (FEditor.Selection <> FLayerSelector.Items.Objects[FLayerSelector.ItemIndex]) then
-    FEditor.Selection := TGRTransformationLayer(FLayerSelector.Items.Objects[FLayerSelector.ItemIndex]);
+  begin
+    FSelfSelectionChanged := True;
+    try
+      FEditor.Selection := TGRTransformationLayer(FLayerSelector.Items.Objects[FLayerSelector.ItemIndex]);
+    finally
+      FSelfSelectionChanged := False;
+    end;
+  end;
   
   if Assigned(FEditor.Selection) then 
   begin
@@ -322,12 +335,14 @@ begin
     //vInspCat.SortKind := iskNone;
     AddObjectToInspector(FInspector.Root, FEditor.Selection);
   end;
+  AddSettingObjectToInspector();
 end;
 
 procedure TGRLayerInspector.DoSelectionChanged(Sender: TObject);
 begin
   FLayerSelector.ItemIndex := FLayerSelector.Items.IndexOfObject(FEditor.Selection);
-  DoLayerSelectorChanged(FLayerSelector);
+  if not FSelfSelectionChanged then
+    DoLayerSelectorChanged(FLayerSelector);
 end;
 
 procedure TGRLayerInspector.InspectorAfterItemCreate(Sender: TObject; Item: TJvCustomInspectorItem);
@@ -348,6 +363,8 @@ begin
       Items[i] := data.AsString + cNameClassSeperator + TObject(Items.Objects[i]).ClassName;
       Refresh;
       ItemIndex := i;
+      if Assigned(FInspCat) then
+        FInspCat.DisplayName := Items[i];
     end
   else if (data.Name = 'X') or (data.Name = 'Y') then
     with FLayerSelector do

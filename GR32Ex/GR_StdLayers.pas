@@ -5,7 +5,7 @@
 It contains a reimplementation of the layers used currently in Graphics32. The implementation starts from
 TCustomLayer and defines the following new:
 
-- TGRTextLayer (derived from TGRCustomPropertyLayer)
+- TGRCustomTextLayer (derived from TGRCustomPropertyLayer)
 - TGRCustomBitmapLayer (derived from TGRCustomPropertyLayer)
 
 3D programmer here!
@@ -54,6 +54,9 @@ unit GR_StdLayers;
 interface
 
 uses
+  {$IFDEF Debug}
+  CnDebug,
+  {$ENDIF}
   Windows, Messages,
   SysUtils, Classes, Types, Graphics
   , GR32
@@ -104,7 +107,8 @@ ImgView32 container.
 
     procedure PaintTo(Buffer: TBitmap32; const R: TRect);
 
-    property AlphaBlend;
+  published
+    property AlphaBlend default true;
     property AlphaBlendValue;
   end;
 
@@ -112,17 +116,18 @@ ImgView32 container.
   public
     procedure Assign(Source: TPersistent);override;
 
+  published
     property Bitmap;
     property Cropped;
   end;
 
   { 
-TGRTextLayer
+TGRCustomTextLayer
 This layer is not really implemented, but used as a placeholder. Once
 somebody decides to write a real text layer, this one can serve as the
 starting point.
   }
-  TGRTextLayer = class(TGRCustomBitmapLayer)
+  TGRCustomTextLayer = class(TGRCustomBitmapLayer)
   protected
     FText: string;
     FFont: TFont32;
@@ -136,6 +141,7 @@ starting point.
     procedure SetWordWrap(const Value: Boolean);
     procedure DoTextChanged(Sender: TObject);
 
+    function GetNativeSize: TSize; override;
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
@@ -148,6 +154,15 @@ starting point.
     property Layout: TTextLayout read FLayout write SetLayout default tlTop;
     property WordWrap: Boolean read FWordWrap write SetWordWrap;
   end;
+  
+  TGRTextLayer = class(TGRCustomTextLayer)
+  published
+    property Text;
+    property Font;
+    property Alignment;
+    property Layout;
+    property WordWrap;
+  end;
 
 implementation
 
@@ -157,8 +172,8 @@ uses
 type
   TAffineTransformationAccess = class(TAffineTransformation);
 
-{ TGRTextLayer }
-constructor TGRTextLayer.Create(ALayerCollection: TLayerCollection);
+{ TGRCustomTextLayer }
+constructor TGRCustomTextLayer.Create(ALayerCollection: TLayerCollection);
 begin
   inherited;
   FAlignment := taCenter;
@@ -166,16 +181,16 @@ begin
   FFont.OnChange := DoTextChanged;
 end;
 
-destructor TGRTextLayer.Destroy;
+destructor TGRCustomTextLayer.Destroy;
 begin
   FreeAndNil(FFont);
   inherited;
 end;
 
-procedure TGRTextLayer.Assign(Source: TPersistent);
+procedure TGRCustomTextLayer.Assign(Source: TPersistent);
 begin
-  if Source is TGRTextLayer then
-    with Source as TGRTextLayer do
+  if Source is TGRCustomTextLayer then
+    with Source as TGRCustomTextLayer do
     begin
       Changing;
       Self.FText := FText;
@@ -187,7 +202,7 @@ begin
   inherited Assign(Source);
 end;
 
-procedure TGRTextLayer.DoTextChanged(Sender: TObject);
+procedure TGRCustomTextLayer.DoTextChanged(Sender: TObject);
 const
   Alignments: array[TAlignment] of Word = (DT_LEFT, DT_RIGHT, DT_CENTER);
   WordWraps: array[Boolean] of Word = (0, DT_WORDBREAK);
@@ -198,7 +213,7 @@ begin
 	FBitmap.BeginUpdate;
 	try
 	  with FSize do FBitmap.SetSize(cx, cy);
-	  FBitmap.Clear;
+	  FBitmap.Clear(0);
     vDrawStyle := DT_EXPANDTABS or WordWraps[FWordWrap] or Alignments[FAlignment];
     vRect := FBitmap.ClipRect;
     FFont.DrawText(FBitmap, FText, vRect, vDrawStyle);
@@ -209,7 +224,17 @@ begin
   //Changed;
 end;
 
-procedure TGRTextLayer.SetAlignment(const Value: TAlignment);
+function TGRCustomTextLayer.GetNativeSize: TSize;
+begin
+	Result := FSize;
+	{
+	if (Result.cx <> FBitmap.Width) or (Result.cy <> FBitmap.Height) then
+	with Result do
+	  FBitmap.SetSize(cx, cy);
+	}
+end;
+
+procedure TGRCustomTextLayer.SetAlignment(const Value: TAlignment);
 begin
   if Value <> FAlignment then
   begin
@@ -218,7 +243,7 @@ begin
   end;
 end;
 
-procedure TGRTextLayer.SetLayout(const Value: TTextLayout);
+procedure TGRCustomTextLayer.SetLayout(const Value: TTextLayout);
 begin
   if Value <> FLayout then
   begin
@@ -227,7 +252,7 @@ begin
   end;
 end;
 
-procedure TGRTextLayer.SetText(const Value: string);
+procedure TGRCustomTextLayer.SetText(const Value: string);
 begin
   if FText <> Value then
   begin
@@ -236,7 +261,7 @@ begin
   end;
 end;
 
-procedure TGRTextLayer.SetWordWrap(const Value: Boolean);
+procedure TGRCustomTextLayer.SetWordWrap(const Value: Boolean);
 begin
   if FWordWrap <> Value then
   begin
@@ -250,6 +275,7 @@ constructor TGRCustomBitmapLayer.Create(ALayerCollection: TLayerCollection);
 begin
   inherited;
 
+  FAlphaBlend := True;
   FBitmap := TBitmap32Ex.Create;
   FBitmap.DrawMode := dmBlend;
   FBitmap.OnChange := BitmapChanged;
@@ -325,9 +351,13 @@ begin
   {$ENDIF}
   B := Point(X, Y);
   if TAffineTransformationAccess(FTransformation).TransformValid then
+  begin
     B := FTransformation.ReverseTransform(B);
-
-  Result := PtInRect(Rect(0, 0, Bitmap.Width, Bitmap.Height), B);
+  end
+  else begin
+  	B := Point(GetLayerPosition(FloatPoint(X, Y)));
+  end;
+  with GetNativeSize do Result := PtInRect(Rect(0, 0, cx, cy), B);
   if Result and AlphaHit and (Bitmap.PixelS[B.X, B.Y] and $FF000000 = 0) then
     Result := False;
 end;
@@ -343,6 +373,7 @@ begin
   {$ENDIF}
   Result.cx := FBitmap.Width;
   Result.cy := FBitmap.Height;
+  //FSize := Result;
 end;
 
 procedure TGRCustomBitmapLayer.Paint(Buffer: TBitmap32);
@@ -386,6 +417,8 @@ begin
         vRect.Right := Round(x + cx);
         vRect.Bottom := Round(y + cy);
     end;
+    //with vRect do SendDebug(ClassName + ' vRect(%d,%d,%d,%d)', [Left, Top, Right, Bottom]);
+
     if FCropped then
     begin
       BlockTransfer(Buffer, vRect.Left, vRect.Top, Buffer.ClipRect, FBitmap, vRect, FBitmap.DrawMode, FBitmap.OnPixelCombine);
