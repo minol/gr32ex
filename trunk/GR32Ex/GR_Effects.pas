@@ -37,7 +37,7 @@ uses
 const
   DefaultShadowOffsetX = 8;
   DefaultShadowOffsetY = 8;
-  DefaultShadowColor = clBlack;
+  DefaultShadowColor = clNone;
   DefaultShadowBlur = 2;
   DefaultShadowOpacity = 256 div 2;
 
@@ -91,8 +91,9 @@ begin
   FOffsetX := DefaultShadowOffsetX;
   FOffsetY := DefaultShadowOffsetY;
   FBlur := DefaultShadowBlur;
-  FColor := clBlack;
+  FColor := DefaultShadowColor;
   FOpacity := DefaultShadowOpacity;
+  FEnabled := True;
 end;
 
 procedure TShadowEffect.Assign(Source: TPersistent);

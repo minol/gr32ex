@@ -31,7 +31,7 @@ interface
 
 uses
   {$ifdef Debug}
-  DbugIntf,
+  CnDebug,
   {$endif} 
   Windows,
   SysUtils, Classes, Graphics
@@ -161,6 +161,8 @@ type
     property Tiled: Boolean read FTiled write SetTiled;
     property UseSysColors: Boolean read FUseSysColors write SetUseSysColors
       default False;
+
+    property Enabled;
   end;
   
   { Summary the wallpaper property }
@@ -202,6 +204,7 @@ type
     property Picture: TPicture read FPicture;
     property Style: TWallpaperStyle read FStyle write SetStyle;
     property Transparent: Boolean read FTransparent write SetTransparent;
+    property Enabled;
   end;
   
   { Description
@@ -2668,7 +2671,7 @@ begin
       end;
     end;
   
-    if FGradient.Style <> gsNone then
+    if FGradient.Enabled and (FGradient.Style <> gsNone) then
     begin
       //ShowMessage('Paint Gradinet');
       bmpGradient := TBitmap32.Create;
@@ -3007,6 +3010,7 @@ var
   end;
   
 begin
+	Dst.Font := Self;
   vCharSize := TextExtent(Dst, 'A');
   MaxRight := 0;
   if DT_WORDBREAK and aFormat = DT_WORDBREAK then
@@ -3076,6 +3080,7 @@ var
   vTexture, vTextBMP: TBitmap32;
   Sz: TSize;
   PaddedText: string;
+  vTextureDisabled: Boolean;
 begin
   //with Background do
     //if Background.Enabled and not Background.Empty then
@@ -3112,6 +3117,9 @@ begin
           vColor.Color := Color32(Self.Color);
           vColor.rgbAlpha := FOpacity;
           vTexture.Clear(vColor.Color);
+          {$IFDEF Debug}
+          SendDebug('FOpacity: %x; vTexture.Clear R,B,G,A: [%x,%x,%x, %x]:', [FOpacity, vColor.rgbRed, vColor.rgbBlue, vColor.rgbGreen, vColor.rgbAlpha]);
+          {$ENDIF}
         end;
         //vTextBMP.DrawMode := dmBlend;
         //vTextBMP.CombineMode := cmMerge;
@@ -3131,12 +3139,15 @@ begin
           //if Quality > fqNormal then
             //ConvolveI(GaussianBlureFilter3x3, vTextBMP);
         end;
+        //Bug here, when the font color is black, the Shadow can not display. why?
+        //I get it, the Shaow use the black generate the BWIamge, so change the default shaodow color to clNone is ok.
         BlueChannelToAlpha(vTexture, vTextBMP);
         //ApplyBlueChannelToAlpha(vTextBMP);
         //ApplyTransparentColor(vTextBMP, clWhite32);
         //vTextBMP.DrawTo(vTexture);
         if Shadow.Enabled then
         begin
+        	senddebug('Draw Shadow.Enabled');
           Shadow.PaintTo(vTexture, Dst, vTexture.BoundsRect, X, Y);
           //Shadow.GenerateShadow(vTexture, vShadowBMP, vTexture.BoundsRect);
           //vShadowBMP.DrawTo(Dst, X+Shadow.OffsetX, Y+Shadow.OffsetY);
