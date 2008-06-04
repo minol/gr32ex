@@ -142,6 +142,8 @@ starting point.
     procedure DoTextChanged(Sender: TObject);
 
     function GetNativeSize: TSize; override;
+    procedure SetHeight(const Value: Integer); override;
+    procedure SetWidth(const Value: Integer); override;
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
@@ -259,6 +261,24 @@ begin
     FText := Value;
     DoTextChanged(nil);
   end;
+end;
+
+procedure TGRCustomTextLayer.SetHeight(const Value: Integer);
+begin
+	if Value <> FSize.cy then
+	begin
+	  inherited;
+	  DoTextChanged(nil);
+	end;
+end;
+	
+procedure TGRCustomTextLayer.SetWidth(const Value: Integer);
+begin
+	if Value <> FSize.cy then
+	begin
+	  inherited;
+	  DoTextChanged(nil);
+	end;
 end;
 
 procedure TGRCustomTextLayer.SetWordWrap(const Value: Boolean);

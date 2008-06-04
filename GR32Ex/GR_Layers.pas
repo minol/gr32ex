@@ -220,8 +220,8 @@ was to provide as many of the features of Photoshop as I could implement.
     procedure SetScaling(const Value: TFloatPoint);
     procedure SetSkew(const Value: TFloatPoint);
     procedure SetSize(const Value: TSize);
-    procedure SetHeight(const Value: Integer);
-    procedure SetWidth(const Value: Integer);
+    procedure SetHeight(const Value: Integer); virtual;
+    procedure SetWidth(const Value: Integer); virtual;
     function GetWidth: Integer;
     function GetHeight: Integer;
 
