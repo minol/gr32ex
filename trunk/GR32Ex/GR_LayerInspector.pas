@@ -24,6 +24,8 @@
  * ***** END LICENSE BLOCK ***** *)
 unit GR_LayerInspector;
 
+{$I Setting.inc}
+
 interface
 
 uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
@@ -32,7 +34,7 @@ uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   , GR32
   , GR32_Image
   , GR32_Layers
-  , GR32_ExtLayers
+  , GR_Layers
   , GR_ImageEx
   , GR_JvInspector
   ;
@@ -197,11 +199,11 @@ var
   vEventStrs, vBehaviors: TStringList;
   i, j: integer;
 begin
-  if aObj is TGRCustomLayer then
+  if aObj is TGRLayer then
   begin
     vEventStrs := TStringList.Create;
     try
-      TGRCustomLayer(aObj).GetRegisteredEvents(vEventStrs);
+      TGRLayer(aObj).GetRegisteredEvents(vEventStrs);
       if vEventStrs.Count > 0 then
       begin
         vInspEventCat := TJvInspectorCustomCategoryItem.Create(Parent, nil);
@@ -428,12 +430,12 @@ end;
 
 procedure TGRInspectorEventItem.GetValueList(const Strings: TStrings);
 var
-  vInstance: TSDPlayingLayer;
+  vInstance: TGRLayer;
 begin
   if (Data is TJvInspectorPropData) then
   begin
-    vInstance := TSDPlayingLayer(TJvInspectorPropData(Data).Instance);
-    if vInstance is TSDPlayingLayer then
+    vInstance := TGRLayer(TJvInspectorPropData(Data).Instance);
+    if vInstance is TGRLayer then
     begin
       vInstance.GetRegisteredBehaviors(Strings);
     end;

@@ -29,7 +29,6 @@ uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   Buttons, ExtCtrls, Dialogs, ExtDlgs
   , GR32
   , GR32_Image
-  , GR32_ExtLayers
   , GR_Layers
   ;
 
@@ -51,21 +50,21 @@ type
     procedure btnOpenPicClick(Sender: TObject);
     procedure NumberKeyPressOnly(Sender: TObject; var Key: Char);
   protected
-    FLayer: TGRLayer;
+    FLayer: TGRPropertyLayer;
     FImage: TImage32;
-    procedure SetLayer(const Value: TGRLayer); virtual;
+    procedure SetLayer(const Value: TGRPropertyLayer); virtual;
     { Private declarations }
   public
     { Public declarations }
     class function LayerClass: TGRLayerClass; virtual;
-    class function Execute(aLayer: TGRLayer): Boolean;
+    class function Execute(aLayer: TGRPropertyLayer): Boolean;
     constructor Create(aComponent: TComponent);override;
-    property Layer: TGRLayer read FLayer write SetLayer;
+    property Layer: TGRPropertyLayer read FLayer write SetLayer;
   end;
 
 procedure RegisterLayerEditor(const aEditor: TGRLayerEditorClass);
-function GetLayerEditorClass(const aLayer: TGRLayer): TGRLayerEditorClass;
-function ShowLayerEditor(const aLayer: TGRLayer): Boolean;
+function GetLayerEditorClass(const aLayer: TGRPropertyLayer): TGRLayerEditorClass;
+function ShowLayerEditor(const aLayer: TGRPropertyLayer): Boolean;
 
 implementation
 
@@ -74,7 +73,7 @@ implementation
 var
   FLayerEditorClasses: TList;
 
-function GetLayerEditorClass(const aLayer: TGRLayer): TGRLayerEditorClass;
+function GetLayerEditorClass(const aLayer: TGRPropertyLayer): TGRLayerEditorClass;
 var
  i: integer;
 begin
@@ -95,7 +94,7 @@ begin
       Add(aEditor);
 end;
 
-function ShowLayerEditor(const aLayer: TGRLayer): Boolean;
+function ShowLayerEditor(const aLayer: TGRPropertyLayer): Boolean;
 var
   vEditorClass: TGRLayerEditorClass;
 begin
@@ -111,10 +110,10 @@ end;
 
 { TGRLayerEditor }
 
-procedure TGRLayerEditor.SetLayer(const Value: TGRLayer);
+procedure TGRLayerEditor.SetLayer(const Value: TGRPropertyLayer);
 begin
   FLayer := Value;
-  FImage.Bitmap.Assign(FLayer.Bitmap);
+  //FImage.Bitmap.Assign(FLayer.Bitmap);
   edtName.Text := FLayer.Name;
   edtLeft.Text := IntToStr(FLayer.Left);
   edtTop.Text := IntToStr(FLayer.Top);
@@ -123,14 +122,14 @@ end;
 procedure TGRLayerEditor.btnOKClick(Sender: TObject);
 begin
  //save the properties to layer control.
-  FLayer.Bitmap.Assign(FImage.Bitmap);
+  //FLayer.Bitmap.Assign(FImage.Bitmap);
   FLayer.Name := edtName.Text;
   FLayer.Left := StrToInt(edtLeft.Text);
   FLayer.Top := StrToInt(edtTop.Text);
 end;
 
 class function TGRLayerEditor.Execute(
-  aLayer: TGRLayer): Boolean;
+  aLayer: TGRPropertyLayer): Boolean;
 begin
   with Create(nil) do
   try

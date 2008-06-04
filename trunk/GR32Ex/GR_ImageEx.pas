@@ -69,6 +69,7 @@ type
     procedure SetPopupMenu(const Value: TPopupMenu);
     procedure WMKillFocus(var Message: TMessage); message WM_KILLFOCUS;
     procedure DoLayerChanged(Sender: TLayerCollection; Action: TLayerListNotification; Layer: TCustomLayer; Index: Integer);
+    function GetFixupReferences: TFixupReferences;
 
     procedure ReadData(aReader: TReader);
     procedure WriteData(aWriter: TWriter);
@@ -86,6 +87,7 @@ type
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); overload; override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); overload; override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); overload; override;
+    procedure Notification(AComponent: TComponent; Operation: TOperation);override;
 
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyPress(var Key: Char); override;
@@ -128,11 +130,11 @@ type
   TImage32Editor = class(TImage32Ex)
   protected
     FRubberBand: TGRRubberBandLayer;
-    FSelection: TGRPropertyLayer;
+    FSelection: TGRTransformationLayer;
     FPopupMenu: TPopupMenu;
     FOnSelectionChanged: TNotifyEvent;
 
-    procedure SetSelection(Value: TGRPropertyLayer);
+    procedure SetSelection(Value: TGRTransformationLayer);
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer; Layer: TCustomLayer); reintroduce; overload;override;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
   public
@@ -141,7 +143,7 @@ type
     function CreateLayer(const aClass: TGRLayerClass): TGRPropertyLayer;
     procedure Clear;
 
-    property Selection: TGRPropertyLayer read FSelection write SetSelection;
+    property Selection: TGRTransformationLayer read FSelection write SetSelection;
     property OnSelectionChanged: TNotifyEvent read FOnSelectionChanged write FOnSelectionChanged;
   end;
 
@@ -278,7 +280,7 @@ begin
   inherited;
   FTransparent := False;
   FFocusLayers := TList.Create;
-  Layers.OnListNotify := DoLayerChanged;
+  TLayerCollectionAccess(Layers).OnListNotify := DoLayerChanged;
 end;
 
 destructor TImage32Ex.Destroy;
@@ -349,7 +351,7 @@ begin
   Result := Item2.TabOrder - Item1.TabOrder;
 end;
  
-procedure TImage32Ex.DoLayerChanged(Sender: TLayerCollection; Action: TLayerListNotification; Layer: TCustomLayer; Index: Integer)
+procedure TImage32Ex.DoLayerChanged(Sender: TLayerCollection; Action: TLayerListNotification; Layer: TCustomLayer; Index: Integer);
 var
   i: integer;
 begin
@@ -381,6 +383,7 @@ begin
       end;
       lnCleared:
         FFocusLayers.Clear;
+    end; //case
   end;
 end;
 
@@ -392,7 +395,7 @@ end;
 
 procedure TImage32Ex.LoadFromStream(const aStream: TStream);
 var
-  vReader: TGRReader;
+  //vReader: TGRReader;
   vLayer: TGRCustomLayer;
   vObjName, vMethodName: string;
   vM: TMethod;
@@ -455,15 +458,17 @@ begin
 end;
 
 procedure TImage32Ex.SaveToStream(const aStream: TStream);
-var
-  vWriter: TGRWriter;
+//var
+  //vWriter: TGRWriter;
 begin
+	aStream.WriteComponent(Self);
+	{
   vWriter := TGRWriter.Create(aStream, 4096);
   try
     vWriter.WriteDescendent(Self, nil);
   finally
     vWriter.Free;
-  end;
+  end; //}
 end;
 
 procedure TImage32Ex.LoadFromFile(const aFileName: string);
@@ -695,6 +700,18 @@ begin
   end;
 end;
 
+procedure TImage32Ex.SetPopupMenu(const Value: TPopupMenu);
+begin
+  if Value <> FPopupMenu then
+  begin
+    if Assigned(FPopupMenu) then
+      FPopupMenu.RemoveFreeNotification(Self);
+    FPopupMenu := Value;
+    if Assigned(FPopupMenu) then
+      FPopupMenu.FreeNotification(Self);
+  end;
+end;
+
 procedure TImage32Ex.SetTransparent(const Value: Boolean);
 begin
   if FTransparent <> Value then
@@ -771,6 +788,16 @@ begin
     inherited;
   //when ReleaseCapture this would be never execute.
   FIsDragging := False;
+end;
+
+procedure TImage32Ex.Notification(AComponent: TComponent; Operation: TOperation);
+begin
+  if (Operation = opRemove) then
+  begin
+    if (AComponent = FPopupMenu)  then
+      FPopupMenu := nil
+  end;
+  inherited;
 end;
 
 procedure TImage32Ex.WMKillFocus(var Message: TMessage);
@@ -903,7 +930,7 @@ begin
   end;
 end;
 
-procedure TImage32Editor.SetSelection(Value: TGRPropertyLayer);
+procedure TImage32Editor.SetSelection(Value: TGRTransformationLayer);
 begin
   if Value is TGRRubberBandLayer then exit;
   if Value <> FSelection then
@@ -934,6 +961,12 @@ begin
     end;
     if Assigned(FOnSelectionChanged) then FOnSelectionChanged(Self);
   end;
+end;
+
+procedure TFixupReferences.Notify(Ptr: Pointer; Action: TListNotification);
+begin
+  if Assigned(Ptr) and (Action = lnDeleted) then
+    FreeMem(Ptr);
 end;
 
 procedure Register;

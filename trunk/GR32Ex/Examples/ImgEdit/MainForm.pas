@@ -25,9 +25,10 @@ uses
   GR32_Layers,
   GR32_Image,
   GR32_PNG,
-  GR32_ExtLayers,
   GR_Layers, 
+  GR_StdLayers,
   GR_ImageEx,
+  GR_LayerRegisters,
   { SynEdit }
   {$IFDEF SynEdit_Supports}
   SynEdit, SynEditTypes, SynHighlighterPas,
