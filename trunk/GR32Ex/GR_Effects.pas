@@ -87,7 +87,7 @@ type
   protected
     FReflectionImg: TBitmap32;
     FReflection: Longword;
-    //FReflectionAxis: Integer;
+    FRealHeight: Integer;
 
     function GetReflectionImg: TBitmap32;
     procedure SetReflection(const Value: Longword);
@@ -102,9 +102,10 @@ type
     procedure PaintTo(aSrc, aDst: TBitmap32; aR: TRect; aDstX, aDstY: integer);
       overload; override;
 
+    //the source real height from bottom(no transparent line.).
+    property RealHeight: Integer read FRealHeight;
   published
     property Reflection: Longword read FReflection write SetReflection default DefaultReflectionValue;
-    //property ReflectionAxis: Integer read FReflectionAxis write SetReflectionAxis default 1;
   end;
 
 implementation
@@ -253,39 +254,43 @@ var
   w, h: Integer;
   vH: Integer;
   vAlpha: Integer;
-  vEmptyLastLine: Integer;
-  vLine: PColor32Array;
-  vIsEmpty: Boolean;
-  vDstLine: PColor32Array;
+  vFirstNoneEmptyLine: Integer;
   vDstX, vDstY: Integer;
+  //vSrcBits, vDstBits: PColor32Array;
+  vLine, vDstLine: PColor32Array;
 begin
   w := R.Right - R.Left;
   h := R.Bottom - R.Top;
   aDst.SetSize(w, h);
-  w := Min(aSrc.Width, w);
+  w := Min(aSrc.Width-1, w);
   vH := aSrc.Height - Round(FReflection / (255.0 / aSrc.Height));
   h := Min(vH, h);
+  vH := aSrc.Height - h;
 
   //Check lasy empty line:
-  vEmptyLastLine := aSrc.Height;
-  vIsEmpty := true;
-  for y := aSrc.Height downto (aSrc.Height - h) do
+  vFirstNoneEmptyLine := aSrc.Height;
+  for y := aSrc.Height - 1 downto vH do
   begin
+    vFirstNoneEmptyLine := y;
     vLine := aSrc.ScanLine[y];
-    for x := R.Left to w do
+    x := 0;
+    while x < aSrc.Width - 1 do
     begin
-      if PColor32Entry(vLine[x]).A <> 0 then
+      if TColor32Entry(vLine[x]).A <> 0 then
       begin
         break;
       end;
+      Inc(x);
     end;
-    vEmptyLastLine := y+1;
-  end;
+    if x < aSrc.Width - 1 then
+      break;
+  end; //}
 
   vDstY := 0;
-  for y := vEmptyLastLine downto (aSrc.Height - h) do
+  FRealHeight := vFirstNoneEmptyLine;
+  for y := vFirstNoneEmptyLine downto vH do
   begin
-    vAlpha := (255 div aSrc.Height) * (aSrc.Height - vDstY)) - FReflection;
+    vAlpha := Round((255.0 / aSrc.Height) * (aSrc.Height - vDstY)) - FReflection;
     if vAlpha <= 0 then
     begin
      break;
@@ -297,11 +302,12 @@ begin
     vDstX := 0;
     for x := R.Left to w do
     begin
-    	vDstLine[x]^ := vLine[x]^;
-    	with PColor32Entry(vDstLine[x])^ do
+//      vC.ARGB := vLine[x];
+    	vDstLine[vDstX] := vLine[x];
+      with TColor32Entry(vDstLine[vDstX]) do
         if A <> 0 then
         begin
-      	  A := vAlpha div 255 * A;
+      	  A := Round(vAlpha / 255 * A);
         end;
       Inc(vDstX);
     end;
@@ -343,20 +349,5 @@ begin
     Update;
   end;
 end;
-
-{
-procedure TReflectionEffect.SetReflectionAxis(const Value: Integer);
-begin
-  if FReflectionAxis <> Value then
-  begin
-    BeginUpdate;
-    try
-      FReflectionAxis := Value;
-    finally
-      EndUpdate;
-    end;
-  end;
-end;
-//}
 
 end.
