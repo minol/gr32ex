@@ -25,7 +25,7 @@ unit GR_Effects;
 interface
 
 uses
-  Windows, Messages, 
+  Windows, Messages,
   SysUtils, Classes, Graphics
   , GR32
   , GR32_Transforms
@@ -40,11 +40,12 @@ const
   DefaultShadowColor = clNone;
   DefaultShadowBlur = 2;
   DefaultShadowOpacity = 256 div 2;
+  DefaultReflectionValue = 160;
 
 type
   TCustomEffectProperty = class(TCustomGraphicProperty)
   end;
-  
+
   { Summary the drop shadow effect. }
   TShadowEffect = class(TCustomEffectProperty)
   private
@@ -81,10 +82,37 @@ type
     property Opacity: Byte read FOpacity write SetOpacity default
       DefaultShadowOpacity;
   end;
-  
+
+  TReflectionEffect = class(TCustomEffectProperty)
+  protected
+    FReflectionImg: TBitmap32;
+    FReflection: Longword;
+    //FReflectionAxis: Integer;
+
+    function GetReflectionImg: TBitmap32;
+    procedure SetReflection(const Value: Longword);
+    //procedure SetReflectionAxis(const Value: Integer);
+
+    property ReflectionImg: TBitmap32 read GetReflectionImg;
+  public
+    constructor Create(AOwner: TPersistent); override;
+    destructor Destroy; override;
+    { Summary Generate Reflection image from Src }
+    procedure Generate(aSrc, aDst: TBitmap32; R:TRect);
+    procedure PaintTo(aSrc, aDst: TBitmap32; aR: TRect; aDstX, aDstY: integer);
+      overload; override;
+
+  published
+    property Reflection: Longword read FReflection write SetReflection default DefaultReflectionValue;
+    //property ReflectionAxis: Integer read FReflectionAxis write SetReflectionAxis default 1;
+  end;
 
 implementation
 
+uses
+  Math;
+
+{ TShadowEffect }
 constructor TShadowEffect.Create(AOwner: TPersistent);
 begin
   inherited Create(AOwner);
@@ -206,5 +234,129 @@ begin
   end;
 end;
 
+{ TReflectionEffect }
+constructor TReflectionEffect.Create(AOwner: TPersistent);
+begin
+	inherited;
+	FReflection := DefaultReflectionValue;
+end;
+	
+destructor TReflectionEffect.Destroy;
+begin
+  FreeAndNil(FReflectionImg);
+  inherited;
+end;
+
+procedure TReflectionEffect.Generate(aSrc, aDst: TBitmap32; R:TRect);
+var
+  x, y: Integer;
+  w, h: Integer;
+  vH: Integer;
+  vAlpha: Integer;
+  vEmptyLastLine: Integer;
+  vLine: PColor32Array;
+  vIsEmpty: Boolean;
+  vDstLine: PColor32Array;
+  vDstX, vDstY: Integer;
+begin
+  w := R.Right - R.Left;
+  h := R.Bottom - R.Top;
+  aDst.SetSize(w, h);
+  w := Min(aSrc.Width, w);
+  vH := aSrc.Height - Round(FReflection / (255.0 / aSrc.Height));
+  h := Min(vH, h);
+
+  //Check lasy empty line:
+  vEmptyLastLine := aSrc.Height;
+  vIsEmpty := true;
+  for y := aSrc.Height downto (aSrc.Height - h) do
+  begin
+    vLine := aSrc.ScanLine[y];
+    for x := R.Left to w do
+    begin
+      if PColor32Entry(vLine[x]).A <> 0 then
+      begin
+        break;
+      end;
+    end;
+    vEmptyLastLine := y+1;
+  end;
+
+  vDstY := 0;
+  for y := vEmptyLastLine downto (aSrc.Height - h) do
+  begin
+    vAlpha := (255 div aSrc.Height) * (aSrc.Height - vDstY)) - FReflection;
+    if vAlpha <= 0 then
+    begin
+     break;
+    end;
+    if vAlpha > 255 then vAlpha := 255;
+
+    vLine := aSrc.ScanLine[y];
+    vDstLine := aDst.ScanLine[vDstY];
+    vDstX := 0;
+    for x := R.Left to w do
+    begin
+    	vDstLine[x]^ := vLine[x]^;
+    	with PColor32Entry(vDstLine[x])^ do
+        if A <> 0 then
+        begin
+      	  A := vAlpha div 255 * A;
+        end;
+      Inc(vDstX);
+    end;
+    Inc(vDstY);
+  end;
+
+  //aDst.Draw(0,0,R,aSrc);
+  //aDst.DrawMode := dmBlend;
+end;
+
+function TReflectionEffect.GetReflectionImg: TBitmap32;
+begin
+  if not Assigned(FReflectionImg) then
+    FReflectionImg := TBitmap32.Create;
+  Result := FReflectionImg;
+end;
+
+procedure TReflectionEffect.PaintTo(aSrc, aDst: TBitmap32; aR: TRect; aDstX, aDstY: integer);
+var
+  vBmp: TBitmap32;
+begin
+  if not Enabled then Exit;
+  vBmp := TBitmap32.Create;
+  try
+    Generate(aSrc, vBmp, aR);
+    vBmp.DrawMode := dmBlend;
+    vBmp.DrawTo(aDst, aDstX, aDstY);
+    //aSrc.DrawTo(aDst, aDstX, aDstY);
+  finally
+    vBmp.Free;
+  end;
+end;
+
+procedure TReflectionEffect.SetReflection(const Value: Longword);
+begin
+  if FReflection <> Value then
+  begin
+    FReflection := Value;
+    Update;
+  end;
+end;
+
+{
+procedure TReflectionEffect.SetReflectionAxis(const Value: Integer);
+begin
+  if FReflectionAxis <> Value then
+  begin
+    BeginUpdate;
+    try
+      FReflectionAxis := Value;
+    finally
+      EndUpdate;
+    end;
+  end;
+end;
+//}
 
 end.
