@@ -1,9 +1,3 @@
-
-{
-Summary the Image run-time test.
-@author Riceball LEE(lixeuyu@snda.com)
-@revision 0;1
-}
 unit TestForm;
 
 {$I Setting.inc}
