@@ -44,6 +44,14 @@ const
 
 type
   TCustomEffectProperty = class(TCustomGraphicProperty)
+  private
+    FEnabled: Boolean;
+    procedure SetEnabled(const Value: Boolean);
+  public
+    constructor Create(AOwner: TPersistent); override;
+    procedure Assign(Source: TPersistent); override;
+  published
+    property Enabled: Boolean read FEnabled write SetEnabled default True;
   end;
 
   { Summary the drop shadow effect. }
@@ -51,13 +59,11 @@ type
   private
     FBlur: Byte;
     FColor: TColor;
-    FEnabled: Boolean;
     FOffsetX: Integer;
     FOffsetY: Integer;
     FOpacity: Byte;
     procedure SetBlur(const Value: Byte);
     procedure SetColor(const Value: TColor);
-    procedure SetEnabled(const Value: Boolean);
     procedure SetOffsetX(const Value: Integer);
     procedure SetOffsetY(const Value: Integer);
     procedure SetOpacity(const Value: Byte);
@@ -74,7 +80,6 @@ type
     { Summary The shadow color. }
     property Color: TColor read FColor write SetColor default
       DefaultShadowColor;
-    property Enabled: Boolean read FEnabled write SetEnabled default True;
     property OffsetX: Integer read FOffsetX write SetOffsetX default
       DefaultShadowOffsetX;
     property OffsetY: Integer read FOffsetY write SetOffsetY default
@@ -88,11 +93,12 @@ type
     FReflectionImg: TBitmap32;
     FReflection: byte;
     FReflectionHeight: Integer;
+    FReflectionOffset: Integer;
     FRealHeight: Integer;
 
     function GetReflectionImg: TBitmap32;
     procedure SetReflection(const Value: byte);
-    //procedure SetReflectionAxis(const Value: Integer);
+    procedure SetReflectionOffset(const Value: Integer);
 
     property ReflectionImg: TBitmap32 read GetReflectionImg;
   published
@@ -103,18 +109,52 @@ type
     procedure Generate(aSrc, aDst: TBitmap32; R:TRect);
     procedure PaintTo(aSrc, aDst: TBitmap32; aR: TRect; aDstX, aDstY: integer);
       overload; override;
+    procedure Assign(Source: TPersistent); override;
 
     //the source real height from bottom(no transparent line.).
     property RealHeight: Integer read FRealHeight;
     property ReflectionHeight: Integer read FReflectionHeight;
   published
     property Reflection: byte read FReflection write SetReflection default DefaultReflectionValue;
+    property ReflectionOffset: Integer read FReflectionOffset write SetReflectionOffset;
   end;
 
 implementation
 
 uses
   Math;
+
+{ TCustomEffectProperty }
+constructor TCustomEffectProperty.Create(AOwner: TPersistent);
+begin
+  inherited Create(AOwner);
+  FEnabled := True;
+end;
+
+procedure TCustomEffectProperty.Assign(Source: TPersistent);
+begin
+  if Source is TCustomEffectProperty then
+    with Source as TCustomEffectProperty do
+    begin
+      Self.BeginUpdate;
+      try
+        Self.FEnabled := Enabled;
+      finally
+        Self.EndUpdate;
+      end;
+    end
+  else
+    inherited Assign(Source);
+end;
+
+procedure TCustomEffectProperty.SetEnabled(const Value: Boolean);
+begin
+  if FEnabled <> Value then
+  begin
+    FEnabled := Value;
+    Update;
+  end;
+end;
 
 { TShadowEffect }
 constructor TShadowEffect.Create(AOwner: TPersistent);
@@ -125,7 +165,6 @@ begin
   FBlur := DefaultShadowBlur;
   FColor := DefaultShadowColor;
   FOpacity := DefaultShadowOpacity;
-  FEnabled := True;
 end;
 
 procedure TShadowEffect.Assign(Source: TPersistent);
@@ -140,13 +179,11 @@ begin
         Self.FOffsetY := OffsetY;
         Self.FColor := Color;
         Self.FOpacity := Opacity;
-        Self.FEnabled := Enabled;
       finally
         Self.EndUpdate;
       end;
-    end
-  else
-    inherited Assign(Source);
+    end;
+  inherited Assign(Source);
 end;
 
 procedure TShadowEffect.GenerateShadow(aSrc, aDst: TBitmap32; R:TRect);
@@ -197,15 +234,6 @@ begin
   if FColor <> Value then
   begin
     FColor := Value;
-    Update;
-  end;
-end;
-
-procedure TShadowEffect.SetEnabled(const Value: Boolean);
-begin
-  if FEnabled <> Value then
-  begin
-    FEnabled := Value;
     Update;
   end;
 end;
@@ -337,7 +365,7 @@ begin
   try
     Generate(aSrc, vBmp, aR);
     vBmp.DrawMode := dmBlend;
-    vBmp.DrawTo(aDst, aDstX, aDstY);
+    vBmp.DrawTo(aDst, aDstX, aDstY+FReflectionOffset);
     //aSrc.DrawTo(aDst, aDstX, aDstY);
   finally
     vBmp.Free;
@@ -351,6 +379,31 @@ begin
     FReflection := Value;
     Update;
   end;
+end;
+
+procedure TReflectionEffect.SetReflectionOffset(const Value: Integer);
+begin
+  if FReflectionOffset <> Value then
+  begin
+    FReflectionOffset := Value;
+    Update;
+  end;
+end;
+
+procedure TReflectionEffect.Assign(Source: TPersistent);
+begin
+  if Source is TReflectionEffect then
+    with Source as TReflectionEffect do
+    begin
+      Self.BeginUpdate;
+      try
+        Self.FReflectionOffset := FReflectionOffset;
+        Self.FReflection := FReflection;
+      finally
+        Self.EndUpdate;
+      end;
+    end;
+  inherited Assign(Source);
 end;
 
 end.

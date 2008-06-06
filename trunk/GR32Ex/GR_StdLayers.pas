@@ -71,6 +71,7 @@ uses
   , GR_BitmapEx
   , GR_Layers
   , GR_Graphics
+  , GR_Effects
   ;
 
 
@@ -166,6 +167,20 @@ starting point.
     property WordWrap;
   end;
 
+  TGRCustomReflectionLayer = class(TGRCustomBitmapLayer)
+  protected
+    //Reflect this layer
+    FLayer: TGRLayer;
+    FRelection: TReflectionEffect;
+    procedure SetLayer(const Value: TGRLayer);
+    procedure ChangeNotification(ALayer: TGRCustomLayer);override;
+  public
+    constructor Create(ALayerCollection: TLayerCollection); override;
+    destructor Destroy; override;
+    procedure Assign(Source: TPersistent);override;
+    property Layer: TGRLayer read FLayer write SetLayer;
+  end;
+
 implementation
 
 uses
@@ -212,28 +227,28 @@ var
   vRect: TRect;
   vDrawStyle: Longint;
 begin
-	FBitmap.BeginUpdate;
-	try
-	  with FSize do FBitmap.SetSize(cx, cy);
-	  FBitmap.Clear(0);
+  FBitmap.BeginUpdate;
+  try
+    with FSize do FBitmap.SetSize(cx, cy);
+    FBitmap.Clear(0);
     vDrawStyle := DT_EXPANDTABS or WordWraps[FWordWrap] or Alignments[FAlignment];
     vRect := FBitmap.ClipRect;
     FFont.DrawText(FBitmap, FText, vRect, vDrawStyle);
-	finally
-	  FBitmap.EndUpdate;
-	  FBitmap.Changed; //this will notify the bitmap onChange event.
-	end;
+  finally
+    FBitmap.EndUpdate;
+    FBitmap.Changed; //this will notify the bitmap onChange event.
+  end;
   //Changed;
 end;
 
 function TGRCustomTextLayer.GetNativeSize: TSize;
 begin
-	Result := FSize;
-	{
-	if (Result.cx <> FBitmap.Width) or (Result.cy <> FBitmap.Height) then
-	with Result do
-	  FBitmap.SetSize(cx, cy);
-	}
+  Result := FSize;
+  {
+  if (Result.cx <> FBitmap.Width) or (Result.cy <> FBitmap.Height) then
+  with Result do
+    FBitmap.SetSize(cx, cy);
+  }
 end;
 
 procedure TGRCustomTextLayer.SetAlignment(const Value: TAlignment);
@@ -265,20 +280,20 @@ end;
 
 procedure TGRCustomTextLayer.SetHeight(const Value: Integer);
 begin
-	if Value <> FSize.cy then
-	begin
-	  inherited;
-	  DoTextChanged(nil);
-	end;
+  if Value <> FSize.cy then
+  begin
+    inherited;
+    DoTextChanged(nil);
+  end;
 end;
-	
+  
 procedure TGRCustomTextLayer.SetWidth(const Value: Integer);
 begin
-	if Value <> FSize.cy then
-	begin
-	  inherited;
-	  DoTextChanged(nil);
-	end;
+  if Value <> FSize.cy then
+  begin
+    inherited;
+    DoTextChanged(nil);
+  end;
 end;
 
 procedure TGRCustomTextLayer.SetWordWrap(const Value: Boolean);
@@ -375,7 +390,7 @@ begin
     B := FTransformation.ReverseTransform(B);
   end
   else begin
-  	B := Point(GetLayerPosition(FloatPoint(X, Y)));
+    B := Point(GetLayerPosition(FloatPoint(X, Y)));
   end;
   with GetNativeSize do Result := PtInRect(Rect(0, 0, cx, cy), B);
   if Result and AlphaHit and (Bitmap.PixelS[B.X, B.Y] and $FF000000 = 0) then
@@ -478,6 +493,49 @@ begin
       Changed;
     end;
   inherited Assign(Source);
+end;
+
+{ TGRCustomReflectionLayer }
+constructor TGRCustomReflectionLayer.Create(ALayerCollection: TLayerCollection);
+begin
+  inherited;
+  FRelection := TReflectionEffect.Create(Self);
+end;
+  
+destructor TGRCustomReflectionLayer.Destroy;
+begin
+  FreeAndNil(FRelection);
+  inherited;
+end;
+
+procedure TGRCustomReflectionLayer.Assign(Source: TPersistent);
+begin
+  if Source is TGRCustomReflectionLayer then
+    with Source as TGRCustomReflectionLayer do
+    begin
+      Changing;
+      Self.FRelection.Assign(FRelection);
+      Changed;
+    end;
+  inherited Assign(Source);
+end;
+
+procedure TGRCustomReflectionLayer.ChangeNotification(ALayer: TGRCustomLayer);
+begin
+  if aLayer = FLayer then
+    //Update My Self;
+end;
+
+procedure TGRCustomReflectionLayer.SetLayer(const Value: TGRLayer);
+begin
+  if FLayer <> Value then
+  begin
+    if Assigned(FLayer) then
+      FLayer.RemoveChangeNotification(Self);
+    FLayer := Value;
+    if Assigned(FLayer) then
+      FLayer.AddChangeNotification(Self);
+  end;
 end;
 
 initialization

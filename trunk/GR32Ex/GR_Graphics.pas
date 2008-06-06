@@ -436,6 +436,7 @@ type
     FOutline: Boolean;
     FQuality: TFontQuality;
     FShadow: TShadowEffect;
+    FReflection: TReflectionEffect;
     procedure SetBackground(const Value: TGRBackground);
     procedure SetCharSpacing(const Value: Integer);
     procedure SetLineSpacing(const Value: Integer);
@@ -514,6 +515,7 @@ type
     property Quality: TFontQuality read FQuality write SetQuality;
     { Summary the font shadow }
     property Shadow: TShadowEffect read FShadow write SetShadow;
+    property Reflection: TReflectionEffect read FReflection;
   end;
   
   TGRStyle = class(TCustomGraphicProperty)
@@ -2828,15 +2830,18 @@ begin
   FOpacity := 255;
   FBackground := TGRBackground.Create(Self);
   FShadow := TShadowEffect.Create(Self);
+  FReflection := TReflectionEffect.Create(Self);
   FBackground.Enabled := False;
   FBackground.OnChanged := DoPropertyChanged;
   FShadow.OnChanged := DoPropertyChanged;
+  FReflection.OnChanged := DoPropertyChanged;
 end;
 
 destructor TFont32.Destroy;
 begin
   FreeAndNil(FBackground);
   FreeAndNil(FShadow);
+  FreeAndNil(FReflection);
   inherited Destroy;
 end;
 
@@ -3147,10 +3152,15 @@ begin
         //vTextBMP.DrawTo(vTexture);
         if Shadow.Enabled then
         begin
-        	senddebug('Draw Shadow.Enabled');
+        	//senddebug('Draw Shadow.Enabled');
           Shadow.PaintTo(vTexture, Dst, vTexture.BoundsRect, X, Y);
           //Shadow.GenerateShadow(vTexture, vShadowBMP, vTexture.BoundsRect);
           //vShadowBMP.DrawTo(Dst, X+Shadow.OffsetX, Y+Shadow.OffsetY);
+        end;
+        if Reflection.Enabled then
+        begin
+          Reflection.PaintTo(vTexture, Dst, vTexture.BoundsRect, X, Y+vTexture.Height);
+          //Shadow.GenerateShadow(vTexture, vShadowBMP, vTexture.BoundsRect);
         end;
         //ApplyTransparentColor(vTexture, clBlack32);
         vTexture.MasterAlpha := FOpacity;

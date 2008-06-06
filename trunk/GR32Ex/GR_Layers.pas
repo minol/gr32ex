@@ -118,8 +118,6 @@ type
     FOnSetName: TGRSetNameEvent;
   {$ENDIF}
 
-    procedure AddChangeNotification(ALayer: TGRCustomLayer);
-    procedure RemoveChangeNotification(ALayer: TGRCustomLayer);
     procedure SetName(const Value: string);virtual;
     procedure ChangeNotification(ALayer: TGRCustomLayer); virtual;
     procedure DoChange; virtual;
@@ -132,6 +130,8 @@ type
     {$ENDIF}
     procedure Assign(Source: TPersistent);override;
     procedure Changed; overload; override;
+    procedure AddChangeNotification(ALayer: TGRCustomLayer);
+    procedure RemoveChangeNotification(ALayer: TGRCustomLayer);
 
   public
     property Captured: Boolean read GetCaptured write SetCaptured;
