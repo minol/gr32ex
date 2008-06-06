@@ -2835,6 +2835,8 @@ begin
   FBackground.OnChanged := DoPropertyChanged;
   FShadow.OnChanged := DoPropertyChanged;
   FReflection.OnChanged := DoPropertyChanged;
+  FReflection.Reflection := 26;
+  FShadow.Enabled := False;
 end;
 
 destructor TFont32.Destroy;
@@ -3077,6 +3079,13 @@ begin
   {$endif}
   aRect.Right := MaxRight;
   aRect.Bottom := CurrentY;
+  if Shadow.Enabled then
+  begin
+    Inc(aRect.Right, Shadow.OffsetX);
+    Inc(aRect.Bottom, Shadow.OffsetY);
+  end;
+  if Reflection.Enabled then
+    Inc(aRect.Bottom, Reflection.GetReflectionHeight(aRect.Bottom));
 end;
 
 procedure TFont32.RenderText(Dst: TBitmap32; X, Y: Integer; const Text: String);

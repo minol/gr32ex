@@ -467,6 +467,7 @@ begin
     Parent := tbsScript;
     Align := alClient;
   end;
+  tbiDesign.Click;
 end;
 destructor TfrmMain.Destroy;
 begin
