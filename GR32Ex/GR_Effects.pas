@@ -264,10 +264,10 @@ var
 begin
   w := R.Right - R.Left;
   h := R.Bottom - R.Top;
-  aDst.SetSize(w, h);
   w := Min(aSrc.Width-1, w);
-  vH := aSrc.Height - Round(FReflection / (255.0 / aSrc.Height));
+  vH := aSrc.Height - (FReflection * aSrc.Height div 255);
   h := Min(vH, h);
+  aDst.SetSize(w, h);
   vH := aSrc.Height - h;
 
   //Check lasy empty line:
