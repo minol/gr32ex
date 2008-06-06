@@ -2179,7 +2179,7 @@ begin
     Value.AddChangeNotification(Self);
     //Changed;
     //Self.AddNotification(FChildLayer);
-    LayerOptions := LayerOptions or LOB_NO_UPDATE
+    LayerOptions := LayerOptions or LOB_NO_UPDATE or LOB_VISIBLE;
   end
   else
   begin
@@ -2191,7 +2191,7 @@ begin
     FScaled := False;
     FScaling := FloatPoint(1, 1);
     FSkew := FloatPoint(0, 0);
-    LayerOptions := LayerOptions and not LOB_NO_UPDATE;
+    LayerOptions := LayerOptions and not LOB_NO_UPDATE and not LOB_VISIBLE;
   end;
   //fixed bug: can not drag here (rb)
   UpdateTransformation;
@@ -2871,8 +2871,8 @@ begin
       	    dx := dy * T;
       	  end;
         end;
-      	FSize.cx := FSize.cx + Round(dx);
-      	FSize.cy := FSize.cy + Round(dy);
+      	FSize.cx := FOldSize.cx + Round(dx);
+      	FSize.cy := FOldSize.cy + Round(dy);
      	end
      	else
      	begin

@@ -110,6 +110,7 @@ type
     procedure PaintTo(aSrc, aDst: TBitmap32; aR: TRect; aDstX, aDstY: integer);
       overload; override;
     procedure Assign(Source: TPersistent); override;
+    function GetReflectionHeight(const aH: Integer): Integer;
 
     //the source real height from bottom(no transparent line.).
     property RealHeight: Integer read FRealHeight;
@@ -277,6 +278,11 @@ destructor TReflectionEffect.Destroy;
 begin
   FreeAndNil(FReflectionImg);
   inherited;
+end;
+
+function TReflectionEffect.GetReflectionHeight(const aH: Integer): Integer;
+begin
+  Result := aH - (FReflection * aH div 255);
 end;
 
 procedure TReflectionEffect.Generate(aSrc, aDst: TBitmap32; R:TRect);

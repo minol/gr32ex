@@ -102,6 +102,9 @@ ImgView32 container.
     property Bitmap: TBitmap32Ex read FBitmap write SetBitmap;
     property Cropped: Boolean read FCropped write SetCropped;
   public
+    {$IFDEF Designtime_Supports}
+    class function RubberbandOptions: TGRRubberBandOptions; override;
+    {$ENDIF}
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
     procedure Assign(Source: TPersistent);override;
@@ -135,6 +138,7 @@ starting point.
     FAlignment: TAlignment;
     FLayout: TTextLayout;
     FWordWrap: Boolean;
+    FAutoSize: Boolean;
 
     procedure SetAlignment(const Value: TAlignment);
     procedure SetLayout(const Value: TTextLayout);
@@ -145,6 +149,8 @@ starting point.
     function GetNativeSize: TSize; override;
     procedure SetHeight(const Value: Integer); override;
     procedure SetWidth(const Value: Integer); override;
+    procedure SetAutoSize(const Value: Boolean);
+    procedure AdjustBounds; dynamic;
   public
     constructor Create(ALayerCollection: TLayerCollection); override;
     destructor Destroy; override;
@@ -156,6 +162,7 @@ starting point.
       taCenter;
     property Layout: TTextLayout read FLayout write SetLayout default tlTop;
     property WordWrap: Boolean read FWordWrap write SetWordWrap;
+    property AutoSize: Boolean read FAutoSize write SetAutoSize default True;
   end;
   
   TGRTextLayer = class(TGRCustomTextLayer)
@@ -165,6 +172,7 @@ starting point.
     property Alignment;
     property Layout;
     property WordWrap;
+    property AutoSize;
   end;
 
   TGRCustomReflectionLayer = class(TGRCustomBitmapLayer)
@@ -193,7 +201,11 @@ type
 constructor TGRCustomTextLayer.Create(ALayerCollection: TLayerCollection);
 begin
   inherited;
+  {$IFDEF Designtime_Supports}
+  FIsResizeSupport := True;
+  {$ENDIF}
   FAlignment := taCenter;
+  FAutoSize := True;
   FFont := TFont32.Create;
   FFont.OnChange := DoTextChanged;
 end;
@@ -202,6 +214,32 @@ destructor TGRCustomTextLayer.Destroy;
 begin
   FreeAndNil(FFont);
   inherited;
+end;
+
+procedure TGRCustomTextLayer.AdjustBounds;
+  const
+    WordWraps: array[Boolean] of Word = (0, DT_WORDBREAK);
+  var
+    vX: Integer;
+    vRect: TRect;
+    vAlignment: TAlignment;
+
+begin
+  if FAutoSize then
+  begin
+    with GetNativeSize do vRect := Rect(0,0,cx,cy);
+    FFont.DrawText(FBitmap, FText, vRect, (DT_EXPANDTABS or DT_CALCRECT) or WordWraps[FWordWrap]);
+    vX := Left;
+    vAlignment := FAlignment;
+    //if UseRightToLeftAlignment then ChangeBiDiModeAlignment(vAlignment);
+    if vAlignment = taRightJustify then Inc(vX, Width - vRect.Right);
+  {$ifdef debug}
+  //SendDebug(Format('W=%x', [vRect.Right]));
+  {$endif}
+    FPosition.X := vX;
+    FSize.cx := vRect.Right;
+    FSize.cy := vRect.Bottom;
+  end;
 end;
 
 procedure TGRCustomTextLayer.Assign(Source: TPersistent);
@@ -224,15 +262,26 @@ const
   Alignments: array[TAlignment] of Word = (DT_LEFT, DT_RIGHT, DT_CENTER);
   WordWraps: array[Boolean] of Word = (0, DT_WORDBREAK);
 var
-  vRect: TRect;
+  vRect, vCalcRect: TRect;
   vDrawStyle: Longint;
 begin
   FBitmap.BeginUpdate;
   try
+    AdjustBounds;
     with FSize do FBitmap.SetSize(cx, cy);
     FBitmap.Clear(0);
     vDrawStyle := DT_EXPANDTABS or WordWraps[FWordWrap] or Alignments[FAlignment];
     vRect := FBitmap.ClipRect;
+
+    { Calculate vertical layout }
+    if FLayout <> tlTop then
+    begin
+      vCalcRect := vRect;
+      FFont.DrawText(FBitmap, FText, vCalcRect, vDrawStyle or DT_CALCRECT);
+      if FLayout = tlBottom then OffsetRect(vRect, 0, Height - vCalcRect.Bottom)
+      else OffsetRect(vRect, 0, (Height - vCalcRect.Bottom) div 2);
+    end;
+
     FFont.DrawText(FBitmap, FText, vRect, vDrawStyle);
   finally
     FBitmap.EndUpdate;
@@ -256,6 +305,15 @@ begin
   if Value <> FAlignment then
   begin
     FAlignment := Value;
+    DoTextChanged(nil);
+  end;
+end;
+
+procedure TGRCustomTextLayer.SetAutoSize(const Value: Boolean);
+begin
+  if Value <> FAutoSize then
+  begin
+    FAutoSize := Value;
     DoTextChanged(nil);
   end;
 end;
@@ -306,6 +364,19 @@ begin
 end;
 
 { TGRCustomBitmapLayer }
+{$IFDEF Designtime_Supports}
+class function TGRCustomBitmapLayer.RubberbandOptions: TGRRubberBandOptions;
+begin
+  Result := [rboAllowCornerResize,
+    rboAllowEdgeResize,
+    rboAllowMove,
+    rboAllowRotation,
+    rboShowFrame,
+    rboShowHandles
+  ];
+end;
+{$ENDIF}
+
 constructor TGRCustomBitmapLayer.Create(ALayerCollection: TLayerCollection);
 begin
   inherited;
