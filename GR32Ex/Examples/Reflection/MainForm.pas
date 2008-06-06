@@ -59,7 +59,7 @@ begin
     vDst.DrawMode := dmBlend;
 	  vEff.Generate(vBmp, vDst, vBmp.ClipRect);
     FImgRef.Bitmap.Assign(vDst);
-    FImgRef.Height := vDst.Height;
+    FImgRef.Height := vEff.ReflectionHeight;
 
 	  //vDst.SaveToFile(ExtractFilePath(ParamStr(0))+'vcl1.png');
 	finally

@@ -86,14 +86,16 @@ type
   TReflectionEffect = class(TCustomEffectProperty)
   protected
     FReflectionImg: TBitmap32;
-    FReflection: Longword;
+    FReflection: byte;
+    FReflectionHeight: Integer;
     FRealHeight: Integer;
 
     function GetReflectionImg: TBitmap32;
-    procedure SetReflection(const Value: Longword);
+    procedure SetReflection(const Value: byte);
     //procedure SetReflectionAxis(const Value: Integer);
 
     property ReflectionImg: TBitmap32 read GetReflectionImg;
+  published
   public
     constructor Create(AOwner: TPersistent); override;
     destructor Destroy; override;
@@ -104,8 +106,9 @@ type
 
     //the source real height from bottom(no transparent line.).
     property RealHeight: Integer read FRealHeight;
+    property ReflectionHeight: Integer read FReflectionHeight;
   published
-    property Reflection: Longword read FReflection write SetReflection default DefaultReflectionValue;
+    property Reflection: byte read FReflection write SetReflection default DefaultReflectionValue;
   end;
 
 implementation
@@ -290,7 +293,7 @@ begin
   FRealHeight := vFirstNoneEmptyLine;
   for y := vFirstNoneEmptyLine downto vH do
   begin
-    vAlpha := Round((255.0 / aSrc.Height) * (aSrc.Height - vDstY)) - FReflection;
+    vAlpha := ((255 * (aSrc.Height - vDstY) div aSrc.Height) ) - FReflection;
     if vAlpha <= 0 then
     begin
      break;
@@ -307,13 +310,13 @@ begin
       with TColor32Entry(vDstLine[vDstX]) do
         if A <> 0 then
         begin
-      	  A := Round(vAlpha / 255 * A);
+      	  A := (vAlpha * A div 255 );
         end;
       Inc(vDstX);
     end;
     Inc(vDstY);
   end;
-
+  FReflectionHeight := vDstY;
   //aDst.Draw(0,0,R,aSrc);
   //aDst.DrawMode := dmBlend;
 end;
@@ -341,7 +344,7 @@ begin
   end;
 end;
 
-procedure TReflectionEffect.SetReflection(const Value: Longword);
+procedure TReflectionEffect.SetReflection(const Value: byte);
 begin
   if FReflection <> Value then
   begin
