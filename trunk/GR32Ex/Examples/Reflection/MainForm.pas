@@ -16,6 +16,7 @@ type
   private
     { Private declarations }
     FImg: TImage32;
+    FImgRef: TImage32;
   public
     { Public declarations }
   end;
@@ -33,18 +34,32 @@ var
   vEff: TReflectionEffect;
 begin
   FImg := TImage32.Create(Self);
+  FImgRef := TImage32.Create(Self);
+  with FImgRef do
+  begin
+    Parent := Self;
+    Align := alTop;
+    Bitmap.DrawMode := dmBlend;
+  end;
   with FImg do
   begin
     Parent := Self;
-    Align := alClient;
+    Align := alTop;
+    Bitmap.DrawMode := dmBlend;
   end;
+
 	vBmp := TBitmap32.Create;
 	vDst := TBitmap32.Create;
   vEff := TReflectionEffect.Create(nil);
 	try
+    vBmp.DrawMode := dmBlend;
 	  vBmp.LoadFromFile(ExtractFilePath(ParamStr(0))+ 'vcl.png');
+    FImg.Bitmap.Assign(vBmp);
+    FImg.Height := vBmp.Height;
+    vDst.DrawMode := dmBlend;
 	  vEff.Generate(vBmp, vDst, vBmp.ClipRect);
-    FImg.Bitmap.Assign(vDst);
+    FImgRef.Bitmap.Assign(vDst);
+    FImgRef.Height := vDst.Height;
 
 	  //vDst.SaveToFile(ExtractFilePath(ParamStr(0))+'vcl1.png');
 	finally
