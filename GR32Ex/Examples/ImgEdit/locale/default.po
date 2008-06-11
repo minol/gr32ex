@@ -330,3 +330,11 @@ msgstr ""
 #: MainForm.pas:221 
 msgid "Save current layout as:"
 msgstr ""
+
+# the registered layers class Name
+msgid "TGRTextLayer"
+msgstr "Text"
+
+msgid "TGRBitmapLayer"
+msgstr "Bitmap"
+
