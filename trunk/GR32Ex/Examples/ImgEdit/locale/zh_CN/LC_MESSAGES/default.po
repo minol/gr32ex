@@ -150,3 +150,19 @@ msgstr "标准"
 
 msgid "Underline"
 msgstr "下划线"
+
+# the registered layers class Name
+msgid "TGRTextLayer"
+msgstr "文字"
+
+msgid "TGRBitmapLayer"
+msgstr "图像"
+
+
+#. frmMain..tabMain..SpTBXTabItem1..Caption
+#: MainForm.dfm:49
+#. frmMain..tabMain..tbsDesign..Caption
+#: MainForm.dfm:57
+msgid "Design"
+msgstr "设计"
+
