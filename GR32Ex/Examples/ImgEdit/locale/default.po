@@ -338,3 +338,10 @@ msgstr "Text"
 msgid "TGRBitmapLayer"
 msgstr "Bitmap"
 
+#. frmMain..tabMain..SpTBXTabItem1..Caption
+#: MainForm.dfm:49
+#. frmMain..tabMain..tbsDesign..Caption
+#: MainForm.dfm:57
+msgid "Design"
+msgstr "Design"
+
