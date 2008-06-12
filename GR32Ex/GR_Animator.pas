@@ -21,6 +21,14 @@
  *  Idea come from FlexSDK
  *
  * ***** END LICENSE BLOCK ***** *)
+{
+  BeforeShow BeforeHide, MouseEnter, MouseLeave
+  how to hook these events of object to animate?
+  use message.
+  hook the TObject.Dispatch method
+  
+
+}
 unit GR_Animator;
 
 {$I Setting.inc}
@@ -31,7 +39,7 @@ uses
   {$ifdef Debug}
   DbugIntf,
   {$endif} 
-  Windows,
+  Windows, Messages,
   SysUtils, Classes
   , Graphics
   , Contnrs
@@ -50,6 +58,30 @@ type
   TGRAnimator = class;
   TGRAnimatorInstance = class;
   TGRAnimatorInstanceClass = class of TGRAnimatorInstance;
+
+  PGRPublisherInfo = ^ TGRPublisherInfo;
+  TGRPublisherInfo = record
+    Publisher: TObject;
+    //the subscribed meesages of the Publisher.
+    Messages: array of Cardinal;
+  end;
+  TGRPublisherInfoList = class(TList)
+  protected
+    procedure Notify(Ptr: Pointer; Action: TListNotification); override;
+  end;
+  
+  //I should use a singleton to hook the object dispatch method and check whether it is publisher.
+  TGRMessageSubscriber = class
+  protected
+    FPublisherList: TGRPublisherInfoList;
+  public
+    {
+    @param aMsg        the message id code to Subscribe.
+    @param aPublisher  which aPublisher send the aMsg.
+    }
+    procedure SubscribeMeesage(const aMsg: Cardinal; aPublisher: TObject);
+    procedure UnsubcribeMeesage(const aMsg: Cardinal; aPublisher: TObject);
+  end;
 
   TGRCustomAnimator = class
   protected
@@ -401,6 +433,15 @@ const
   G32DefaultDelay: ShortInt = 100; // Time in ms.
   G32MinimumDelay: ShortInt = 10;  // Time in ms.
 
+
+{ TGRPublisherInfoList }
+procedure TGRPublisherInfoList.Notify(Ptr: Pointer; Action: TListNotification);
+begin
+  if Assigned(Ptr) and (Action = lnDeleted) then
+  begin
+    FreeMem(Ptr);
+  end;
+end;
 
 { TGRCustomAnimator }
 constructor TGRCustomAnimator.Create;
