@@ -26,6 +26,14 @@
   how to hook these events of object to animate?
   use message.
   hook the TObject.Dispatch method
+  or Maybe i should redesign the GR32_Layers and GR32_Image.
+   TEventDispatcher = class(TComponent)
+   protected
+     //addMessageListener?
+     function AddEventListener(const aSubscriber: TObject; const aMsg: Cardinal): Longword;
+   end;
+   TCsutomLayer = class(TEventDispatcher)
+   
   
 
 }
