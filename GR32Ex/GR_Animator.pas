@@ -30,6 +30,8 @@
    TEventDispatcher = class(TComponent)
    protected
      //addMessageListener?
+      when aMsg occur, the aSubscriber will be received this.
+     
      function AddEventListener(const aSubscriber: TObject; const aMsg: Cardinal): Longword;
    end;
    TCsutomLayer = class(TEventDispatcher)
