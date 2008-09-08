@@ -91,9 +91,13 @@ How to set the transparent to the GRControls:
  1. GRControl.Transparent := true;
  2. GRControl.Color := clNone;
 
-Note:the TGRAnimationEffects(GR_AniGEffetcts) impl stdcontrol performance is very pool: invalidate the whole background every-time is not clever .
+Note:the TGRAnimationEffects(GR_AniGEffetcts) implement stdcontrol performance is very pool: invalidate the whole background every-time is not clever .
      and this make the speed slow down.
      the TGRAnimationEffects paint to the TImage32 is well.
+
+The Animations:
+   Control one layer or more layers to execute some animation. these layers are called as "target".
+   each animation layer will be wrapped by an animationInstance when executing animation.
 
 thanks to:
   GR32 Team(http://sourceforge.net/projects/graphics32) for their great GR32 Pack. No Them No this!
