@@ -2868,7 +2868,7 @@ begin
     aBitmap32.Clear(LColor);
   if (Color <> clNone) then
   begin
-    LIsLowered := FState <> bsUp;
+    LIsLowered := (FState <> bsUp) and (FState <> bsDisabled);
     DrawColorButtonBorder(aBitmap32, aBitmap32.ClipRect, LColor
       , LIsLowered, 2, 220);
   end;
