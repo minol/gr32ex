@@ -439,7 +439,8 @@ begin
     //AlphaBlendValue := 150;
     //Glyph.Transparent := True;
     //Glyph.TransparentMode := tmAuto;
-    LoadPicture(Glyph, 'Background\123.png');
+    //LoadPicture(Glyph, 'Background\123.png');
+    Glyph.LoadFromFile('Background\123.png');
     //Glyph.LoadFromFile('systray.bmp');
     //ApplyTransparentColor(Glyph, Glyph.Bits[0]);
     GroupIndex := 0;
