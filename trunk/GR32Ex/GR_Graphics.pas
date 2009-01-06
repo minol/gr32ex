@@ -34,7 +34,7 @@ uses
   CnDebug,
   {$endif} 
   Windows,
-  SysUtils, Classes, Graphics
+  SysUtils, Classes, Graphics, Math
   , Dialogs
   , GR32
   , GR32_Blend
@@ -775,6 +775,7 @@ end;//*)
 {$endif}
 
 {------ Gradient Pattern Paint Helper Proc ------}
+//[bug] #issue 6: Radial gradients have an incorrect size (gradient end is outside the pattern)  via yann.papouin
 procedure RadialCentral(const Colors: TGradientColors; Pattern: TBitmap32);
 var
   X, Y: Integer;
@@ -788,20 +789,21 @@ begin
   for X := 0 to 180 do
   begin
     PreCalcX := 180 - X;
-    PreCalcXs[X] := PreCalcX * PreCalcX;
+    PreCalcXs[X] := PreCalcX * PreCalcX  * 2; //#issue 6 
   end;
   for X := 181 to 361 do
   begin
     PreCalcX := X - 181;
-    PreCalcXs[X] := PreCalcX * PreCalcX;
+    PreCalcXs[X] := PreCalcX * PreCalcX * 2; //#issue 6  
   end;
   for Y := 0 to 361 do
   begin
     PreCalcY := 180 - Y;
-    PreCalcY := PreCalcY * PreCalcY;
+    PreCalcY := PreCalcY * PreCalcY * 2; //#issue 6  
     Row := PRGBColor32Array(Pattern.ScanLine[Y]);
     for X := 0 to 361 do
-      Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      //Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      Row[X] := Colors[EnsureRange(Round(Sqrt(PreCalcXs[X] + PreCalcY)), 0, 255)]; //#issue 6 
   end;
   { Not optimized code
   for Y := 0 to 361 do
@@ -815,6 +817,7 @@ begin
   }
 end;
 
+//[bug] #issue 6: Radial gradients have an incorrect size (gradient end is outside the pattern)  via yann.papouin
 procedure RadialTop(const Colors: TGradientColors; Pattern: TBitmap32);
 var
   X, Y: Integer;
@@ -828,19 +831,20 @@ begin
   for X := 0 to 180 do
   begin
     PreCalcX := 180 - X;
-    PreCalcXs[X] := PreCalcX * PreCalcX;
+    PreCalcXs[X] := PreCalcX * PreCalcX * 2;
   end;
   for X := 181 to 361 do
   begin
     PreCalcX := X - 181;
-    PreCalcXs[X] := PreCalcX * PreCalcX;
+    PreCalcXs[X] := PreCalcX * PreCalcX * 2;
   end;
   for Y := 0 to 180 do
   begin
-    PreCalcY := Y * Y;
+    PreCalcY := Y * Y * 2;
     Row := PRGBColor32Array(Pattern.ScanLine[Y]);
     for X := 0 to 361 do
-      Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      //Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      Row[X] := Colors[EnsureRange(Round(Sqrt(PreCalcXs[X] + PreCalcY)), 0, 255)];
   end;
   { Not optimized code
   for Y := 0 to 180 do
@@ -854,6 +858,7 @@ begin
   }
 end;
 
+//[bug] #issue 6: Radial gradients have an incorrect size (gradient end is outside the pattern)  via yann.papouin
 procedure RadialBottom(const Colors: TGradientColors; Pattern: TBitmap32);
 var
   X, Y: Integer;
@@ -867,20 +872,21 @@ begin
   for X := 0 to 180 do
   begin
     PreCalcX := 180 - X;
-    PreCalcXs[X] := PreCalcX * PreCalcX;
+    PreCalcXs[X] := PreCalcX * PreCalcX * 2;
   end;
   for X := 181 to 361 do
   begin
     PreCalcX := X - 181;
-    PreCalcXs[X] := PreCalcX * PreCalcX;
+    PreCalcXs[X] := PreCalcX * PreCalcX * 2;
   end;
   for Y := 0 to 180 do
   begin
     PreCalcY := 180 - Y;
-    PreCalcY := PreCalcY * PreCalcY;
+    PreCalcY := PreCalcY * PreCalcY * 2;
     Row := PRGBColor32Array(Pattern.ScanLine[Y]);
     for X := 0 to 361 do
-      Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      //Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      Row[X] := Colors[EnsureRange(Round(Sqrt(PreCalcXs[X] + PreCalcY)), 0, 255)];
   end;
   { Not optimized code
   for Y := 0 to 180 do
@@ -894,31 +900,40 @@ begin
   }
 end;
 
+//[bug] #issue 6: Radial gradients have an incorrect size (gradient end is outside the pattern)  via yann.papouin
 procedure RadialLeft(const Colors: TGradientColors; Pattern: TBitmap32);
 var
   X, Y: Integer;
   Row: PRGBColor32Array;
-  PreCalcY: Integer;
+  PreCalcX, PreCalcY: Integer;
+  PreCalcXs: array[0..180] of Integer;
   PreCalcYs: array[0..361] of Integer;
 begin
   Pattern.SetSize(181, 362);
   //Pattern.Width := 181;
   //Pattern.Height := 362;
+  for X := 0 to 180 do
+  begin
+    PreCalcX := X;
+    PreCalcXs[X] := PreCalcX * PreCalcX * 2;
+  end;
+
   for Y := 0 to 180 do
   begin
     PreCalcY := 180 - Y;
-    PreCalcYs[Y] := PreCalcY * PreCalcY;
+    PreCalcYs[Y] := PreCalcY * PreCalcY * 2;
   end;
   for Y := 181 to 361 do
   begin
     PreCalcY := Y - 181;
-    PreCalcYs[Y] := PreCalcY * PreCalcY;
+    PreCalcYs[Y] := PreCalcY * PreCalcY * 2;
   end;
   for Y := 0 to 361 do
   begin
     Row := PRGBColor32Array(Pattern.ScanLine[Y]);
     for X := 0 to 180 do
-      Row[X] := Colors[Round(Sqrt(X * X + PreCalcYs[Y]))];
+      //Row[X] := Colors[Round(Sqrt(X * X + PreCalcYs[Y]))];
+      Row[X] := Colors[EnsureRange(Round(Sqrt(PreCalcXs[X] + PreCalcYs[Y])), 0, 255)];
   end;
   { Not optimized code
   for Y := 0 to 180 do
@@ -936,6 +951,7 @@ begin
   }
 end;
 
+//[bug] #issue 6: Radial gradients have an incorrect size (gradient end is outside the pattern)  via yann.papouin
 procedure RadialRight(const Colors: TGradientColors; Pattern: TBitmap32);
 var
   X, Y: Integer;
@@ -950,23 +966,24 @@ begin
   for X := 0 to 180 do
   begin
     PreCalcX := 180 - X;
-    PreCalcXs[X] := PreCalcX * PreCalcX;
+    PreCalcXs[X] := PreCalcX * PreCalcX * 2;
   end;
   for Y := 0 to 180 do
   begin
     PreCalcY := 180 - Y;
-    PreCalcYs[Y] := PreCalcY * PreCalcY;
+    PreCalcYs[Y] := PreCalcY * PreCalcY * 2;
   end;
   for Y := 181 to 361 do
   begin
     PreCalcY := Y - 181;
-    PreCalcYs[Y] := PreCalcY * PreCalcY;
+    PreCalcYs[Y] := PreCalcY * PreCalcY * 2;
   end;
   for Y := 0 to 361 do
   begin
     Row := PRGBColor32Array(Pattern.ScanLine[Y]);
     for X := 0 to 180 do
-      Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcYs[Y]))];
+      //Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcYs[Y]))];
+      Row[X] := Colors[EnsureRange(Round(Sqrt(PreCalcXs[X] + PreCalcYs[Y])), 0, 255)];
   end;
   { Not optimized code
   for Y := 0 to 180 do
@@ -984,6 +1001,7 @@ begin
   }
 end;
 
+//[bug] #issue 6: Radial gradients have an incorrect size (gradient end is outside the pattern)  via yann.papouin
 procedure RadialTopLeft(const Colors: TGradientColors; Pattern: TBitmap32);
 var
   X, Y: Integer;
@@ -995,13 +1013,14 @@ begin
   //Pattern.Width := 181;
   //Pattern.Height := 181;
   for X := 0 to 180 do
-    PreCalcXs[X] := X * X;
+    PreCalcXs[X] := X * X * 2;
   for Y := 0 to 180 do
   begin
-    PreCalcY := Y * Y;
+    PreCalcY := Y * Y * 2;
     Row := PRGBColor32Array(Pattern.ScanLine[Y]);
     for X := 0 to 180 do
-      Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      //Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      Row[X] := Colors[EnsureRange(Round(Sqrt(PreCalcXs[X] + PreCalcY)), 0, 255)];
   end;
   { Not optimized code
   for Y := 0 to 180 do
@@ -1013,6 +1032,7 @@ begin
   }
 end;
 
+//[bug] #issue 6: Radial gradients have an incorrect size (gradient end is outside the pattern)  via yann.papouin
 procedure RadialTopRight(const Colors: TGradientColors; Pattern: TBitmap32);
 var
   X, Y: Integer;
@@ -1026,14 +1046,15 @@ begin
   for X := 0 to 180 do
   begin
     PreCalcX := 180 - X;
-    PreCalcXs[X] := PreCalcX * PreCalcX;
+    PreCalcXs[X] := PreCalcX * PreCalcX * 2;
   end;
   for Y := 0 to 180 do
   begin
-    PreCalcY := Y * Y;
+    PreCalcY := Y * Y * 2;
     Row := PRGBColor32Array(Pattern.ScanLine[Y]);
     for X := 0 to 180 do
-      Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      //Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      Row[X] := Colors[EnsureRange(Round(Sqrt(PreCalcXs[X] + PreCalcY)), 0, 255)];
   end;
   { Not optimized code
   for Y := 0 to 180 do
@@ -1045,6 +1066,7 @@ begin
   }
 end;
 
+//[bug] #issue 6: Radial gradients have an incorrect size (gradient end is outside the pattern)  via yann.papouin
 procedure RadialBottomLeft(const Colors: TGradientColors; Pattern: TBitmap32);
 var
   X, Y: Integer;
@@ -1056,14 +1078,15 @@ begin
   //Pattern.Width := 181;
   //Pattern.Height := 181;
   for X := 0 to 180 do
-    PreCalcXs[X] := X * X;
+    PreCalcXs[X] := X * X * 2;
   for Y := 0 to 180 do
   begin
     PreCalcY := 180 - Y;
-    PreCalcY := PreCalcY * PreCalcY;
+    PreCalcY := PreCalcY * PreCalcY * 2;
     Row := PRGBColor32Array(Pattern.ScanLine[Y]);
     for X := 0 to 180 do
-      Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      //Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      Row[X] := Colors[EnsureRange(Round(Sqrt(PreCalcXs[X] + PreCalcY)), 0, 255)];
   end;
   { Not optimized code
   for Y := 0 to 180 do
@@ -1075,6 +1098,7 @@ begin
   }
 end;
 
+//[bug] #issue 6: Radial gradients have an incorrect size (gradient end is outside the pattern)  via yann.papouin
 procedure RadialBottomRight(const Colors: TGradientColors; Pattern: TBitmap32);
 var
   X, Y: Integer;
@@ -1088,15 +1112,16 @@ begin
   for X := 0 to 180 do
   begin
     PreCalcX := 180 - X;
-    PreCalcXs[X] := PreCalcX * PreCalcX;
+    PreCalcXs[X] := PreCalcX * PreCalcX * 2;
   end;
   for Y := 0 to 180 do
   begin
     PreCalcY := 180 - Y;
-    PreCalcY := PreCalcY * PreCalcY;
+    PreCalcY := PreCalcY * PreCalcY * 2;
     Row := PRGBColor32Array(Pattern.ScanLine[Y]);
     for X := 0 to 180 do
-      Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      //Row[X] := Colors[Round(Sqrt(PreCalcXs[X] + PreCalcY))];
+      Row[X] := Colors[EnsureRange(Round(Sqrt(PreCalcXs[X] + PreCalcY)), 0, 255)];
   end;
   { Not optimized code
   for Y := 0 to 180 do
