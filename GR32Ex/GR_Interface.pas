@@ -2718,10 +2718,14 @@ begin
   gv_StyledPolygon.Closed := xClosed;
 
   TmpPoly := gv_StyledPolygon.Outline;
-  OutlineP := TmpPoly.Grow(xPenData.Width, xPenData.EdgeSharpness);
+  OutlineP := nil;
+  try
+    OutlineP := TmpPoly.Grow(xPenData.Width, xPenData.EdgeSharpness);
 
-  OutlineP.FillMode := pfWinding;
-  TmpPoly.Free;
+    OutlineP.FillMode := pfWinding;
+  finally
+    TmpPoly.Free;
+  end;
 
   OutlineP.Antialiased := xAntialised;
   gv_StyledPolygon.Antialiased := xAntialised;
@@ -2736,6 +2740,8 @@ begin
   OutlineP.Closed := xClosed;
   OutlineP.DrawFill(xBitmap, xPenData.Color);
 
+  if Assigned(OutlineP) then OutlineP.Free;
+  PP := nil;
 end;
 
 
