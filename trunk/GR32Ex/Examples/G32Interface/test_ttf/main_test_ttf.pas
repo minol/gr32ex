@@ -1,11 +1,11 @@
 unit main_test_ttf;
-{$I G32i.inc}
+{$I Setting.inc}
 
 
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, G32_Interface,
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, GR_Interface,
   StdCtrls, ExtCtrls, GR32_Transforms, Buttons, ComCtrls;
 
 type
